@@ -134,7 +134,7 @@ export function ToolRail({ note }: { note: Note }) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="w-full rounded-md border border-card-border bg-surface p-4 text-left transition-colors hover:bg-stone"
+              className="w-full rounded-md border border-hairline/80 bg-transparent p-4 text-left transition-colors hover:bg-stone/70"
             >
               <span className="ns-card-heading block text-ink underline decoration-hairline decoration-1 underline-offset-4">
                 Aa
@@ -377,7 +377,7 @@ function ToolTile({ icon: Icon, label, active, className, ...props }: TileProps)
     >
       <span
         className={cn(
-          "flex size-11 items-center justify-center rounded-full border border-card-border bg-surface text-ink transition-colors group-hover:bg-stone",
+          "flex size-11 items-center justify-center rounded-full border border-hairline/80 bg-transparent text-ink transition-colors group-hover:bg-stone/70",
           active && "border-primary bg-primary text-primary-ink group-hover:bg-primary/88",
         )}
       >
@@ -395,7 +395,7 @@ function BlockTile({ icon: Icon, label, active, className, ...props }: TileProps
       aria-label={label}
       aria-pressed={active}
       className={cn(
-        "flex min-h-[4.75rem] flex-col items-center justify-center gap-1.5 rounded-md border border-card-border bg-surface px-1.5 py-2.5 text-ink transition-colors hover:bg-stone",
+        "flex min-h-[4.75rem] flex-col items-center justify-center gap-1.5 rounded-md border border-hairline/80 bg-transparent px-1.5 py-2.5 text-ink transition-colors hover:bg-stone/70",
         active && "border-primary bg-primary text-primary-ink hover:bg-primary/88",
         className,
       )}
