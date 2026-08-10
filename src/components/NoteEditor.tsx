@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
@@ -11,7 +11,9 @@ import TaskList from "@tiptap/extension-task-list";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
 import { Lock } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/CopyButton";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
@@ -22,13 +24,13 @@ import { SelectionMenu } from "./SelectionMenu";
 
 const CONTENT_DEBOUNCE_MS = 320;
 
-function readImageAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+function parseLabels(raw: string): string[] {
+  return raw
+    .split(/[,#]/)
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .filter((tag, index, all) => all.findIndex((t) => t.toLowerCase() === tag.toLowerCase()) === index)
+    .slice(0, 24);
 }
 
 export function NoteEditor({ note }: { note: Note }) {
@@ -45,8 +47,13 @@ export function NoteEditor({ note }: { note: Note }) {
   const loadedIdRef = useRef<string | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<{ id: string; html: string } | null>(null);
+  const [labelsRaw, setLabelsRaw] = useState(note.tags.join(", "));
 
   noteIdRef.current = note.id;
+
+  useEffect(() => {
+    setLabelsRaw(note.tags.join(", "));
+  }, [note.id, note.tags]);
 
   const commit = useCallback(() => {
     if (flushTimer.current) {
@@ -77,6 +84,7 @@ export function NoteEditor({ note }: { note: Note }) {
         protocols: ["http", "https", "mailto"],
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
+      // Keep for older notes that already have images; new inserts are disabled.
       Image.configure({ allowBase64: true }),
       Placeholder.configure({ placeholder: "Start typing. It saves itself." }),
       CharacterCount,
@@ -88,19 +96,25 @@ export function NoteEditor({ note }: { note: Note }) {
         spellcheck: "true",
         "aria-label": "Note body",
       },
-      handlePaste(view, event) {
+      handlePaste(_view, event) {
         const files = Array.from(event.clipboardData?.files ?? []).filter((file) =>
           file.type.startsWith("image/"),
         );
         if (files.length === 0) return false;
         event.preventDefault();
-        void Promise.all(files.map(readImageAsDataUrl)).then((sources) => {
-          const { schema } = view.state;
-          const nodes = sources
-            .map((src) => schema.nodes.image?.create({ src }))
-            .filter((node) => node !== undefined);
-          if (nodes.length === 0) return;
-          view.dispatch(view.state.tr.replaceSelectionWith(nodes[0]!));
+        toast("Images are off for now", {
+          description: "Notes are text and code only right now.",
+        });
+        return true;
+      },
+      handleDrop(_view, event) {
+        const files = Array.from(event.dataTransfer?.files ?? []).filter((file) =>
+          file.type.startsWith("image/"),
+        );
+        if (files.length === 0) return false;
+        event.preventDefault();
+        toast("Images are off for now", {
+          description: "Notes are text and code only right now.",
         });
         return true;
       },
@@ -147,6 +161,15 @@ export function NoteEditor({ note }: { note: Note }) {
   }, [commit]);
 
   const words = countWords(note.text);
+  const labels = parseLabels(labelsRaw);
+
+  const commitLabels = () => {
+    const next = parseLabels(labelsRaw);
+    const same =
+      next.length === note.tags.length &&
+      next.every((tag, i) => tag.toLowerCase() === note.tags[i]?.toLowerCase());
+    if (!same) patchNote(note.id, { tags: next });
+  };
 
   return (
     <div className="ns-editor flex min-h-0 flex-1 flex-col">
@@ -175,6 +198,35 @@ export function NoteEditor({ note }: { note: Note }) {
           }
         }}
       />
+
+      <label className="mt-4 block space-y-1.5">
+        <span className="ns-caption text-ink">Labels</span>
+        <Input
+          value={labelsRaw}
+          onChange={(event) => setLabelsRaw(event.target.value)}
+          onBlur={commitLabels}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commitLabels();
+            }
+          }}
+          placeholder="work, ideas, java — filter these on My Notes"
+          disabled={!canEdit}
+        />
+        {labels.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {labels.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-hairline bg-stone px-2.5 py-0.5 text-[12px] text-ink"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </label>
 
       <div className="ns-mono mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-muted">
         <span>{formatClock(note.updatedAt)}</span>

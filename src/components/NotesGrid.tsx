@@ -19,8 +19,29 @@ export function NotesGrid() {
 
   const [chooserOpen, setChooserOpen] = useState(false);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [labelFilter, setLabelFilter] = useState<string | null>(null);
 
-  const visible = useMemo(() => searchNotes(liveNotes(notes), query), [notes, query]);
+  const allLive = useMemo(() => liveNotes(notes), [notes]);
+  const allLabels = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const note of allLive) {
+      for (const tag of note.tags) {
+        const key = tag.toLowerCase();
+        if (!set.has(key)) set.set(key, tag);
+      }
+    }
+    return [...set.values()].sort((a, b) => a.localeCompare(b));
+  }, [allLive]);
+
+  const visible = useMemo(() => {
+    let list = searchNotes(allLive, query);
+    if (labelFilter) {
+      const needle = labelFilter.toLowerCase();
+      list = list.filter((note) => note.tags.some((tag) => tag.toLowerCase() === needle));
+    }
+    return list;
+  }, [allLive, query, labelFilter]);
+
   const selectedIds = useMemo(
     () => visible.map((note) => note.id).filter((id) => selected[id]),
     [visible, selected],
@@ -53,7 +74,8 @@ export function NotesGrid() {
             <h1 className="ns-display text-ink">My Notes</h1>
             <p className="ns-caption mt-2 text-body-muted">
               {visible.length} {visible.length === 1 ? "item" : "items"}
-              {query ? ` matching “${query}”` : " on this device"}
+              {labelFilter ? ` labeled “${labelFilter}”` : ""}
+              {query ? ` matching “${query}”` : labelFilter ? "" : " on this device"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -85,14 +107,50 @@ export function NotesGrid() {
           </div>
         </div>
 
+        {allLabels.length > 0 ? (
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <span className="ns-mono text-muted">Labels</span>
+            <button
+              type="button"
+              onClick={() => setLabelFilter(null)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-[12px] transition-colors",
+                labelFilter === null
+                  ? "border-primary bg-primary text-primary-ink"
+                  : "border-hairline bg-surface text-slate hover:bg-stone",
+              )}
+            >
+              All
+            </button>
+            {allLabels.map((label) => {
+              const active = labelFilter?.toLowerCase() === label.toLowerCase();
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setLabelFilter(active ? null : label)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-[12px] transition-colors",
+                    active
+                      ? "border-primary bg-primary text-primary-ink"
+                      : "border-hairline bg-surface text-slate hover:bg-stone",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
         {visible.length === 0 ? (
           <div className="mt-14 rounded-lg border border-dashed border-hairline px-8 py-16 text-center">
             <FileText className="mx-auto size-5 text-muted" />
             <p className="ns-feature mt-4 text-ink">
-              {query ? "No notes match that search" : "Nothing here yet"}
+              {query || labelFilter ? "No notes match that filter" : "Nothing here yet"}
             </p>
             <p className="ns-caption mx-auto mt-2 max-w-sm text-body-muted">
-              Create a note or a prompt. Delete and re-edit ask for your vault answer.
+              Create a note or a prompt. Add labels on notes to filter them here.
             </p>
           </div>
         ) : (
@@ -180,6 +238,11 @@ export function NotesGrid() {
             })}
           </ul>
         )}
+
+        <p className="ns-micro mt-14 flex items-center justify-center gap-2 text-muted">
+          <img src="/android-chrome-192x192.png" alt="" className="size-4 rounded-xs" />
+          Arigato Labs
+        </p>
       </div>
 
       <NewItemDialog open={chooserOpen} onOpenChange={setChooserOpen} onChoose={onChoose} />

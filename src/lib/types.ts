@@ -1,5 +1,26 @@
 export type NoteTheme = "plain" | "azure" | "sage" | "sand" | "aurora";
-export type Typeface = "sans" | "display" | "serif" | "mono";
+export type Typeface =
+  | "inter"
+  | "roboto"
+  | "opensans"
+  | "lato"
+  | "montserrat"
+  | "poppins"
+  | "nunito"
+  | "spacegrotesk"
+  | "playfair"
+  | "merriweather"
+  | "georgia"
+  | "times"
+  | "jetbrains"
+  | "firacode"
+  | "sourcecode"
+  | "courier"
+  // legacy ids from early builds
+  | "sans"
+  | "display"
+  | "serif"
+  | "mono";
 export type TextSize = "s" | "m" | "l";
 export type LineSpacing = "tight" | "normal" | "relaxed";
 export type View = "editor" | "all" | "shared" | "trash";
@@ -60,6 +81,18 @@ export interface VaultConfig {
 }
 
 export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
+  const legacyTypeface = raw.typeface as string | undefined;
+  const typefaceMap: Record<string, Note["typeface"]> = {
+    sans: "inter",
+    display: "spacegrotesk",
+    serif: "georgia",
+    mono: "jetbrains",
+  };
+  const typeface =
+    (legacyTypeface && typefaceMap[legacyTypeface]) ||
+    (legacyTypeface as Note["typeface"] | undefined) ||
+    "inter";
+
   return {
     id: raw.id,
     kind: raw.kind === "prompt" ? "prompt" : "note",
@@ -68,7 +101,7 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     html: raw.html ?? "<p></p>",
     text: raw.text ?? "",
     theme: raw.theme ?? "plain",
-    typeface: raw.typeface ?? "sans",
+    typeface,
     size: raw.size ?? "m",
     spacing: raw.spacing ?? "normal",
     pinned: Boolean(raw.pinned),

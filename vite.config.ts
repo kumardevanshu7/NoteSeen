@@ -86,7 +86,8 @@ export default defineConfig({
         ],
         share_target: {
           action: "/app",
-          method: "GET",
+          method: "POST",
+          enctype: "multipart/form-data",
           params: { title: "title", text: "text", url: "url" },
         },
       },

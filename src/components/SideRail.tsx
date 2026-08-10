@@ -200,6 +200,10 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
           <Kbd>K</Kbd>
           <span>to jump anywhere</span>
         </span>
+        <span className="mt-2 flex items-center gap-1.5">
+          <ArigatoMark size={14} />
+          Arigato Labs
+        </span>
       </div>
 
       <NewItemDialog

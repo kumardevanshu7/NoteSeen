@@ -89,7 +89,7 @@ export function PromptEditor({ note }: { note: Note }) {
       </label>
 
       <label className="block space-y-1.5">
-        <span className="ns-caption text-ink">Tags</span>
+        <span className="ns-caption text-ink">Labels</span>
         <Input
           value={tagsRaw}
           onChange={(event) => setTagsRaw(event.target.value)}
@@ -111,13 +111,16 @@ export function PromptEditor({ note }: { note: Note }) {
       </label>
 
       <label className="flex min-h-0 flex-1 flex-col space-y-1.5">
-        <span className="ns-caption text-ink">Prompt</span>
+        <span className="ns-caption flex items-center justify-between gap-2 text-ink">
+          <span>Prompt</span>
+          <span className="ns-mono font-normal text-muted">.txt</span>
+        </span>
         <textarea
           value={body}
           onChange={(event) => setBody(event.target.value)}
-          placeholder="Write the prompt you want to reuse…"
+          placeholder="Plain text prompt you can copy and reuse…"
           disabled={!canEdit}
-          className="ns-scroll min-h-[40vh] w-full flex-1 resize-y rounded-sm border border-hairline bg-surface px-3 py-3 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/20 disabled:opacity-60"
+          className="ns-scroll min-h-[40vh] w-full flex-1 resize-y rounded-sm border border-hairline bg-surface px-3 py-3 font-mono text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/20 disabled:opacity-60"
         />
       </label>
     </div>

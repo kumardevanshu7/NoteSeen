@@ -1,4 +1,4 @@
-import { useRef, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import { type ComponentProps, type ComponentType, type ReactNode } from "react";
 import {
   AlignCenter,
   AlignJustify,
@@ -9,8 +9,8 @@ import {
   Check,
   ChevronsUpDown,
   Code2,
+  FileCode2,
   Heading2,
-  Image as ImageIcon,
   Italic,
   Link2,
   List,
@@ -35,7 +35,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
-import { LINE_SPACINGS, NOTE_THEMES, TEXT_SIZES, TYPEFACES } from "@/lib/note-themes";
+import { CODE_LANGUAGES, LINE_SPACINGS, NOTE_THEMES, TEXT_SIZES, TYPEFACES } from "@/lib/note-themes";
 import type { Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -66,13 +66,17 @@ const EMOJI = [
   "♻️",
 ];
 
+const NOTE_CODE_LANGS = CODE_LANGUAGES.filter((lang) => lang.id !== "txt");
+
 export function ToolRail({ note }: { note: Note }) {
   const editor = useEditorStore((state) => state.editor);
   useEditorTick(editor);
   const patchNote = useNotes((state) => state.patchNote);
-  const imageInput = useRef<HTMLInputElement>(null);
 
   const typeface = TYPEFACES.find((option) => option.id === note.typeface) ?? TYPEFACES[0];
+  const activeCodeLang =
+    (editor?.isActive("codeBlock") && (editor.getAttributes("codeBlock").language as string | undefined)) ||
+    null;
 
   const alignments = [
     { id: "left", icon: AlignLeft, label: "Left" },
@@ -81,13 +85,13 @@ export function ToolRail({ note }: { note: Note }) {
     { id: "justify", icon: AlignJustify, label: "Justify" },
   ];
 
-  const onPickImage = (file: File | undefined) => {
-    if (!file || !editor) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      editor.chain().focus().setImage({ src: String(reader.result), alt: file.name }).run();
-    };
-    reader.readAsDataURL(file);
+  const applyCodeLanguage = (language: string) => {
+    if (!editor) return;
+    if (editor.isActive("codeBlock")) {
+      editor.chain().focus().updateAttributes("codeBlock", { language }).run();
+      return;
+    }
+    editor.chain().focus().toggleCodeBlock({ language }).run();
   };
 
   return (
@@ -142,7 +146,7 @@ export function ToolRail({ note }: { note: Note }) {
               </span>
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56">
+          <DropdownMenuContent align="end" className="max-h-80 min-w-56 overflow-y-auto">
             <DropdownMenuLabel>Typeface</DropdownMenuLabel>
             {TYPEFACES.map((option) => (
               <DropdownMenuItem
@@ -249,7 +253,24 @@ export function ToolRail({ note }: { note: Note }) {
 
       <Section title="Others">
         <div className="grid grid-cols-4 gap-2">
-          <BlockTile icon={ImageIcon} label="Image" onClick={() => imageInput.current?.click()} />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <BlockTile
+                icon={FileCode2}
+                label={activeCodeLang ? activeCodeLang.slice(0, 6) : "Code lang"}
+                active={Boolean(activeCodeLang)}
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-72 min-w-52 overflow-y-auto">
+              <DropdownMenuLabel>Code language</DropdownMenuLabel>
+              {NOTE_CODE_LANGS.map((lang) => (
+                <DropdownMenuItem key={lang.id} onSelect={() => applyCodeLanguage(lang.id)}>
+                  <span className="flex-1">{lang.label}</span>
+                  {activeCodeLang === lang.id ? <Check className="size-3.5" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <BlockTile
             icon={Link2}
             label="Link"
@@ -319,18 +340,13 @@ export function ToolRail({ note }: { note: Note }) {
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
           />
         </div>
+        <p className="ns-micro mt-3 text-muted">Images are off for now — text and code only.</p>
       </Section>
 
-      <input
-        ref={imageInput}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => {
-          onPickImage(event.target.files?.[0]);
-          event.target.value = "";
-        }}
-      />
+      <p className="ns-micro mt-8 flex items-center gap-2 text-muted">
+        <img src="/android-chrome-192x192.png" alt="" className="size-4 rounded-xs" />
+        Arigato Labs
+      </p>
     </aside>
   );
 }

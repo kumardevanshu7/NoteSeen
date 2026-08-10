@@ -555,25 +555,112 @@
   line-height: 1.9;
 }
 
+.ns-paper[data-typeface="inter"] .tiptap,
+.ns-paper[data-typeface="inter"] .ns-title,
 .ns-paper[data-typeface="sans"] .tiptap,
 .ns-paper[data-typeface="sans"] .ns-title {
   font-family: var(--font-sans);
 }
 
+.ns-paper[data-typeface="roboto"] .tiptap,
+.ns-paper[data-typeface="roboto"] .ns-title {
+  font-family: Roboto, var(--font-sans);
+}
+
+.ns-paper[data-typeface="opensans"] .tiptap,
+.ns-paper[data-typeface="opensans"] .ns-title {
+  font-family: "Open Sans", var(--font-sans);
+}
+
+.ns-paper[data-typeface="lato"] .tiptap,
+.ns-paper[data-typeface="lato"] .ns-title {
+  font-family: Lato, var(--font-sans);
+}
+
+.ns-paper[data-typeface="montserrat"] .tiptap,
+.ns-paper[data-typeface="montserrat"] .ns-title {
+  font-family: Montserrat, var(--font-sans);
+}
+
+.ns-paper[data-typeface="poppins"] .tiptap,
+.ns-paper[data-typeface="poppins"] .ns-title {
+  font-family: Poppins, var(--font-sans);
+}
+
+.ns-paper[data-typeface="nunito"] .tiptap,
+.ns-paper[data-typeface="nunito"] .ns-title {
+  font-family: Nunito, var(--font-sans);
+}
+
+.ns-paper[data-typeface="spacegrotesk"] .tiptap,
+.ns-paper[data-typeface="spacegrotesk"] .ns-title,
 .ns-paper[data-typeface="display"] .tiptap,
 .ns-paper[data-typeface="display"] .ns-title {
   font-family: var(--font-display);
 }
 
+.ns-paper[data-typeface="playfair"] .tiptap,
+.ns-paper[data-typeface="playfair"] .ns-title {
+  font-family: "Playfair Display", Georgia, serif;
+}
+
+.ns-paper[data-typeface="merriweather"] .tiptap,
+.ns-paper[data-typeface="merriweather"] .ns-title {
+  font-family: Merriweather, Georgia, serif;
+}
+
+.ns-paper[data-typeface="georgia"] .tiptap,
+.ns-paper[data-typeface="georgia"] .ns-title,
+.ns-paper[data-typeface="serif"] .tiptap,
+.ns-paper[data-typeface="serif"] .ns-title {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.ns-paper[data-typeface="times"] .tiptap,
+.ns-paper[data-typeface="times"] .ns-title {
+  font-family: "Times New Roman", Times, serif;
+}
+
+.ns-paper[data-typeface="jetbrains"] .tiptap,
+.ns-paper[data-typeface="jetbrains"] .ns-title,
 .ns-paper[data-typeface="mono"] .tiptap,
 .ns-paper[data-typeface="mono"] .ns-title {
   font-family: var(--font-mono);
   letter-spacing: -0.01em;
 }
 
-.ns-paper[data-typeface="serif"] .tiptap,
-.ns-paper[data-typeface="serif"] .ns-title {
-  font-family: ui-serif, Georgia, "Times New Roman", serif;
+.ns-paper[data-typeface="firacode"] .tiptap,
+.ns-paper[data-typeface="firacode"] .ns-title {
+  font-family: "Fira Code", var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+.ns-paper[data-typeface="sourcecode"] .tiptap,
+.ns-paper[data-typeface="sourcecode"] .ns-title {
+  font-family: "Source Code Pro", var(--font-mono);
+  letter-spacing: -0.01em;
+}
+
+.ns-paper[data-typeface="courier"] .tiptap,
+.ns-paper[data-typeface="courier"] .ns-title {
+  font-family: "Courier New", Courier, monospace;
+  letter-spacing: -0.01em;
+}
+
+.tiptap pre {
+  position: relative;
+}
+
+.tiptap pre::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--muted) 80%, transparent);
 }
 
 @media print {

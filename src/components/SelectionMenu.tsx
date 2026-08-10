@@ -8,28 +8,13 @@ import {
   Italic,
   Languages,
   Link2,
-  Sparkles,
   Strikethrough,
   Underline as UnderlineIcon,
-  WandSparkles,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useEditorTick } from "@/hooks/use-editor-tick";
-
-const AI_ACTIONS = [
-  { id: "grammar", label: "Fix grammar", icon: Check },
-  { id: "positive", label: "Rewrite in a positive tone", icon: WandSparkles },
-  { id: "punchy", label: "Make it punchier", icon: Sparkles },
-  { id: "translate", label: "Translate it", icon: Languages },
-];
-
-function notifyAiPending(label: string) {
-  toast(`${label} needs a model`, {
-    description: "Add your AI credentials in the sync step and these rewrites turn on.",
-  });
-}
 
 export function SelectionMenu({ editor }: { editor: Editor }) {
   useEditorTick(editor);
@@ -190,24 +175,6 @@ export function SelectionMenu({ editor }: { editor: Editor }) {
                 }
               />
             </div>
-
-            <div className="border-t border-hairline p-1.5">
-              <p className="ns-mono flex items-center gap-2 px-2 pt-1 pb-1.5 text-muted">
-                Rewrite
-                <span className="rounded-full border border-coral-soft px-1.5 py-px text-[9px] tracking-[0.12em] text-coral">
-                  AI
-                </span>
-              </p>
-              {AI_ACTIONS.map((action) => (
-                <MenuAction
-                  key={action.id}
-                  icon={action.icon}
-                  label={action.label}
-                  muted
-                  onClick={() => notifyAiPending(action.label)}
-                />
-              ))}
-            </div>
           </>
         )}
       </div>
@@ -219,21 +186,16 @@ function MenuAction({
   icon: Icon,
   label,
   onClick,
-  muted = false,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   onClick: () => void;
-  muted?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        "flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-[13px] transition-colors hover:bg-stone",
-        muted ? "text-body-muted" : "text-ink",
-      )}
+      className="flex w-full items-center gap-2.5 rounded-xs px-2 py-1.5 text-left text-[13px] text-ink transition-colors hover:bg-stone"
     >
       <Icon className="size-3.5 shrink-0 text-slate" />
       <span className="truncate">{label}</span>

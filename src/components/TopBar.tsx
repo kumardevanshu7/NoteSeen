@@ -3,7 +3,9 @@ import {
   Copy,
   Download,
   EllipsisVertical,
+  FileCode2,
   FileDown,
+  FileType2,
   FolderOpen,
   Link2Off,
   Menu,
@@ -39,6 +41,7 @@ import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
+import { downloadHtml, exportPdf } from "@/lib/export-note";
 import { copyMarkdown, downloadMarkdown } from "@/lib/note-file";
 import { noteLabel } from "@/lib/selectors";
 import type { Note } from "@/lib/types";
@@ -177,6 +180,29 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
               Stop writing to {note.fileName}
             </DropdownMenuItem>
           ) : null}
+          <DropdownMenuItem
+            disabled={!note}
+            onSelect={() => {
+              if (!note) return;
+              downloadHtml(note);
+              toast.success("HTML downloaded");
+            }}
+          >
+            <FileCode2 />
+            Download HTML +
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!note}
+            onSelect={() => {
+              if (!note) return;
+              const ok = exportPdf(note);
+              if (ok) toast.message("Print dialog open — choose Save as PDF");
+              else toast.error("Allow pop-ups to export PDF");
+            }}
+          >
+            <FileType2 />
+            Download PDF +
+          </DropdownMenuItem>
           <DropdownMenuItem disabled={!note} onSelect={() => note && downloadMarkdown(note)}>
             <FileDown />
             Export as Markdown

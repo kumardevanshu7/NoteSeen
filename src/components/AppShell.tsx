@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { isAbortError, consumeLaunchFiles, supportsFileSystemAccess, type NsFileHandle } from "@/lib/fs";
 import { pickNoteFiles } from "@/lib/note-file";
 import { isEditableTarget } from "@/lib/utils";
-import { useEditorStore } from "@/store/editor";
 import { registerLifecycleFlush, useNotes } from "@/store/notes";
 import { useVault } from "@/store/vault";
 import { CommandPalette } from "./CommandPalette";
@@ -30,18 +29,6 @@ function isNoteFileName(name: string): boolean {
 
 function isNoteFile(file: File): boolean {
   return isNoteFileName(file.name);
-}
-
-function insertImages(files: File[]): void {
-  const editor = useEditorStore.getState().editor;
-  if (!editor) return;
-  for (const file of files) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      editor.chain().focus().setImage({ src: String(reader.result), alt: file.name }).run();
-    };
-    reader.readAsDataURL(file);
-  }
 }
 
 export function AppShell() {
@@ -167,8 +154,10 @@ export function AppShell() {
       event.preventDefault();
 
       const images = files.filter((file) => file.type.startsWith("image/"));
-      if (images.length > 0) {
-        insertImages(images);
+      if (images.length > 0 && files.every((file) => file.type.startsWith("image/"))) {
+        toast("Images are off for now", {
+          description: "Drop a .noteseen, .md, or .txt file instead.",
+        });
         return;
       }
 
