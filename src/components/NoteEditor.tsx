@@ -44,6 +44,7 @@ export function NoteEditor({ note }: { note: Note }) {
   };
 
   const noteIdRef = useRef(note.id);
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const loadedIdRef = useRef<string | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,7 +62,10 @@ export function NoteEditor({ note }: { note: Note }) {
   }, [patchNote]);
 
   const editor = useEditor({
-    immediatelyRender: true,
+    // ProseMirror owns this subtree. Rendering it during React's first pass made
+    // React and PM disagree on ownership, which surfaced as removeChild crashes.
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: false,
     editable: canEdit,
     extensions: [
       StarterKit.configure({
@@ -201,6 +205,14 @@ export function NoteEditor({ note }: { note: Note }) {
     };
   }, [commit]);
 
+  // Long titles wrap instead of scrolling out of view on narrow phones.
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [note.title, note.id, note.typeface, note.size]);
+
   const words = countWords(note.text);
 
   return (
@@ -216,8 +228,10 @@ export function NoteEditor({ note }: { note: Note }) {
           ) : null}
         </div>
 
-        <input
-          className="ns-title ns-card-heading w-full bg-transparent outline-none disabled:opacity-70"
+        <textarea
+          ref={titleRef}
+          rows={1}
+          className="ns-title ns-card-heading w-full resize-none overflow-hidden bg-transparent break-words outline-none disabled:opacity-70"
           value={note.title}
           placeholder="Untitled note"
           aria-label="Note title"

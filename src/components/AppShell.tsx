@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FilePlus2, FolderOpen } from "lucide-react";
+import { FilePlus2, FolderOpen, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { isAbortError, consumeLaunchFiles, supportsFileSystemAccess, type NsFileHandle } from "@/lib/fs";
@@ -48,6 +48,7 @@ export function AppShell() {
   const initVault = useVault((state) => state.initVault);
 
   const [navOpen, setNavOpen] = useState(false);
+  const [styleOpen, setStyleOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
 
@@ -62,6 +63,10 @@ export function AppShell() {
   useEffect(() => {
     if (ready) hideBootSplash();
   }, [ready]);
+
+  useEffect(() => {
+    setStyleOpen(false);
+  }, [activeId, view]);
 
   // Edge swipe (from left) opens the sidebar on phones.
   useEffect(() => {
@@ -295,15 +300,15 @@ export function AppShell() {
           {view === "editor" ? (
             note ? (
               <>
-                <div className="ns-scroll flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+                <div className="ns-scroll flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
                     <article
-                    className="ns-paper mx-auto w-full max-w-[46rem] px-6 py-9 sm:px-12 sm:py-12"
+                    className="ns-paper mx-auto w-full max-w-[46rem] px-5 py-7 sm:px-12 sm:py-12"
                     data-theme={note.theme}
                     data-typeface={note.typeface}
                     data-size={note.size}
                     data-spacing={note.spacing}
                   >
-                    <EditorErrorBoundary>
+                    <EditorErrorBoundary key={note.id}>
                       {note.kind === "prompt" ? (
                         <PromptEditor note={note} />
                       ) : (
@@ -325,7 +330,41 @@ export function AppShell() {
           ) : null}
         </main>
 
-        {view === "editor" && note && note.kind === "note" ? <ToolRail note={note} /> : null}
+        {view === "editor" && note && note.kind === "note" ? (
+          <>
+            <div className="ns-no-print hidden xl:block">
+              <ToolRail note={note} />
+            </div>
+
+            {!styleOpen ? (
+              <button
+                type="button"
+                onClick={() => setStyleOpen(true)}
+                className="ns-no-print fixed right-4 bottom-16 z-30 flex items-center gap-2 rounded-full border border-hairline bg-surface px-4 py-2.5 text-[13px] font-medium text-ink shadow-lg xl:hidden"
+              >
+                <Palette className="size-4" />
+                Style
+              </button>
+            ) : null}
+
+            {styleOpen ? (
+              <div className="ns-no-print fixed inset-0 z-40 flex justify-end xl:hidden">
+                <div
+                  className="ns-fade absolute inset-0 bg-black/40"
+                  onClick={() => setStyleOpen(false)}
+                  aria-hidden
+                />
+                <div className="relative z-10 h-full max-w-[85vw]">
+                  <ToolRail
+                    note={note}
+                    onClose={() => setStyleOpen(false)}
+                    className="h-full shadow-2xl"
+                  />
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
       <CommandPalette

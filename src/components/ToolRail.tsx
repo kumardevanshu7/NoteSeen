@@ -21,6 +21,7 @@ import {
   Strikethrough,
   Type,
   Underline as UnderlineIcon,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -68,7 +69,14 @@ const EMOJI = [
 
 const NOTE_CODE_LANGS = CODE_LANGUAGES.filter((lang) => lang.id !== "txt");
 
-export function ToolRail({ note }: { note: Note }) {
+interface ToolRailProps {
+  note: Note;
+  /** Passed when the rail is shown as a phone drawer. */
+  onClose?: () => void;
+  className?: string;
+}
+
+export function ToolRail({ note, onClose, className }: ToolRailProps) {
   const editor = useEditorStore((state) => state.editor);
   useEditorTick(editor);
   const patchNote = useNotes((state) => state.patchNote);
@@ -95,7 +103,26 @@ export function ToolRail({ note }: { note: Note }) {
   };
 
   return (
-    <aside className="ns-scroll ns-no-print hidden w-72 shrink-0 overflow-y-auto border-l border-hairline bg-canvas px-5 py-6 xl:block">
+    <aside
+      className={cn(
+        "ns-scroll ns-no-print w-72 shrink-0 overflow-y-auto border-l border-hairline bg-canvas px-5 py-6",
+        className,
+      )}
+    >
+      {onClose ? (
+        <div className="mb-3 flex items-center justify-between">
+          <span className="ns-caption text-ink">Style</span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close style panel"
+            className="flex size-8 items-center justify-center rounded-full text-slate hover:bg-stone hover:text-ink"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ) : null}
+
       <Section title="Theme style">
         <div className="flex flex-wrap gap-2.5">
           {NOTE_THEMES.map((theme) => {
