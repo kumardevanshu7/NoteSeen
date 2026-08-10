@@ -81,16 +81,29 @@ export interface VaultConfig {
 }
 
 export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
-  const legacyTypeface = raw.typeface as string | undefined;
-  const typefaceMap: Record<string, Note["typeface"]> = {
+  const legacy = raw.typeface as string | undefined;
+  const aliases: Record<string, Typeface> = {
     sans: "inter",
+    roboto: "inter",
+    opensans: "inter",
+    lato: "inter",
+    montserrat: "inter",
+    poppins: "inter",
+    nunito: "inter",
     display: "spacegrotesk",
     serif: "georgia",
+    playfair: "georgia",
+    merriweather: "georgia",
+    times: "georgia",
     mono: "jetbrains",
+    firacode: "jetbrains",
+    sourcecode: "jetbrains",
+    courier: "jetbrains",
   };
+  const allowed = new Set(["inter", "spacegrotesk", "georgia", "jetbrains"]);
   const typeface =
-    (legacyTypeface && typefaceMap[legacyTypeface]) ||
-    (legacyTypeface as Note["typeface"] | undefined) ||
+    (legacy && allowed.has(legacy) ? (legacy as Typeface) : undefined) ||
+    (legacy ? aliases[legacy] : undefined) ||
     "inter";
 
   return {

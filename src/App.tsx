@@ -1,33 +1,81 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
-import { AppShell } from "@/components/AppShell";
-import { AuthGate } from "@/components/AuthGate";
-import { LandingPage } from "@/components/LandingPage";
 import { useAppDeepLinkRedirect, usePath } from "@/lib/nav";
-import { useAuth } from "@/store/auth";
-import { AboutPage } from "@/pages/AboutPage";
-import { ContactPage } from "@/pages/ContactPage";
-import { DisclaimerPage } from "@/pages/DisclaimerPage";
-import { ExplorePage } from "@/pages/ExplorePage";
-import { PrivacyPage } from "@/pages/PrivacyPage";
-import { TermsPage } from "@/pages/TermsPage";
+import { hideBootSplash } from "@/lib/boot";
+
+const LandingPage = lazy(() =>
+  import("@/components/LandingPage").then((m) => ({ default: m.LandingPage })),
+);
+const AppShell = lazy(() =>
+  import("@/components/AppShell").then((m) => ({ default: m.AppShell })),
+);
+const AuthGate = lazy(() =>
+  import("@/components/AuthGate").then((m) => ({ default: m.AuthGate })),
+);
+const ExplorePage = lazy(() =>
+  import("@/pages/ExplorePage").then((m) => ({ default: m.ExplorePage })),
+);
+const AboutPage = lazy(() =>
+  import("@/pages/AboutPage").then((m) => ({ default: m.AboutPage })),
+);
+const PrivacyPage = lazy(() =>
+  import("@/pages/PrivacyPage").then((m) => ({ default: m.PrivacyPage })),
+);
+const TermsPage = lazy(() =>
+  import("@/pages/TermsPage").then((m) => ({ default: m.TermsPage })),
+);
+const DisclaimerPage = lazy(() =>
+  import("@/pages/DisclaimerPage").then((m) => ({ default: m.DisclaimerPage })),
+);
+const ContactPage = lazy(() =>
+  import("@/pages/ContactPage").then((m) => ({ default: m.ContactPage })),
+);
+
+function RouteFallback() {
+  return (
+    <div className="flex h-full min-h-dvh items-center justify-center bg-canvas">
+      <span className="ns-mono text-muted">Loading…</span>
+    </div>
+  );
+}
+
+function AuthApp() {
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    void import("@/store/auth").then(({ useAuth }) => {
+      if (cancelled) return;
+      unsub = useAuth.getState().initAuth();
+    });
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, []);
+
+  return (
+    <AuthGate>
+      <AppShell />
+    </AuthGate>
+  );
+}
 
 export default function App() {
   const path = usePath();
-  const initAuth = useAuth((state) => state.initAuth);
   useAppDeepLinkRedirect();
 
-  useEffect(() => initAuth(), [initAuth]);
+  useEffect(() => {
+    // Legal/marketing pages: drop splash as soon as the light shell paints.
+    if (!path.startsWith("/app")) {
+      const t = window.setTimeout(() => hideBootSplash(), 80);
+      return () => window.clearTimeout(t);
+    }
+  }, [path]);
 
-  let page = <LandingPage />;
-  if (path === "/app" || path.startsWith("/app/")) {
-    page = (
-      <AuthGate>
-        <AppShell />
-      </AuthGate>
-    );
-  } else if (path === "/explore") page = <ExplorePage />;
+  let page: ReactNode = <LandingPage />;
+  if (path === "/app" || path.startsWith("/app/")) page = <AuthApp />;
+  else if (path === "/explore") page = <ExplorePage />;
   else if (path === "/about") page = <AboutPage />;
   else if (path === "/privacy") page = <PrivacyPage />;
   else if (path === "/terms") page = <TermsPage />;
@@ -36,7 +84,7 @@ export default function App() {
 
   return (
     <TooltipProvider>
-      {page}
+      <Suspense fallback={<RouteFallback />}>{page}</Suspense>
       <Toaster />
     </TooltipProvider>
   );

@@ -8,24 +8,12 @@ let logoDataUrlCache: string | null = null;
 function fontFamily(typeface: Note["typeface"]): string {
   const map: Record<string, string> = {
     inter: "Inter, system-ui, sans-serif",
-    roboto: "Roboto, system-ui, sans-serif",
-    opensans: '"Open Sans", system-ui, sans-serif',
-    lato: "Lato, system-ui, sans-serif",
-    montserrat: "Montserrat, system-ui, sans-serif",
-    poppins: "Poppins, system-ui, sans-serif",
-    nunito: "Nunito, system-ui, sans-serif",
     spacegrotesk: '"Space Grotesk", system-ui, sans-serif',
-    playfair: '"Playfair Display", Georgia, serif',
-    merriweather: "Merriweather, Georgia, serif",
-    georgia: "Georgia, serif",
-    times: '"Times New Roman", Times, serif',
+    georgia: "Georgia, 'Times New Roman', serif",
     jetbrains: '"JetBrains Mono", ui-monospace, monospace',
-    firacode: '"Fira Code", ui-monospace, monospace',
-    sourcecode: '"Source Code Pro", ui-monospace, monospace',
-    courier: '"Courier New", Courier, monospace',
     sans: "Inter, system-ui, sans-serif",
     display: '"Space Grotesk", system-ui, sans-serif',
-    serif: "Georgia, serif",
+    serif: "Georgia, 'Times New Roman', serif",
     mono: '"JetBrains Mono", ui-monospace, monospace',
   };
   return map[typeface] ?? map.inter;

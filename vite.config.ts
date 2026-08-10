@@ -49,12 +49,12 @@ export default defineConfig({
         short_name: "NoteSeen",
         description:
           "Open, type, close. NoteSeen saves instantly and keeps every note as a portable .noteseen file you own.",
-        start_url: "/",
+        start_url: "/app",
         scope: "/",
         display: "standalone",
         display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
         orientation: "any",
-        background_color: "#ffffff",
+        background_color: "#0d0d11",
         theme_color: "#17171c",
         categories: ["productivity", "utilities"],
         icons: [

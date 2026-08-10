@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Logo";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { SiteFooter } from "@/components/SiteFooter";
+import { hideBootSplash } from "@/lib/boot";
 import { useAuth } from "@/store/auth";
 
 /** Blocks the notes app until Google Auth succeeds (and profile is set). */
@@ -13,10 +15,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const profileReady = useAuth((state) => state.profileReady);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
 
+  useEffect(() => {
+    if (ready) hideBootSplash();
+  }, [ready]);
+
   if (!ready) {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
-        <span className="ns-mono text-muted">Checking sign-in…</span>
+        <img
+          src="/android-chrome-192x192.png"
+          alt=""
+          className="size-12 rounded-xl"
+          width={48}
+          height={48}
+        />
       </div>
     );
   }

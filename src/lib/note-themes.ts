@@ -46,32 +46,39 @@ export const NOTE_THEMES: ThemeOption[] = [
   },
 ];
 
+/** Four design fonts — self-hosted / system, no Google Fonts megapack. */
 export const TYPEFACES: { id: Typeface; label: string; hint: string }[] = [
   { id: "inter", label: "Inter", hint: "Sans" },
-  { id: "roboto", label: "Roboto", hint: "Sans" },
-  { id: "opensans", label: "Open Sans", hint: "Sans" },
-  { id: "lato", label: "Lato", hint: "Sans" },
-  { id: "montserrat", label: "Montserrat", hint: "Sans" },
-  { id: "poppins", label: "Poppins", hint: "Sans" },
-  { id: "nunito", label: "Nunito", hint: "Sans" },
   { id: "spacegrotesk", label: "Space Grotesk", hint: "Display" },
-  { id: "playfair", label: "Playfair Display", hint: "Serif" },
-  { id: "merriweather", label: "Merriweather", hint: "Serif" },
   { id: "georgia", label: "Georgia", hint: "Serif" },
-  { id: "times", label: "Times New Roman", hint: "Serif" },
   { id: "jetbrains", label: "JetBrains Mono", hint: "Mono" },
-  { id: "firacode", label: "Fira Code", hint: "Mono" },
-  { id: "sourcecode", label: "Source Code Pro", hint: "Mono" },
-  { id: "courier", label: "Courier New", hint: "Mono" },
 ];
 
-/** @deprecated aliases kept for older notes */
+/** Map older typeface ids onto the four design fonts. */
 export const TYPEFACE_ALIASES: Record<string, Typeface> = {
   sans: "inter",
+  roboto: "inter",
+  opensans: "inter",
+  lato: "inter",
+  montserrat: "inter",
+  poppins: "inter",
+  nunito: "inter",
   display: "spacegrotesk",
   serif: "georgia",
+  playfair: "georgia",
+  merriweather: "georgia",
+  times: "georgia",
   mono: "jetbrains",
+  firacode: "jetbrains",
+  sourcecode: "jetbrains",
+  courier: "jetbrains",
 };
+
+export function resolveTypeface(raw: string | undefined | null): Typeface {
+  if (!raw) return "inter";
+  if (TYPEFACES.some((t) => t.id === raw)) return raw as Typeface;
+  return TYPEFACE_ALIASES[raw] ?? "inter";
+}
 
 export const TEXT_SIZES: { id: TextSize; label: string }[] = [
   { id: "s", label: "Compact" },

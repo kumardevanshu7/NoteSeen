@@ -21,6 +21,7 @@ import { TopBar } from "./TopBar";
 import { TrashView } from "./TrashView";
 import { VaultGateDialog } from "./VaultGateDialog";
 import { EditorErrorBoundary } from "./EditorErrorBoundary";
+import { hideBootSplash } from "@/lib/boot";
 import type { NoteKind } from "@/lib/types";
 
 const NOTE_FILE_PATTERN = /\.(noteseen|md|markdown|txt|html?)$/i;
@@ -57,6 +58,54 @@ export function AppShell() {
     void initVault();
     return registerLifecycleFlush();
   }, [init, initVault]);
+
+  useEffect(() => {
+    if (ready) hideBootSplash();
+  }, [ready]);
+
+  // Edge swipe (from left) opens the sidebar on phones.
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    const onStart = (event: TouchEvent) => {
+      if (navOpen) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      if (touch.clientX > 28) return;
+      startX = touch.clientX;
+      startY = touch.clientY;
+      tracking = true;
+    };
+
+    const onMove = (event: TouchEvent) => {
+      if (!tracking) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      const dx = touch.clientX - startX;
+      const dy = Math.abs(touch.clientY - startY);
+      if (dx > 56 && dy < 48) {
+        tracking = false;
+        setNavOpen(true);
+      }
+    };
+
+    const onEnd = () => {
+      tracking = false;
+    };
+
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [navOpen]);
 
   const openFromDisk = useCallback(async () => {
     if (!supportsFileSystemAccess()) {

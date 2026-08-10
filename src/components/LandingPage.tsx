@@ -1,24 +1,63 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Logo";
-import { navigate } from "@/lib/nav";
-import { useAuth } from "@/store/auth";
 import { SiteFooter } from "@/components/SiteFooter";
+import { navigate } from "@/lib/nav";
+import { hideBootSplash } from "@/lib/boot";
 
+/**
+ * Landing paints first without waiting on Firebase.
+ * Auth boots in the background so returning users jump to /app.
+ */
 export function LandingPage() {
-  const user = useAuth((state) => state.user);
-  const ready = useAuth((state) => state.ready);
-  const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (ready && user) navigate("/app");
-  }, [ready, user]);
+    hideBootSplash();
+  }, []);
 
-  const signIn = () => {
-    void signInWithGoogle().then(() => {
-      if (useAuth.getState().user) navigate("/app");
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+
+    void import("@/store/auth").then(({ useAuth }) => {
+      if (cancelled) return;
+      unsub = useAuth.getState().initAuth();
+      const check = () => {
+        const { ready, user } = useAuth.getState();
+        if (ready && user) navigate("/app");
+      };
+      check();
+      return useAuth.subscribe(check);
+    }).then((stop) => {
+      if (cancelled) {
+        stop?.();
+        return;
+      }
+      const prev = unsub;
+      unsub = () => {
+        prev?.();
+        stop?.();
+      };
     });
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+    };
+  }, []);
+
+  const signIn = async () => {
+    setBusy(true);
+    try {
+      const { useAuth } = await import("@/store/auth");
+      if (!useAuth.getState().ready) useAuth.getState().initAuth();
+      await useAuth.getState().signInWithGoogle();
+      if (useAuth.getState().user) navigate("/app");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -31,8 +70,8 @@ export function LandingPage() {
           variant="outline"
           size="sm"
           className="rounded-full"
-          onClick={signIn}
-          disabled={!ready}
+          onClick={() => void signIn()}
+          disabled={busy}
         >
           Sign in
         </Button>
@@ -47,8 +86,8 @@ export function LandingPage() {
             Open. Type. Close — already saved. Sign in with Google to use your notes across devices.
           </p>
           <div className="ns-landing-rise ns-landing-rise-3 mt-8 flex flex-wrap items-center gap-3">
-            <Button variant="primary" size="lg" onClick={signIn} disabled={!ready}>
-              Continue with Google
+            <Button variant="primary" size="lg" onClick={() => void signIn()} disabled={busy}>
+              {busy ? "Opening Google…" : "Continue with Google"}
               <ArrowRight className="size-4" />
             </Button>
           </div>

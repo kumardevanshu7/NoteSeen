@@ -17,12 +17,41 @@
       content="NoteSeen is a fast notes app by Arigato Labs. Sign in, type, close — already saved."
     />
     <title>NoteSeen</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Lato:wght@400;700&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Montserrat:wght@400;600;700&family=Nunito:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;600;700&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
+    <style>
+      #ns-boot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #ffffff;
+        color: #212121;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        transition: opacity 220ms ease, visibility 220ms ease;
+      }
+      html.dark #ns-boot {
+        background: #0d0d11;
+        color: #f2f2f4;
+      }
+      #ns-boot img {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+      }
+      #ns-boot span {
+        font-size: 15px;
+        letter-spacing: -0.02em;
+        font-weight: 600;
+      }
+      #ns-boot.ns-boot-done {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+    </style>
     <script>
       try {
         var stored = localStorage.getItem("noteseen.appearance");
@@ -34,6 +63,10 @@
     </script>
   </head>
   <body class="h-full">
+    <div id="ns-boot" aria-hidden="true">
+      <img src="/android-chrome-192x192.png" alt="" width="56" height="56" />
+      <span>NoteSeen</span>
+    </div>
     <div id="root" class="h-full"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
