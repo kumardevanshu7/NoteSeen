@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Logo";
-import { useAuth } from "@/store/auth";
+import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { SiteFooter } from "@/components/SiteFooter";
+import { useAuth } from "@/store/auth";
 
-/** Blocks the notes app until Google Auth succeeds. */
+/** Blocks the notes app until Google Auth succeeds (and profile is set). */
 export function AuthGate({ children }: { children: ReactNode }) {
   const ready = useAuth((state) => state.ready);
   const user = useAuth((state) => state.user);
+  const profile = useAuth((state) => state.profile);
+  const profileReady = useAuth((state) => state.profileReady);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
 
   if (!ready) {
@@ -44,5 +47,26 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return children;
+  if (!profileReady) {
+    return (
+      <div className="flex h-full items-center justify-center bg-canvas">
+        <span className="ns-mono text-muted">Loading profile…</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <OnboardingDialog />
+      {profile ? (
+        children
+      ) : (
+        <div className="flex h-full items-center justify-center bg-canvas px-5">
+          <span className="ns-mono text-center text-muted">
+            Finish profile setup to open your notes
+          </span>
+        </div>
+      )}
+    </>
+  );
 }

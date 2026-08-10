@@ -10,21 +10,130 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function stringLen(value, min, max) {
+      return value is string
+        && value.size() >= min
+        && value.size() <= max;
+    }
+
+    // ---- User profile (users/{uid}) ----
+    // Auth bootstrap may omit profile fields.
+    // Once any profile field is written, all of them must be valid.
+
+    function userDocKeysOk() {
+      return request.resource.data.keys().hasOnly([
+        'uid', 'email', 'displayName', 'photoURL', 'updatedAt',
+        'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt'
+      ])
+      && request.resource.data.keys().hasAll(['uid', 'updatedAt']);
+    }
+
+    function userIdentityOk(uid) {
+      let d = request.resource.data;
+      return d.uid == uid
+        && d.uid == request.auth.uid
+        && d.updatedAt is number
+        && (!d.keys().hasAny(['email'])
+          || d.email == null
+          || (d.email is string
+            && d.email == request.auth.token.email
+            && d.email.size() <= 320))
+        && (!d.keys().hasAny(['displayName'])
+          || d.displayName == null
+          || stringLen(d.displayName, 0, 120))
+        && (!d.keys().hasAny(['photoURL'])
+          || d.photoURL == null
+          || (d.photoURL is string && d.photoURL.size() <= 2048));
+    }
+
+    function profileFieldsPresent() {
+      return request.resource.data.keys().hasAny([
+        'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt'
+      ]);
+    }
+
+    function validProfile() {
+      let d = request.resource.data;
+      return d.keys().hasAll([
+          'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt'
+        ])
+        && d.username is string
+        && d.username.matches('^[a-z0-9_]{3,24}$')
+        && stringLen(d.fullName, 2, 80)
+        && d.profession in ['job', 'student', 'freelancer', 'solo_entrepreneur']
+        && d.gender in ['male', 'female', 'other', 'prefer_not']
+        && d.age is number
+        && d.age >= 13
+        && d.age <= 120
+        && d.onboardedAt is number;
+    }
+
+    function validUserWrite(uid) {
+      return isOwner(uid)
+        && userDocKeysOk()
+        && userIdentityOk(uid)
+        && (!profileFieldsPresent() || validProfile());
+    }
+
+    // ---- Notes (users/{uid}/notes/{noteId}) ----
+
+    function validTags(tags) {
+      return tags is list
+        && tags.size() <= 24;
+    }
+
+    function validNote(noteId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'id', 'kind', 'title', 'tags', 'html', 'text',
+          'theme', 'typeface', 'size', 'spacing',
+          'pinned', 'createdAt', 'updatedAt', 'deletedAt', 'fileName'
+        ])
+        && d.keys().hasAll([
+          'id', 'kind', 'title', 'tags', 'html', 'text',
+          'theme', 'typeface', 'size', 'spacing',
+          'pinned', 'createdAt', 'updatedAt', 'deletedAt'
+        ])
+        && d.id == noteId
+        && d.id is string
+        && d.id.size() > 0
+        && d.id.size() <= 128
+        && d.kind in ['note', 'prompt']
+        && stringLen(d.title, 0, 500)
+        && stringLen(d.html, 0, 500000)
+        && stringLen(d.text, 0, 500000)
+        && validTags(d.tags)
+        && d.theme in ['plain', 'azure', 'sage', 'sand', 'aurora']
+        && d.typeface in [
+          'inter', 'roboto', 'opensans', 'lato', 'montserrat', 'poppins', 'nunito',
+          'spacegrotesk', 'playfair', 'merriweather', 'georgia', 'times',
+          'jetbrains', 'firacode', 'sourcecode', 'courier',
+          'sans', 'display', 'serif', 'mono'
+        ]
+        && d.size in ['s', 'm', 'l']
+        && d.spacing in ['tight', 'normal', 'relaxed']
+        && d.pinned is bool
+        && d.createdAt is number
+        && d.updatedAt is number
+        && (d.deletedAt == null || d.deletedAt is number)
+        && (!d.keys().hasAny(['fileName'])
+          || d.fileName == null
+          || stringLen(d.fileName, 1, 260));
+    }
+
+    function createdAtImmutable() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read: if isOwner(uid);
+      allow create, update: if validUserWrite(uid);
+      allow delete: if false;
 
       match /notes/{noteId} {
         allow read: if isOwner(uid);
-        allow create, update: if isOwner(uid)
-          && request.resource.data.id == noteId
-          && request.resource.data.keys().hasAll([
-            'id', 'kind', 'title', 'tags', 'html', 'text',
-            'theme', 'typeface', 'size', 'spacing',
-            'pinned', 'createdAt', 'updatedAt', 'deletedAt'
-          ])
-          && request.resource.data.kind in ['note', 'prompt']
-          && request.resource.data.createdAt is number
-          && request.resource.data.updatedAt is number;
+        allow create: if isOwner(uid) && validNote(noteId);
+        allow update: if isOwner(uid) && validNote(noteId) && createdAtImmutable();
         allow delete: if isOwner(uid);
       }
     }
