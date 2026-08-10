@@ -13,9 +13,9 @@ import Underline from "@tiptap/extension-underline";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
+import { NoteLabelsField } from "@/components/NoteLabelsField";
 import { clipboardHasImageFile, sanitizePastedHtml } from "@/lib/paste-html";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
@@ -26,15 +26,6 @@ import { SelectionMenu } from "./SelectionMenu";
 
 const CONTENT_DEBOUNCE_MS = 320;
 const MAX_NOTE_HTML = 500_000;
-
-function parseLabels(raw: string): string[] {
-  return raw
-    .split(/[,#]/)
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-    .filter((tag, index, all) => all.findIndex((t) => t.toLowerCase() === tag.toLowerCase()) === index)
-    .slice(0, 24);
-}
 
 export function NoteEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
@@ -57,13 +48,7 @@ export function NoteEditor({ note }: { note: Note }) {
   const loadedIdRef = useRef<string | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<{ id: string; html: string } | null>(null);
-  const [labelsRaw, setLabelsRaw] = useState(note.tags.join(", "));
-
   noteIdRef.current = note.id;
-
-  useEffect(() => {
-    setLabelsRaw(note.tags.join(", "));
-  }, [note.id, note.tags]);
 
   const commit = useCallback(() => {
     if (flushTimer.current) {
@@ -217,15 +202,6 @@ export function NoteEditor({ note }: { note: Note }) {
   }, [commit]);
 
   const words = countWords(note.text);
-  const labels = parseLabels(labelsRaw);
-
-  const commitLabels = () => {
-    const next = parseLabels(labelsRaw);
-    const same =
-      next.length === note.tags.length &&
-      next.every((tag, i) => tag.toLowerCase() === note.tags[i]?.toLowerCase());
-    if (!same) patchNote(note.id, { tags: next });
-  };
 
   return (
     <EditorErrorBoundary>
@@ -256,34 +232,13 @@ export function NoteEditor({ note }: { note: Note }) {
           }}
         />
 
-        <label className="mt-4 block space-y-1.5">
-          <span className="ns-caption text-ink">Labels</span>
-          <Input
-            value={labelsRaw}
-            onChange={(event) => setLabelsRaw(event.target.value)}
-            onBlur={commitLabels}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                commitLabels();
-              }
-            }}
-            placeholder="work, ideas, java — filter these on My Notes"
+        <div className="mt-4">
+          <NoteLabelsField
+            tags={note.tags}
             disabled={!canEdit}
+            onChange={(tags) => patchNote(note.id, { tags })}
           />
-          {labels.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {labels.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full border border-hairline bg-stone px-2.5 py-0.5 text-[12px] text-ink"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </label>
+        </div>
 
         <div className="ns-mono mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-muted">
           <span>{formatClock(note.updatedAt)}</span>

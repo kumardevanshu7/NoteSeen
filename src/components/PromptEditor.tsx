@@ -4,20 +4,12 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/CopyButton";
+import { NoteLabelsField } from "@/components/NoteLabelsField";
 import { plainTextToHtmlFriendly } from "@/lib/prompt-utils";
 import type { Note } from "@/lib/types";
 import { formatClock } from "@/lib/utils";
 import { useNotes } from "@/store/notes";
 import { requireVault } from "@/store/vault";
-
-function parseTags(raw: string): string[] {
-  return raw
-    .split(/[,#]/)
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-    .filter((tag, index, all) => all.findIndex((t) => t.toLowerCase() === tag.toLowerCase()) === index)
-    .slice(0, 24);
-}
 
 export function PromptEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
@@ -26,7 +18,7 @@ export function PromptEditor({ note }: { note: Note }) {
   const canEdit = isNew || sessionUnlocked;
 
   const [title, setTitle] = useState(note.title);
-  const [tagsRaw, setTagsRaw] = useState(note.tags.join(", "));
+  const [tags, setTags] = useState(note.tags);
   const [body, setBody] = useState(note.text);
   const [saving, setSaving] = useState(false);
 
@@ -36,7 +28,7 @@ export function PromptEditor({ note }: { note: Note }) {
 
   useEffect(() => {
     setTitle(note.title);
-    setTagsRaw(note.tags.join(", "));
+    setTags(note.tags);
     setBody(note.text);
   }, [note.id, note.title, note.tags, note.text]);
 
@@ -52,7 +44,6 @@ export function PromptEditor({ note }: { note: Note }) {
       if (!ok) return;
     }
     setSaving(true);
-    const tags = parseTags(tagsRaw);
     const text = body;
     patchNote(note.id, { title: title.trim(), tags, text, html: plainTextToHtmlFriendly(text) });
     setSaving(false);
@@ -68,7 +59,7 @@ export function PromptEditor({ note }: { note: Note }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <CopyButton
-            note={{ ...note, title, text: body, tags: parseTags(tagsRaw) }}
+            note={{ ...note, title, text: body, tags }}
             label="Copy prompt"
           />
           {canEdit ? (
@@ -95,27 +86,12 @@ export function PromptEditor({ note }: { note: Note }) {
         />
       </label>
 
-      <label className="block space-y-1.5">
-        <span className="ns-caption text-ink">Labels</span>
-        <Input
-          value={tagsRaw}
-          onChange={(event) => setTagsRaw(event.target.value)}
-          placeholder="coding, rewrite, email — comma separated"
-          disabled={!canEdit}
-        />
-        {parseTags(tagsRaw).length > 0 ? (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {parseTags(tagsRaw).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full border border-hairline bg-stone px-2.5 py-0.5 text-[12px] text-ink"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </label>
+      <NoteLabelsField
+        tags={tags}
+        disabled={!canEdit}
+        onChange={setTags}
+        placeholder="coding, rewrite, email"
+      />
 
       <label className="flex min-h-0 flex-1 flex-col space-y-1.5">
         <span className="ns-caption flex items-center justify-between gap-2 text-ink">
