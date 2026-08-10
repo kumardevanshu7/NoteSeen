@@ -1,0 +1,215 @@
+import { useMemo, useState } from "react";
+import {
+  FileText,
+  NotebookPen,
+  Pin,
+  Search,
+  Sparkles,
+  Trash2,
+  Users,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/CopyButton";
+import { Kbd } from "@/components/ui/kbd";
+import { NewItemDialog } from "@/components/NewItemDialog";
+import { ArigatoMark } from "@/components/Logo";
+import { useNotes } from "@/store/notes";
+import { liveNotes, noteLabel, searchNotes, trashedNotes } from "@/lib/selectors";
+import type { NoteKind, View } from "@/lib/types";
+import { cn, excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
+import { navigate } from "@/lib/nav";
+
+const NAV: { id: View; label: string; icon: LucideIcon }[] = [
+  { id: "editor", label: "Notes Editor", icon: NotebookPen },
+  { id: "all", label: "My Notes", icon: FileText },
+  { id: "shared", label: "Shared Notes", icon: Users },
+];
+
+export function SideRail({ onClose }: { onClose?: () => void }) {
+  const dismiss = () => onClose?.();
+  const notes = useNotes((state) => state.notes);
+  const activeId = useNotes((state) => state.activeId);
+  const view = useNotes((state) => state.view);
+  const query = useNotes((state) => state.query);
+  const setView = useNotes((state) => state.setView);
+  const setQuery = useNotes((state) => state.setQuery);
+  const setActive = useNotes((state) => state.setActive);
+  const createItem = useNotes((state) => state.createItem);
+  const [chooserOpen, setChooserOpen] = useState(false);
+
+  const live = useMemo(() => liveNotes(notes), [notes]);
+  const trashed = useMemo(() => trashedNotes(notes), [notes]);
+  const visible = useMemo(() => searchNotes(live, query), [live, query]);
+
+  return (
+    <div className="flex h-full w-[268px] shrink-0 flex-col border-r border-hairline bg-canvas">
+      <nav className="px-4 pt-5">
+        {onClose ? (
+          <div className="mb-3 flex justify-end lg:hidden">
+            <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close navigation">
+              <X />
+            </Button>
+          </div>
+        ) : null}
+
+        <ul className="space-y-0.5">
+          {NAV.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setView(item.id);
+                  dismiss();
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-xs px-2.5 py-2 text-left text-sm transition-colors",
+                  view === item.id
+                    ? "bg-stone font-medium text-ink"
+                    : "text-body-muted hover:bg-stone/60 hover:text-ink",
+                )}
+              >
+                <item.icon className="size-4 shrink-0 text-slate" />
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.id === "all" ? (
+                  <span className="ns-mono text-muted">{live.length}</span>
+                ) : null}
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <div className="my-3 h-px bg-hairline" />
+
+        <button
+          type="button"
+          onClick={() => {
+            setView("trash");
+            dismiss();
+          }}
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-xs px-2.5 py-2 text-left text-sm transition-colors",
+            view === "trash"
+              ? "bg-stone font-medium text-ink"
+              : "text-body-muted hover:bg-stone/60 hover:text-ink",
+          )}
+        >
+          <Trash2 className="size-4 shrink-0 text-slate" />
+          <span className="flex-1">Trash</span>
+          {trashed.length > 0 ? <span className="ns-mono text-muted">{trashed.length}</span> : null}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            navigate("/explore");
+            dismiss();
+          }}
+          className="mt-0.5 flex w-full items-center gap-2.5 rounded-xs px-2.5 py-2 text-left text-sm text-body-muted transition-colors hover:bg-stone/60 hover:text-ink"
+        >
+          <span className="inline-flex size-4 shrink-0 items-center justify-center">
+            <ArigatoMark size={17} />
+          </span>
+          <span className="flex-1 truncate">Explore Arigato Labs</span>
+        </button>
+      </nav>
+
+      <div className="px-4 pt-6 pb-3">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search notes"
+            aria-label="Search notes"
+            className="h-9 w-full rounded-full border border-hairline bg-surface pr-3 pl-8.5 text-[13px] text-ink outline-none placeholder:text-muted focus-visible:border-focus"
+          />
+        </label>
+      </div>
+
+      <div className="ns-scroll flex-1 overflow-y-auto px-2 pb-4">
+        <p className="ns-mono px-2.5 pb-2 text-muted">
+          {query ? `${visible.length} result${visible.length === 1 ? "" : "s"}` : "Recent"}
+        </p>
+
+        {visible.length === 0 ? (
+          <div className="px-2.5 py-6">
+            <p className="text-[13px] text-body-muted">
+              {query ? "Nothing matches that search." : "No notes yet."}
+            </p>
+            <Button
+              variant="link"
+              size="inline"
+              className="mt-2 text-[13px]"
+              onClick={() => setChooserOpen(true)}
+            >
+              Start something
+            </Button>
+          </div>
+        ) : (
+          <ul className="space-y-0.5">
+            {visible.map((note) => {
+              const active = note.id === activeId && view === "editor";
+              return (
+                <li key={note.id} className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActive(note.id);
+                      dismiss();
+                    }}
+                    className={cn(
+                      "w-full rounded-sm px-2.5 py-2.5 pr-10 text-left transition-colors",
+                      active ? "bg-stone" : "hover:bg-stone/55",
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {note.kind === "prompt" ? (
+                        <Sparkles className="size-3 shrink-0 text-slate" />
+                      ) : note.pinned ? (
+                        <Pin className="size-3 shrink-0 text-coral" />
+                      ) : null}
+                      <span className="flex-1 truncate text-[13.5px] font-medium text-ink">
+                        {noteLabel(note)}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 flex items-baseline gap-2">
+                      <span className="ns-micro flex-1 truncate text-muted">
+                        {excerpt(note.text) ||
+                          (note.kind === "prompt" ? "Empty prompt" : "Empty note")}
+                      </span>
+                      <span className="ns-micro shrink-0 text-muted">
+                        {formatRelative(note.updatedAt)}
+                      </span>
+                    </span>
+                  </button>
+                  <div className="absolute top-2 right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                    <CopyButton note={note} size="icon-sm" />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="ns-micro border-t border-hairline px-4 py-3 text-muted">
+        <span className="flex items-center gap-1.5">
+          <Kbd>{modKeyLabel()}</Kbd>
+          <Kbd>K</Kbd>
+          <span>to jump anywhere</span>
+        </span>
+      </div>
+
+      <NewItemDialog
+        open={chooserOpen}
+        onOpenChange={setChooserOpen}
+        onChoose={(kind: NoteKind) => {
+          createItem(kind);
+          dismiss();
+        }}
+      />
+    </div>
+  );
+}

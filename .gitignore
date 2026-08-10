@@ -1,0 +1,33 @@
+# Dependencies & build
+node_modules
+dist
+dist-ssr
+dev-dist
+*.tsbuildinfo
+
+# Local / secret env — never commit these
+.env
+.env.local
+.env.development
+.env.development.local
+.env.production
+.env.production.local
+.env.test
+.env.test.local
+.env*.local
+
+# Keep the template that documents Vercel keys
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Logs & caches
+*.log
+npm-debug.log*
+.vercel
+.turbo

@@ -1,0 +1,324 @@
+import { useCallback, useEffect, useState } from "react";
+import { FilePlus2, FolderOpen } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { isAbortError, consumeLaunchFiles, supportsFileSystemAccess, type NsFileHandle } from "@/lib/fs";
+import { pickNoteFiles } from "@/lib/note-file";
+import { isEditableTarget } from "@/lib/utils";
+import { useEditorStore } from "@/store/editor";
+import { registerLifecycleFlush, useNotes } from "@/store/notes";
+import { useVault } from "@/store/vault";
+import { CommandPalette } from "./CommandPalette";
+import { NoteEditor } from "./NoteEditor";
+import { NotesGrid } from "./NotesGrid";
+import { NewItemDialog } from "./NewItemDialog";
+import { PromptEditor } from "./PromptEditor";
+import { SaveIndicator } from "./SaveIndicator";
+import { SharedView } from "./SharedView";
+import { SideRail } from "./SideRail";
+import { ToolRail } from "./ToolRail";
+import { TopBar } from "./TopBar";
+import { TrashView } from "./TrashView";
+import { VaultGateDialog } from "./VaultGateDialog";
+import type { NoteKind } from "@/lib/types";
+
+const NOTE_FILE_PATTERN = /\.(noteseen|md|markdown|txt|html?)$/i;
+
+function isNoteFileName(name: string): boolean {
+  return NOTE_FILE_PATTERN.test(name);
+}
+
+function isNoteFile(file: File): boolean {
+  return isNoteFileName(file.name);
+}
+
+function insertImages(files: File[]): void {
+  const editor = useEditorStore.getState().editor;
+  if (!editor) return;
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      editor.chain().focus().setImage({ src: String(reader.result), alt: file.name }).run();
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+export function AppShell() {
+  const ready = useNotes((state) => state.ready);
+  const init = useNotes((state) => state.init);
+  const notes = useNotes((state) => state.notes);
+  const activeId = useNotes((state) => state.activeId);
+  const view = useNotes((state) => state.view);
+  const createNote = useNotes((state) => state.createNote);
+  const createItem = useNotes((state) => state.createItem);
+  const saveToFile = useNotes((state) => state.saveToFile);
+  const importHandles = useNotes((state) => state.importHandles);
+  const importFiles = useNotes((state) => state.importFiles);
+  const initVault = useVault((state) => state.initVault);
+
+  const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [chooserOpen, setChooserOpen] = useState(false);
+
+  const note = activeId ? (notes[activeId] ?? null) : null;
+
+  useEffect(() => {
+    void init();
+    void initVault();
+    return registerLifecycleFlush();
+  }, [init, initVault]);
+
+  const openFromDisk = useCallback(async () => {
+    if (!supportsFileSystemAccess()) {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".noteseen,.md,.markdown,.txt";
+      input.multiple = true;
+      input.addEventListener("change", () => {
+        void importFiles(Array.from(input.files ?? []));
+      });
+      input.click();
+      return;
+    }
+
+    try {
+      const handles = await pickNoteFiles();
+      if (handles.length > 0) await importHandles(handles);
+    } catch (error) {
+      if (!isAbortError(error)) {
+        console.error("NoteSeen: open failed", error);
+        toast.error("Could not open that file");
+      }
+    }
+  }, [importFiles, importHandles]);
+
+  // Opening a .noteseen file from the OS lands here once the PWA is installed.
+  useEffect(() => {
+    consumeLaunchFiles((handles: NsFileHandle[]) => {
+      void importHandles(handles);
+    });
+  }, [importHandles]);
+
+  useEffect(() => {
+    if (!window.location.search) return;
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("new") === "1") setChooserOpen(true);
+    if (params.get("search") === "1") setPaletteOpen(true);
+
+    const shared = params.get("text") ?? params.get("url");
+    if (shared) {
+      createNote({
+        title: params.get("title") ?? "",
+        html: `<p>${shared.replace(/[<>&]/g, "")}</p>`,
+      });
+    }
+
+    window.history.replaceState({}, "", window.location.pathname);
+  }, [createNote]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod) return;
+      const key = event.key.toLowerCase();
+
+      if (key === "k") {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+        return;
+      }
+      if (key === "n" && !event.shiftKey) {
+        event.preventDefault();
+        setChooserOpen(true);
+        return;
+      }
+      if (key === "s") {
+        event.preventDefault();
+        if (activeId) void saveToFile(activeId);
+        return;
+      }
+      if (key === "o") {
+        event.preventDefault();
+        void openFromDisk();
+        return;
+      }
+      if (key === "f" && !isEditableTarget(event.target)) {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeId, openFromDisk, saveToFile]);
+
+  useEffect(() => {
+    const onDragOver = (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
+      event.preventDefault();
+    };
+
+    const onDrop = async (event: DragEvent) => {
+      const items = Array.from(event.dataTransfer?.items ?? []);
+      const files = Array.from(event.dataTransfer?.files ?? []);
+      if (items.length === 0 && files.length === 0) return;
+      event.preventDefault();
+
+      const images = files.filter((file) => file.type.startsWith("image/"));
+      if (images.length > 0) {
+        insertImages(images);
+        return;
+      }
+
+      const noteFiles = files.filter(isNoteFile);
+      const handleGetters = items
+        .filter((item) => item.kind === "file")
+        .map((item) => {
+          const withHandle = item as DataTransferItem & {
+            getAsFileSystemHandle?: () => Promise<NsFileHandle | null>;
+          };
+          return withHandle.getAsFileSystemHandle?.();
+        })
+        .filter((value): value is Promise<NsFileHandle | null> => value !== undefined);
+
+      if (handleGetters.length > 0) {
+        const handles = (await Promise.all(handleGetters)).filter(
+          (handle): handle is NsFileHandle => handle !== null && isNoteFileName(handle.name),
+        );
+        if (handles.length > 0) {
+          await importHandles(handles);
+          return;
+        }
+      }
+
+      if (noteFiles.length > 0) {
+        await importFiles(noteFiles);
+      } else if (files.length > 0) {
+        toast("That file type is not supported", {
+          description: "Drop a .noteseen, .md or .txt file, or an image to place it in the note.",
+        });
+      }
+    };
+
+    const onDropEvent = (event: DragEvent) => void onDrop(event);
+
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDropEvent);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDropEvent);
+    };
+  }, [importFiles, importHandles]);
+
+  if (!ready) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <span className="ns-mono text-muted">Opening NoteSeen…</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full flex-col bg-canvas">
+      <TopBar
+        note={note}
+        onOpenNav={() => setNavOpen(true)}
+        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenFiles={() => void openFromDisk()}
+      />
+
+      <div className="flex min-h-0 flex-1">
+        <div className="ns-no-print hidden lg:block">
+          <SideRail />
+        </div>
+
+        {navOpen ? (
+          <div className="ns-no-print fixed inset-0 z-40 flex lg:hidden">
+            <div
+              className="ns-fade absolute inset-0 bg-black/25"
+              onClick={() => setNavOpen(false)}
+              aria-hidden
+            />
+            <div className="relative z-10 h-full">
+              <SideRail onClose={() => setNavOpen(false)} />
+            </div>
+          </div>
+        ) : null}
+
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {view === "all" ? <NotesGrid /> : null}
+          {view === "trash" ? <TrashView /> : null}
+          {view === "shared" ? <SharedView /> : null}
+          {view === "editor" ? (
+            note ? (
+              <>
+                <div className="ns-scroll flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+                    <article
+                    className="ns-paper mx-auto w-full max-w-[46rem] px-6 py-9 sm:px-12 sm:py-12"
+                    data-theme={note.theme}
+                    data-typeface={note.typeface}
+                    data-size={note.size}
+                    data-spacing={note.spacing}
+                  >
+                    {note.kind === "prompt" ? (
+                      <PromptEditor note={note} />
+                    ) : (
+                      <NoteEditor note={note} />
+                    )}
+                  </article>
+                </div>
+                <footer className="ns-no-print flex h-10 shrink-0 items-center justify-between border-t border-hairline px-5">
+                  <SaveIndicator fileName={note.fileName} />
+                  <span className="ns-mono text-muted">
+                    {note.kind === "prompt" ? "prompt" : ".noteseen"}
+                  </span>
+                </footer>
+              </>
+            ) : (
+              <EmptyEditor onCreate={() => setChooserOpen(true)} onOpen={() => void openFromDisk()} />
+            )
+          ) : null}
+        </main>
+
+        {view === "editor" && note && note.kind === "note" ? <ToolRail note={note} /> : null}
+      </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onOpenFiles={() => void openFromDisk()}
+        onCreate={() => setChooserOpen(true)}
+      />
+      <NewItemDialog
+        open={chooserOpen}
+        onOpenChange={setChooserOpen}
+        onChoose={(kind: NoteKind) => createItem(kind)}
+      />
+      <VaultGateDialog />
+    </div>
+  );
+}
+
+function EmptyEditor({ onCreate, onOpen }: { onCreate: () => void; onOpen: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+      <h1 className="ns-display text-ink">Nothing open</h1>
+      <p className="ns-caption mt-3 max-w-sm text-body-muted">
+        Start a note or prompt, or open a <span className="font-mono text-[13px]">.noteseen</span>{" "}
+        file you saved earlier.
+      </p>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+        <Button variant="primary" onClick={onCreate}>
+          <FilePlus2 className="size-4" />
+          New
+        </Button>
+        <Button variant="outline" onClick={onOpen}>
+          <FolderOpen className="size-4" />
+          Open a file
+        </Button>
+      </div>
+    </div>
+  );
+}
