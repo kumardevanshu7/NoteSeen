@@ -1,10 +1,14 @@
 import { cn } from "@/lib/utils";
 import { navigate } from "@/lib/nav";
 
+/** Bump when replacing logo PNGs so SW/browser drop the old black-box assets. */
+const MARK_V = "v2";
+
+/** Transparent NoteSeen glyph — no baked black square. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img
-      src="/favicon-32x32.png"
+      src={`/noteseen-mark.png?${MARK_V}`}
       alt=""
       width={20}
       height={20}
@@ -30,10 +34,11 @@ export function Wordmark({ className }: { className?: string }) {
   );
 }
 
+/** Transparent Arigato mark — no baked black square. */
 export function ArigatoMark({ className, size = 17 }: { className?: string; size?: number }) {
   return (
     <img
-      src="/arigato-mark.png"
+      src={`/arigato-mark.png?${MARK_V}`}
       alt="Arigato Labs"
       width={size}
       height={size}

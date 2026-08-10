@@ -1,7 +1,7 @@
 import type { Note } from "@/lib/types";
 import { TYPEFACES } from "@/lib/note-themes";
 
-const LOGO_URL = "/android-chrome-192x192.png";
+const LOGO_URL = "/noteseen-mark.png?v=2";
 
 let logoDataUrlCache: string | null = null;
 

@@ -29,6 +29,8 @@ export default defineConfig({
         "favicon-32x32.png",
         "apple-touch-icon.png",
         "icons/*.png",
+        "noteseen-mark.png",
+        "arigato-mark.png",
         "arigato-labs-logo.png",
         "arigato-single-logo.png",
       ],

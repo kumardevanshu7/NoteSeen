@@ -249,7 +249,7 @@ export function NotesGrid() {
         )}
 
         <p className="ns-micro mt-14 flex items-center justify-center gap-2 text-muted">
-          <img src="/android-chrome-192x192.png" alt="" className="size-4 rounded-xs" />
+          <img src="/noteseen-mark.png?v=2" alt="" className="size-4 object-contain" />
           Arigato Labs
         </p>
       </div>

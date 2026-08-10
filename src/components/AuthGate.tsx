@@ -23,9 +23,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex h-full items-center justify-center bg-canvas">
         <img
-          src="/android-chrome-192x192.png"
+          src="/noteseen-mark.png?v=2"
           alt=""
-          className="size-12 rounded-xl"
+          className="size-12 object-contain"
           width={48}
           height={48}
         />

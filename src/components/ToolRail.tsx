@@ -344,7 +344,7 @@ export function ToolRail({ note }: { note: Note }) {
       </Section>
 
       <p className="ns-micro mt-8 flex items-center gap-2 text-muted">
-        <img src="/android-chrome-192x192.png" alt="" className="size-4 rounded-xs" />
+        <img src="/noteseen-mark.png?v=2" alt="" className="size-4 object-contain" />
         Arigato Labs
       </p>
     </aside>
