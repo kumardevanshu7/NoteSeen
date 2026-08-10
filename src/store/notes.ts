@@ -144,6 +144,10 @@ interface NotesState {
   restoreNote: (id: string) => void;
   purgeNote: (id: string) => Promise<void>;
   emptyTrash: () => Promise<void>;
+  /** Rename a label on every live note that uses it (vault required by caller). */
+  renameLabel: (from: string, to: string) => number;
+  /** Remove a label from every live note that uses it (vault required by caller). */
+  removeLabel: (label: string) => number;
 
   flush: (options?: { toDisk?: boolean }) => Promise<void>;
   saveToFile: (id: string, options?: { forcePicker?: boolean }) => Promise<void>;
@@ -494,6 +498,63 @@ export const useNotes = create<NotesState>((set, get) => {
       await removeNotes(ids);
       void syncAdapter().removeNotes(ids);
       toast.success(`Deleted ${ids.length} note${ids.length === 1 ? "" : "s"} for good`);
+    },
+
+    renameLabel(from, to) {
+      const source = from.trim().toLowerCase();
+      const nextName = to.trim().replace(/\s+/g, " ").slice(0, 40);
+      if (!source || !nextName) return 0;
+
+      const stamp = Date.now();
+      let touched = 0;
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const [id, note] of Object.entries(notes)) {
+          if (note.deletedAt) continue;
+          if (!note.tags.some((tag) => tag.toLowerCase() === source)) continue;
+          const tags = note.tags
+            .map((tag) => (tag.toLowerCase() === source ? nextName : tag))
+            .filter((tag, index, all) => all.findIndex((t) => t.toLowerCase() === tag.toLowerCase()) === index);
+          notes[id] = { ...note, tags, updatedAt: stamp };
+          dirtyNotes.add(id);
+          touched += 1;
+        }
+        return { notes };
+      });
+      if (touched > 0) {
+        scheduleIdb();
+        void get()
+          .flush({ toDisk: false })
+          .then(() => syncAdapter().flushCloud?.());
+      }
+      return touched;
+    },
+
+    removeLabel(label) {
+      const target = label.trim().toLowerCase();
+      if (!target) return 0;
+
+      const stamp = Date.now();
+      let touched = 0;
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const [id, note] of Object.entries(notes)) {
+          if (note.deletedAt) continue;
+          if (!note.tags.some((tag) => tag.toLowerCase() === target)) continue;
+          const tags = note.tags.filter((tag) => tag.toLowerCase() !== target);
+          notes[id] = { ...note, tags, updatedAt: stamp };
+          dirtyNotes.add(id);
+          touched += 1;
+        }
+        return { notes };
+      });
+      if (touched > 0) {
+        scheduleIdb();
+        void get()
+          .flush({ toDisk: false })
+          .then(() => syncAdapter().flushCloud?.());
+      }
+      return touched;
     },
 
     async flush(options) {

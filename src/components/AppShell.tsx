@@ -10,6 +10,7 @@ import { useVault } from "@/store/vault";
 import { CommandPalette } from "./CommandPalette";
 import { NoteEditor } from "./NoteEditor";
 import { NotesGrid } from "./NotesGrid";
+import { LabelsView } from "./LabelsView";
 import { NewItemDialog } from "./NewItemDialog";
 import { PromptEditor } from "./PromptEditor";
 import { SaveIndicator } from "./SaveIndicator";
@@ -239,6 +240,7 @@ export function AppShell() {
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {view === "all" ? <NotesGrid /> : null}
+          {view === "labels" ? <LabelsView /> : null}
           {view === "trash" ? <TrashView /> : null}
           {view === "shared" ? <SharedView /> : null}
           {view === "editor" ? (

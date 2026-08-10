@@ -23,7 +23,7 @@ export type Typeface =
   | "mono";
 export type TextSize = "s" | "m" | "l";
 export type LineSpacing = "tight" | "normal" | "relaxed";
-export type View = "editor" | "all" | "shared" | "trash";
+export type View = "editor" | "all" | "shared" | "trash" | "labels";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type NoteKind = "note" | "prompt";
 

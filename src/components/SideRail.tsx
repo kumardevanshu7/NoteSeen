@@ -5,6 +5,7 @@ import {
   Pin,
   Search,
   Sparkles,
+  Tags,
   Trash2,
   Users,
   X,
@@ -14,9 +15,9 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
 import { Kbd } from "@/components/ui/kbd";
 import { NewItemDialog } from "@/components/NewItemDialog";
-import { ArigatoMark } from "@/components/Logo";
+import { ArigatoMark, LogoMark } from "@/components/Logo";
 import { useNotes } from "@/store/notes";
-import { liveNotes, noteLabel, searchNotes, trashedNotes } from "@/lib/selectors";
+import { collectLabels, liveNotes, noteLabel, searchNotes, trashedNotes } from "@/lib/selectors";
 import type { NoteKind, View } from "@/lib/types";
 import { cn, excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
 import { navigate } from "@/lib/nav";
@@ -24,6 +25,7 @@ import { navigate } from "@/lib/nav";
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "editor", label: "Notes Editor", icon: NotebookPen },
   { id: "all", label: "My Notes", icon: FileText },
+  { id: "labels", label: "Labels", icon: Tags },
   { id: "shared", label: "Shared Notes", icon: Users },
 ];
 
@@ -42,6 +44,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
   const live = useMemo(() => liveNotes(notes), [notes]);
   const trashed = useMemo(() => trashedNotes(notes), [notes]);
   const visible = useMemo(() => searchNotes(live, query), [live, query]);
+  const allLabels = useMemo(() => collectLabels(notes), [notes]);
 
   return (
     <div className="flex h-full w-[268px] shrink-0 flex-col border-r border-hairline bg-canvas">
@@ -53,6 +56,11 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
             </Button>
           </div>
         ) : null}
+
+        <div className="mb-4 flex items-center gap-2 px-1">
+          <LogoMark />
+          <span className="font-display text-[15px] tracking-[-0.02em] text-ink">NoteSeen</span>
+        </div>
 
         <ul className="space-y-0.5">
           {NAV.map((item) => (
@@ -75,10 +83,36 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                 {item.id === "all" ? (
                   <span className="ns-mono text-muted">{live.length}</span>
                 ) : null}
+                {item.id === "labels" && allLabels.length > 0 ? (
+                  <span className="ns-mono text-muted">{allLabels.length}</span>
+                ) : null}
               </button>
             </li>
           ))}
         </ul>
+
+        {allLabels.length > 0 ? (
+          <div className="mt-3 px-1">
+            <p className="ns-mono mb-2 px-1.5 text-muted">Your labels</p>
+            <div className="flex flex-wrap gap-1.5">
+              {allLabels.slice(0, 12).map(({ label, count }) => (
+                <button
+                  key={label.toLowerCase()}
+                  type="button"
+                  title={`${count} note${count === 1 ? "" : "s"}`}
+                  onClick={() => {
+                    setQuery(label);
+                    setView("all");
+                    dismiss();
+                  }}
+                  className="max-w-full truncate rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-[11px] text-slate transition-colors hover:border-ink/20 hover:text-ink"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="my-3 h-px bg-hairline" />
 
@@ -108,9 +142,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
           }}
           className="mt-0.5 flex w-full items-center gap-2.5 rounded-xs px-2.5 py-2 text-left text-sm text-body-muted transition-colors hover:bg-stone/60 hover:text-ink"
         >
-          <span className="inline-flex size-4 shrink-0 items-center justify-center">
-            <ArigatoMark size={17} />
-          </span>
+          <ArigatoMark size={16} className="shrink-0" />
           <span className="flex-1 truncate">Explore Arigato Labs</span>
         </button>
       </nav>
@@ -174,15 +206,28 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                         {noteLabel(note)}
                       </span>
                     </span>
-                    <span className="mt-0.5 flex items-baseline gap-2">
-                      <span className="ns-micro flex-1 truncate text-muted">
-                        {excerpt(note.text) ||
-                          (note.kind === "prompt" ? "Empty prompt" : "Empty note")}
+                    {note.tags.length > 0 ? (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {note.tags.slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="max-w-[7rem] truncate rounded-full border border-hairline bg-surface/80 px-1.5 py-px text-[10px] text-muted"
+                          >
+                            {tag}
+                          </span>
+                        ))}
                       </span>
-                      <span className="ns-micro shrink-0 text-muted">
-                        {formatRelative(note.updatedAt)}
+                    ) : (
+                      <span className="mt-0.5 flex items-baseline gap-2">
+                        <span className="ns-micro flex-1 truncate text-muted">
+                          {excerpt(note.text) ||
+                            (note.kind === "prompt" ? "Empty prompt" : "Empty note")}
+                        </span>
+                        <span className="ns-micro shrink-0 text-muted">
+                          {formatRelative(note.updatedAt)}
+                        </span>
                       </span>
-                    </span>
+                    )}
                   </button>
                   <div className="absolute top-2 right-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
                     <CopyButton note={note} size="icon-sm" />
