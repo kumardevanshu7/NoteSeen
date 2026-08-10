@@ -19,6 +19,7 @@ import { ToolRail } from "./ToolRail";
 import { TopBar } from "./TopBar";
 import { TrashView } from "./TrashView";
 import { VaultGateDialog } from "./VaultGateDialog";
+import { EditorErrorBoundary } from "./EditorErrorBoundary";
 import type { NoteKind } from "@/lib/types";
 
 const NOTE_FILE_PATTERN = /\.(noteseen|md|markdown|txt|html?)$/i;
@@ -251,11 +252,13 @@ export function AppShell() {
                     data-size={note.size}
                     data-spacing={note.spacing}
                   >
-                    {note.kind === "prompt" ? (
-                      <PromptEditor note={note} />
-                    ) : (
-                      <NoteEditor note={note} />
-                    )}
+                    <EditorErrorBoundary>
+                      {note.kind === "prompt" ? (
+                        <PromptEditor note={note} />
+                      ) : (
+                        <NoteEditor note={note} />
+                      )}
+                    </EditorErrorBoundary>
                   </article>
                 </div>
                 <footer className="ns-no-print flex h-10 shrink-0 items-center justify-between border-t border-hairline px-5">
