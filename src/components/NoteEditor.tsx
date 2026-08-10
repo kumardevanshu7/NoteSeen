@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/CopyButton";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
-import { requireVault, useVault } from "@/store/vault";
+import { requireVault } from "@/store/vault";
 import type { Note } from "@/lib/types";
 import { countWords, formatClock, readingMinutes } from "@/lib/utils";
 import { SelectionMenu } from "./SelectionMenu";
@@ -36,12 +36,18 @@ function parseLabels(raw: string): string[] {
 export function NoteEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const setEditor = useEditorStore((state) => state.setEditor);
-  const unlocked = useVault((state) => {
-    const until = state.unlockedUntil;
-    return typeof until === "number" && until > Date.now();
-  });
+  const [sessionUnlocked, setSessionUnlocked] = useState(false);
   const isNew = !note.title && !note.text;
-  const canEdit = unlocked || isNew;
+  const canEdit = isNew || sessionUnlocked;
+
+  useEffect(() => {
+    setSessionUnlocked(false);
+  }, [note.id]);
+
+  const unlockForEdit = async () => {
+    const ok = await requireVault("edit");
+    if (ok) setSessionUnlocked(true);
+  };
 
   const noteIdRef = useRef(note.id);
   const loadedIdRef = useRef<string | null>(null);
@@ -176,7 +182,7 @@ export function NoteEditor({ note }: { note: Note }) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <CopyButton note={note} label="Copy note" />
         {!canEdit ? (
-          <Button variant="outline" size="sm" onClick={() => void requireVault("edit")}>
+          <Button variant="outline" size="sm" onClick={() => void unlockForEdit()}>
             <Lock className="size-3.5" />
             Unlock to edit
           </Button>

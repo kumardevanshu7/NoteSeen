@@ -50,17 +50,21 @@ export function VaultGateDialog() {
       if (isSetup) {
         await setupVault(question, answer);
         toast.success("Vault set", {
-          description: "Edit and delete now ask for this answer.",
+          description: "Every edit and delete will ask for this answer.",
         });
         reset();
       } else {
+        const reason = pendingReason;
         const ok = await unlockWithAnswer(answer);
         if (!ok) {
           setError("Wrong answer. Try again.");
           setBusy(false);
           return;
         }
-        toast.success("Unlocked for 30 minutes");
+        toast.success("Verified", {
+          description:
+            reason === "delete" ? "You can delete now." : "You can edit this item now.",
+        });
         reset();
       }
     } catch (err) {
@@ -79,7 +83,7 @@ export function VaultGateDialog() {
           </DialogTitle>
           <DialogDescription>
             {isSetup
-              ? "One security question for this device. Edit and delete need the answer."
+              ? "One security question for this device. Every edit and delete asks for the answer."
               : pendingReason === "delete"
                 ? "Answer your vault question to delete."
                 : "Answer your vault question to edit."}

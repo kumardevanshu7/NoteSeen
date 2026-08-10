@@ -8,7 +8,7 @@ import { plainTextToHtmlFriendly } from "@/lib/prompt-utils";
 import type { Note } from "@/lib/types";
 import { formatClock } from "@/lib/utils";
 import { useNotes } from "@/store/notes";
-import { requireVault, useVault } from "@/store/vault";
+import { requireVault } from "@/store/vault";
 
 function parseTags(raw: string): string[] {
   return raw
@@ -21,12 +21,9 @@ function parseTags(raw: string): string[] {
 
 export function PromptEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
-  const unlocked = useVault((state) => {
-    const until = state.unlockedUntil;
-    return typeof until === "number" && until > Date.now();
-  });
+  const [sessionUnlocked, setSessionUnlocked] = useState(false);
   const isNew = !note.title && !note.text;
-  const canEdit = unlocked || isNew;
+  const canEdit = isNew || sessionUnlocked;
 
   const [title, setTitle] = useState(note.title);
   const [tagsRaw, setTagsRaw] = useState(note.tags.join(", "));
@@ -34,14 +31,24 @@ export function PromptEditor({ note }: { note: Note }) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setSessionUnlocked(false);
+  }, [note.id]);
+
+  useEffect(() => {
     setTitle(note.title);
     setTagsRaw(note.tags.join(", "));
     setBody(note.text);
   }, [note.id, note.title, note.tags, note.text]);
 
+  const unlockForEdit = async () => {
+    const ok = await requireVault("edit");
+    if (ok) setSessionUnlocked(true);
+    return ok;
+  };
+
   const save = async () => {
     if (!canEdit) {
-      const ok = await requireVault("edit");
+      const ok = await unlockForEdit();
       if (!ok) return;
     }
     setSaving(true);
@@ -70,7 +77,7 @@ export function PromptEditor({ note }: { note: Note }) {
               Save
             </Button>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => void requireVault("edit")}>
+            <Button variant="outline" size="sm" onClick={() => void unlockForEdit()}>
               <Lock className="size-3.5" />
               Unlock to edit
             </Button>
