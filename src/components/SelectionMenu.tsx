@@ -1,5 +1,13 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
-import { BubbleMenu, type Editor } from "@tiptap/react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
+import { createPortal } from "react-dom";
+import type { Editor } from "@tiptap/react";
 import {
   Bold,
   Check,
@@ -14,17 +22,93 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useEditorTick } from "@/hooks/use-editor-tick";
 
+const MENU_WIDTH = 256;
+const GAP = 8;
+
+interface Position {
+  top: number;
+  left: number;
+}
+
+/**
+ * Positioned by hand instead of with Tiptap's BubbleMenu: that helper relocates
+ * the React-rendered node into a Tippy container, so React later fails to
+ * remove a node it no longer owns ("removeChild ... not a child of this node").
+ */
 export function SelectionMenu({ editor }: { editor: Editor }) {
-  useEditorTick(editor);
+  const [position, setPosition] = useState<Position | null>(null);
   const [linkMode, setLinkMode] = useState(false);
   const [linkValue, setLinkValue] = useState("");
   const linkInput = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const heightRef = useRef(180);
+
+  const place = useCallback(() => {
+    if (editor.isDestroyed) return setPosition(null);
+
+    const { from, to, empty } = editor.state.selection;
+    if (empty || !editor.isEditable || editor.isActive("codeBlock")) {
+      return setPosition(null);
+    }
+
+    let start: { top: number; bottom: number; left: number };
+    let end: { top: number; bottom: number; left: number };
+    try {
+      start = editor.view.coordsAtPos(from);
+      end = editor.view.coordsAtPos(to, -1);
+    } catch {
+      // Coordinates are unavailable mid-transaction; the next tick retries.
+      return setPosition(null);
+    }
+
+    const height = heightRef.current;
+    const selectionTop = Math.min(start.top, end.top);
+    const selectionBottom = Math.max(start.bottom, end.bottom);
+
+    const below = selectionBottom + GAP;
+    const fitsBelow = below + height <= window.innerHeight - GAP;
+    const top = fitsBelow ? below : Math.max(GAP, selectionTop - height - GAP);
+
+    const rawLeft = Math.min(start.left, end.left);
+    const left = Math.min(Math.max(GAP, rawLeft), window.innerWidth - MENU_WIDTH - GAP);
+
+    setPosition({ top, left });
+  }, [editor]);
+
+  useEffect(() => {
+    place();
+
+    const onSelection = () => place();
+    editor.on("selectionUpdate", onSelection);
+    editor.on("transaction", onSelection);
+
+    window.addEventListener("scroll", onSelection, true);
+    window.addEventListener("resize", onSelection);
+
+    return () => {
+      editor.off("selectionUpdate", onSelection);
+      editor.off("transaction", onSelection);
+      window.removeEventListener("scroll", onSelection, true);
+      window.removeEventListener("resize", onSelection);
+    };
+  }, [editor, place]);
+
+  // Remember the rendered height so the flip-above decision is accurate.
+  useLayoutEffect(() => {
+    const measured = menuRef.current?.offsetHeight;
+    if (measured && measured !== heightRef.current) heightRef.current = measured;
+  }, [position, linkMode]);
+
+  useEffect(() => {
+    if (!position) setLinkMode(false);
+  }, [position]);
 
   useEffect(() => {
     if (linkMode) linkInput.current?.focus();
   }, [linkMode]);
+
+  if (!position) return null;
 
   const selectedText = editor.state.doc.textBetween(
     editor.state.selection.from,
@@ -76,109 +160,109 @@ export function SelectionMenu({ editor }: { editor: Editor }) {
     },
   ];
 
-  return (
-    <BubbleMenu
-      editor={editor}
-      updateDelay={80}
-      tippyOptions={{ duration: 120, maxWidth: "none", placement: "bottom-start" }}
-      shouldShow={({ editor: instance, from, to }) =>
-        instance.isEditable && from !== to && !instance.isActive("codeBlock")
-      }
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="ns-no-print ns-fade fixed z-50 w-64 overflow-hidden rounded-sm border border-hairline bg-surface shadow-[0_20px_50px_-28px_rgb(0_0_0/0.45)]"
+      style={{ top: position.top, left: position.left }}
+      // Keeps the text selection alive while a menu button is pressed.
+      onMouseDown={(event) => {
+        if (!linkMode) event.preventDefault();
+      }}
     >
-      <div className="w-64 overflow-hidden rounded-sm border border-hairline bg-surface shadow-[0_20px_50px_-28px_rgb(0_0_0/0.45)]">
-        {linkMode ? (
-          <div className="flex items-center gap-1.5 p-2">
-            <input
-              ref={linkInput}
-              value={linkValue}
-              onChange={(event) => setLinkValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  applyLink();
-                }
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setLinkMode(false);
-                }
-              }}
-              placeholder="Paste or type a link"
-              className="h-8 flex-1 rounded-xs border border-hairline bg-surface px-2 text-[13px] text-ink outline-none focus-visible:border-focus"
-            />
-            <button
-              type="button"
-              onClick={applyLink}
-              aria-label="Apply link"
-              className="flex size-8 items-center justify-center rounded-xs text-ink hover:bg-stone"
-            >
-              <Check className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setLinkMode(false)}
-              aria-label="Cancel"
-              className="flex size-8 items-center justify-center rounded-xs text-slate hover:bg-stone"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-0.5 border-b border-hairline p-1.5">
-              {marks.map((mark) => (
-                <button
-                  key={mark.id}
-                  type="button"
-                  aria-label={mark.label}
-                  aria-pressed={editor.isActive(mark.id)}
-                  onClick={mark.run}
-                  className={cn(
-                    "flex size-8 items-center justify-center rounded-xs text-ink transition-colors hover:bg-stone",
-                    editor.isActive(mark.id) && "bg-primary text-primary-ink hover:bg-primary/88",
-                  )}
-                >
-                  <mark.icon className="size-4" />
-                </button>
-              ))}
+      {linkMode ? (
+        <div className="flex items-center gap-1.5 p-2">
+          <input
+            ref={linkInput}
+            value={linkValue}
+            onChange={(event) => setLinkValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                applyLink();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setLinkMode(false);
+              }
+            }}
+            placeholder="Paste or type a link"
+            className="h-8 flex-1 rounded-xs border border-hairline bg-surface px-2 text-[13px] text-ink outline-none focus-visible:border-focus"
+          />
+          <button
+            type="button"
+            onClick={applyLink}
+            aria-label="Apply link"
+            className="flex size-8 items-center justify-center rounded-xs text-ink hover:bg-stone"
+          >
+            <Check className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setLinkMode(false)}
+            aria-label="Cancel"
+            className="flex size-8 items-center justify-center rounded-xs text-slate hover:bg-stone"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-0.5 border-b border-hairline p-1.5">
+            {marks.map((mark) => (
               <button
+                key={mark.id}
                 type="button"
-                aria-label="Add link"
-                onClick={openLinkMode}
+                aria-label={mark.label}
+                aria-pressed={editor.isActive(mark.id)}
+                onClick={mark.run}
                 className={cn(
-                  "ml-auto flex size-8 items-center justify-center rounded-xs text-ink transition-colors hover:bg-stone",
-                  editor.isActive("link") && "bg-primary text-primary-ink hover:bg-primary/88",
+                  "flex size-8 items-center justify-center rounded-xs text-ink transition-colors hover:bg-stone",
+                  editor.isActive(mark.id) && "bg-primary text-primary-ink hover:bg-primary/88",
                 )}
               >
-                <Link2 className="size-4" />
+                <mark.icon className="size-4" />
               </button>
-            </div>
+            ))}
+            <button
+              type="button"
+              aria-label="Add link"
+              onClick={openLinkMode}
+              className={cn(
+                "ml-auto flex size-8 items-center justify-center rounded-xs text-ink transition-colors hover:bg-stone",
+                editor.isActive("link") && "bg-primary text-primary-ink hover:bg-primary/88",
+              )}
+            >
+              <Link2 className="size-4" />
+            </button>
+          </div>
 
-            <div className="p-1.5">
-              <p className="ns-mono px-2 pt-1 pb-1.5 text-muted">Actions</p>
-              <MenuAction
-                icon={Copy}
-                label="Copy the text"
-                onClick={() => {
-                  void navigator.clipboard.writeText(selectedText);
-                  toast.success("Copied");
-                }}
-              />
-              <MenuAction
-                icon={Languages}
-                label={`Search for “${selectedText.slice(0, 18)}${selectedText.length > 18 ? "…" : ""}”`}
-                onClick={() =>
-                  window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(selectedText)}`,
-                    "_blank",
-                    "noopener,noreferrer",
-                  )
-                }
-              />
-            </div>
-          </>
-        )}
-      </div>
-    </BubbleMenu>
+          <div className="p-1.5">
+            <p className="ns-mono px-2 pt-1 pb-1.5 text-muted">Actions</p>
+            <MenuAction
+              icon={Copy}
+              label="Copy the text"
+              onClick={() => {
+                void navigator.clipboard.writeText(selectedText);
+                toast.success("Copied");
+              }}
+            />
+            <MenuAction
+              icon={Languages}
+              label={`Search for “${selectedText.slice(0, 18)}${selectedText.length > 18 ? "…" : ""}”`}
+              onClick={() =>
+                window.open(
+                  `https://www.google.com/search?q=${encodeURIComponent(selectedText)}`,
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+            />
+          </div>
+        </>
+      )}
+    </div>,
+    document.body,
   );
 }
 

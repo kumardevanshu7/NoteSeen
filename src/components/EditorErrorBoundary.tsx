@@ -13,6 +13,9 @@ interface State {
 /** Keeps a paste/editor crash from blanking the whole app shell. */
 export class EditorErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
+  /** One silent remount is enough for transient DOM races. */
+  private retried = false;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
 
   static getDerivedStateFromError(error: Error): State {
     return { error };
@@ -20,7 +23,21 @@ export class EditorErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("NoteSeen: editor crashed", error, info);
+
+    if (!this.retried) {
+      this.retried = true;
+      this.retryTimer = setTimeout(() => this.setState({ error: null }), 60);
+    }
   }
+
+  componentWillUnmount() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+  }
+
+  private reload = () => {
+    this.retried = false;
+    this.setState({ error: null });
+  };
 
   render() {
     if (!this.state.error) return this.props.children;
@@ -29,15 +46,9 @@ export class EditorErrorBoundary extends Component<Props, State> {
       <div className="rounded-sm border border-dashed border-hairline px-6 py-10 text-center">
         <p className="ns-feature text-ink">{this.props.fallbackTitle ?? "Editor hit a snag"}</p>
         <p className="ns-caption mx-auto mt-2 max-w-sm text-body-muted">
-          That paste was too messy for the editor. Try again with less formatting, or paste as plain
-          text (Ctrl+Shift+V).
+          Your note is safe — it was saved before this. Reload the editor to keep writing.
         </p>
-        <Button
-          variant="primary"
-          size="sm"
-          className="mt-5"
-          onClick={() => this.setState({ error: null })}
-        >
+        <Button variant="primary" size="sm" className="mt-5" onClick={this.reload}>
           Reload editor
         </Button>
       </div>
