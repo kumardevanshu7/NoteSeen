@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   onSnapshot,
   setDoc,
   type Unsubscribe,
@@ -11,7 +12,8 @@ import type { Note } from "@/lib/types";
 import { normalizeNote } from "@/lib/types";
 import { type SyncAdapter } from "./adapter";
 
-const CLOUD_PUSH_DEBOUNCE_MS = 3500;
+/** Fast enough to feel instant; still batches rapid keystrokes. */
+const CLOUD_PUSH_DEBOUNCE_MS = 450;
 
 type NoteDoc = Omit<Note, "fileName"> & { fileName?: string | null };
 
@@ -24,7 +26,6 @@ function noteDoc(uid: string, noteId: string) {
 }
 
 function toDoc(note: Note): NoteDoc {
-  // File System handles stay local — never upload them.
   return {
     id: note.id,
     kind: note.kind,
@@ -60,6 +61,8 @@ export function createFirestoreAdapter(): SyncAdapter {
   let pushTimer: ReturnType<typeof setTimeout> | null = null;
   const pending = new Map<string, Note>();
   let connectedUid: string | null = null;
+  /** Remote ids seen on the last full snapshot — used to detect hard deletes. */
+  let knownRemoteIds = new Set<string>();
 
   async function flushPending() {
     if (pushTimer) {
@@ -72,7 +75,6 @@ export function createFirestoreAdapter(): SyncAdapter {
     const entries = [...pending.entries()];
     pending.clear();
 
-    // Firestore batches max out at 500 ops.
     for (let i = 0; i < entries.length; i += 450) {
       const slice = entries.slice(i, i + 450);
       const chunk = writeBatch(getFirebaseDb());
@@ -83,14 +85,27 @@ export function createFirestoreAdapter(): SyncAdapter {
     }
   }
 
-  function schedulePush(notes: Note[]) {
+  function schedulePush(notes: Note[], immediate = false) {
     for (const note of notes) pending.set(note.id, note);
     if (pushTimer) clearTimeout(pushTimer);
+    if (immediate) {
+      void flushPending().catch((error) => {
+        console.error("NoteSeen: Firestore push failed", error);
+      });
+      return;
+    }
     pushTimer = setTimeout(() => {
       void flushPending().catch((error) => {
         console.error("NoteSeen: Firestore push failed", error);
       });
     }, CLOUD_PUSH_DEBOUNCE_MS);
+  }
+
+  async function readAllNotes(uid: string): Promise<Note[]> {
+    const snapshot = await getDocs(notesCol(uid));
+    const notes = snapshot.docs.map((entry) => fromDoc(entry.data() as NoteDoc, entry.id));
+    knownRemoteIds = new Set(notes.map((note) => note.id));
+    return notes;
   }
 
   return {
@@ -116,15 +131,25 @@ export function createFirestoreAdapter(): SyncAdapter {
       );
     },
 
+    async pullNotes() {
+      const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
+      if (!uid) return [];
+      return readAllNotes(uid);
+    },
+
     async pushNotes(notes) {
       if (!getFirebaseAuth().currentUser) return;
-      schedulePush(notes);
+      const urgent = notes.some((note) => note.deletedAt != null);
+      schedulePush(notes, urgent);
     },
 
     async removeNotes(ids) {
       const uid = getFirebaseAuth().currentUser?.uid;
       if (!uid || ids.length === 0) return;
-      for (const id of ids) pending.delete(id);
+      for (const id of ids) {
+        pending.delete(id);
+        knownRemoteIds.delete(id);
+      }
       for (let i = 0; i < ids.length; i += 450) {
         const slice = ids.slice(i, i + 450);
         const batch = writeBatch(getFirebaseDb());
@@ -152,7 +177,25 @@ export function createFirestoreAdapter(): SyncAdapter {
           const notes = snapshot.docs.map((entry) =>
             fromDoc(entry.data() as NoteDoc, entry.id),
           );
-          onRemoteNotes(notes);
+          const nextIds = new Set(notes.map((note) => note.id));
+          // Surface hard-deletes as soft-deleted stubs so devices drop them from live lists.
+          const removed: Note[] = [];
+          for (const id of knownRemoteIds) {
+            if (nextIds.has(id)) continue;
+            removed.push(
+              normalizeNote({
+                id,
+                title: "",
+                html: "<p></p>",
+                text: "",
+                deletedAt: Date.now(),
+                updatedAt: Date.now(),
+                createdAt: Date.now(),
+              }),
+            );
+          }
+          knownRemoteIds = nextIds;
+          onRemoteNotes(removed.length > 0 ? [...notes, ...removed] : notes);
         },
         (error) => {
           console.error("NoteSeen: Firestore listener error", error);
@@ -167,6 +210,7 @@ export function createFirestoreAdapter(): SyncAdapter {
           pushTimer = null;
         }
         connectedUid = null;
+        knownRemoteIds = new Set();
       };
     },
   };

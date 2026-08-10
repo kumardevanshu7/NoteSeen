@@ -401,7 +401,7 @@ export const useNotes = create<NotesState>((set, get) => {
         for (const id of unique) {
           const note = notes[id];
           if (!note) continue;
-          notes[id] = { ...note, deletedAt: stamp, pinned: false };
+          notes[id] = { ...note, deletedAt: stamp, pinned: false, updatedAt: stamp };
         }
         const remaining = Object.values(notes)
           .filter((candidate) => !candidate.deletedAt)
@@ -415,6 +415,10 @@ export const useNotes = create<NotesState>((set, get) => {
 
       for (const id of unique) dirtyNotes.add(id);
       scheduleIdb();
+      // Trash must hit the cloud quickly so other devices drop the note.
+      void get()
+        .flush({ toDisk: false })
+        .then(() => syncAdapter().flushCloud?.());
 
       toast(unique.length === 1 ? "Moved to Trash" : `Moved ${unique.length} items to Trash`, {
         action:
@@ -428,13 +432,20 @@ export const useNotes = create<NotesState>((set, get) => {
     restoreNote(id) {
       const note = get().notes[id];
       if (!note) return;
+      const stamp = Date.now();
       set((state) => ({
-        notes: { ...state.notes, [id]: { ...note, deletedAt: null } },
+        notes: {
+          ...state.notes,
+          [id]: { ...note, deletedAt: null, updatedAt: stamp },
+        },
         activeId: id,
         view: "editor",
       }));
       dirtyNotes.add(id);
       scheduleIdb();
+      void get()
+        .flush({ toDisk: false })
+        .then(() => syncAdapter().flushCloud?.());
     },
 
     async purgeNote(id) {
@@ -641,6 +652,7 @@ export const useNotes = create<NotesState>((set, get) => {
       const local = get().notes;
       const next = { ...local };
       const toSave: Note[] = [];
+      let changed = false;
 
       for (const remoteRaw of remoteNotes) {
         const remote = normalizeNote(remoteRaw);
@@ -648,6 +660,7 @@ export const useNotes = create<NotesState>((set, get) => {
         if (!existing) {
           next[remote.id] = remote;
           toSave.push(remote);
+          changed = true;
           continue;
         }
 
@@ -656,11 +669,21 @@ export const useNotes = create<NotesState>((set, get) => {
         const note = normalizeNote({ ...merged, fileName: existing.fileName });
         next[remote.id] = note;
         toSave.push(note);
+        changed = true;
       }
 
-      if (toSave.length === 0) return;
+      if (!changed) return;
       set({ notes: next });
-      void saveNotes(toSave);
+      if (toSave.length > 0) void saveNotes(toSave);
+
+      // Drop permanently deleted notes from the open editor.
+      const activeId = get().activeId;
+      if (activeId && next[activeId]?.deletedAt) {
+        const live = Object.values(next)
+          .filter((note) => !note.deletedAt)
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        set({ activeId: live[0]?.id ?? null, view: live[0] ? "editor" : "all" });
+      }
     },
 
     async pushAllToCloud() {
@@ -668,6 +691,7 @@ export const useNotes = create<NotesState>((set, get) => {
       const all = Object.values(get().notes);
       if (all.length === 0) return;
       await syncAdapter().pushNotes(all);
+      await syncAdapter().flushCloud?.();
     },
   };
 });

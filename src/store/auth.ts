@@ -12,6 +12,7 @@ import { setSyncAdapter, syncAdapter } from "@/lib/sync/adapter";
 import { createFirestoreAdapter } from "@/lib/sync/firestore";
 import { navigate } from "@/lib/nav";
 import { useNotes } from "@/store/notes";
+import { useVault } from "@/store/vault";
 
 interface AuthState {
   ready: boolean;
@@ -65,11 +66,17 @@ async function startCloudSync(user: User) {
     await adapter.connect();
     useNotes.getState().setCloudUser(user.uid);
 
+    // Pull + merge BEFORE any push so this device cannot resurrect deleted notes.
+    const remote = (await adapter.pullNotes?.()) ?? [];
+    if (remote.length > 0) {
+      useNotes.getState().mergeRemoteNotes(remote);
+    }
+
+    await useNotes.getState().pushAllToCloud();
+
     stopSync = adapter.subscribe((remoteNotes) => {
       useNotes.getState().mergeRemoteNotes(remoteNotes);
     });
-
-    await useNotes.getState().pushAllToCloud();
   } catch (error) {
     console.error("NoteSeen: could not start cloud sync", error);
     toast.error("Could not connect to Firestore", {
@@ -107,6 +114,7 @@ export const useAuth = create<AuthState>((set, get) => ({
             console.error("NoteSeen: profile load failed", error);
             set({ profile: null, profileReady: true });
           }
+          await useVault.getState().syncVaultFromCloud();
           await startCloudSync(user);
           set({ syncing: false });
         })();

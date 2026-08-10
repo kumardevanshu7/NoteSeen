@@ -2,30 +2,25 @@ import type { Note } from "@/lib/types";
 
 /**
  * Seam for remote sync. NoteSeen is local-first: IndexedDB is the source of
- * truth and the UI never waits on a network call. A backend (Firebase or
- * anything else) plugs in here without touching the editor or the store.
- *
- * Implement this interface, then call `setSyncAdapter(yourAdapter)` once during
- * startup. `pushNotes` is called after a local save settles; `subscribe` should
- * hand back remote changes so they can be merged.
+ * truth and the UI never waits on a network call.
  */
 export interface SyncAdapter {
   readonly id: string;
-  /** Resolves once the adapter is authenticated and ready. */
   connect(): Promise<void>;
-  /** Called with notes that changed locally. */
+  /** One-shot pull before live subscribe (avoids push-over-remote race). */
+  pullNotes?(): Promise<Note[]>;
   pushNotes(notes: Note[]): Promise<void>;
-  /** Called when a note is permanently removed locally. */
   removeNotes(ids: string[]): Promise<void>;
-  /** Stream of remote changes. Return an unsubscribe function. */
   subscribe(onRemoteNotes: (notes: Note[]) => void): () => void;
-  /** Flush any debounced cloud writes immediately (used on sign-out). */
   flushCloud?(): Promise<void>;
 }
 
 const localOnly: SyncAdapter = {
   id: "local-only",
   async connect() {},
+  async pullNotes() {
+    return [];
+  },
   async pushNotes() {},
   async removeNotes() {},
   subscribe() {
@@ -44,10 +39,22 @@ export function syncAdapter(): SyncAdapter {
 }
 
 /**
- * Last-write-wins on `updatedAt`. Good enough for a single user across devices;
- * swap in a smarter merge when collaborative editing arrives.
+ * Last-write-wins on updatedAt. Soft-deletes win when their stamp is newer
+ * than the other side's updatedAt (even if updatedAt was forgotten historically).
  */
 export function mergeRemote(local: Note | undefined, remote: Note): Note {
   if (!local) return remote;
-  return remote.updatedAt > local.updatedAt ? remote : local;
+
+  const localDelete = local.deletedAt ?? 0;
+  const remoteDelete = remote.deletedAt ?? 0;
+  const localStamp = Math.max(local.updatedAt, localDelete);
+  const remoteStamp = Math.max(remote.updatedAt, remoteDelete);
+
+  if (remoteStamp > localStamp) return remote;
+  if (localStamp > remoteStamp) return local;
+
+  // Tie-break: prefer deleted over live so trash syncs across devices.
+  if (remoteDelete && !localDelete) return remote;
+  if (localDelete && !remoteDelete) return local;
+  return remote.updatedAt >= local.updatedAt ? remote : local;
 }

@@ -50,7 +50,7 @@ export function VaultGateDialog() {
       if (isSetup) {
         await setupVault(question, answer);
         toast.success("Vault set", {
-          description: "Every edit and delete will ask for this answer.",
+          description: "Synced to your Google account — same question on every device.",
         });
         reset();
       } else {

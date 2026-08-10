@@ -23,9 +23,23 @@ service cloud.firestore {
     function userDocKeysOk() {
       return request.resource.data.keys().hasOnly([
         'uid', 'email', 'displayName', 'photoURL', 'updatedAt',
-        'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt'
+        'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt',
+        'vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt'
       ])
       && request.resource.data.keys().hasAll(['uid', 'updatedAt']);
+    }
+
+    function vaultFieldsOk() {
+      let d = request.resource.data;
+      let hasVault = d.keys().hasAny(['vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt']);
+      return !hasVault || (
+        d.keys().hasAll(['vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt'])
+        && stringLen(d.vaultQuestion, 3, 200)
+        && d.vaultAnswerHash is string
+        && d.vaultAnswerHash.size() >= 32
+        && d.vaultAnswerHash.size() <= 128
+        && d.vaultCreatedAt is number
+      );
     }
 
     function userIdentityOk(uid) {
@@ -72,6 +86,7 @@ service cloud.firestore {
       return isOwner(uid)
         && userDocKeysOk()
         && userIdentityOk(uid)
+        && vaultFieldsOk()
         && (!profileFieldsPresent() || validProfile());
     }
 
