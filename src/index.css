@@ -59,25 +59,25 @@
 --------------------------------------------------------------------------- */
 
 :root {
-  --canvas: #f7f7f5;
+  --canvas: #ffffff;
   --surface: #ffffff;
-  --surface-sunken: #f1f1ee;
-  --stone: #ebeae4;
-  --pale-green: #eaf8e6;
-  --pale-blue: #eef3ff;
+  --surface-sunken: #fafaf9;
+  --stone: #eeece7;
+  --pale-green: #edfce9;
+  --pale-blue: #f1f5ff;
 
-  --ink: #1c1c20;
-  --body-muted: #5c5c66;
-  --slate: #6f6f7c;
-  --muted: #8e8e9a;
+  --ink: #212121;
+  --body-muted: #616161;
+  --slate: #75758a;
+  --muted: #93939f;
 
-  --primary: #1c1c20;
+  --primary: #17171c;
   --primary-ink: #ffffff;
-  --deep-green: #0a4a3e;
+  --deep-green: #003c33;
 
-  --hairline: #dddde2;
-  --card-border: #ececef;
-  --border-light: #e4e4e8;
+  --hairline: #d9d9dd;
+  --card-border: #f2f2f2;
+  --border-light: #e5e7eb;
 
   --action-blue: #1863dc;
   --focus-blue: #4c6ee6;
@@ -87,81 +87,82 @@
 
   /* Accent is driven by the note's theme style swatch. */
   --accent-wash: #ffffff;
-  --accent-line: #dddde2;
-  --accent-ink: #1c1c20;
+  --accent-line: #d9d9dd;
+  --accent-ink: #17171c;
 
   --theme-plain-wash: #ffffff;
-  --theme-plain-line: #e6e6ea;
-  --theme-plain-ink: #1c1c20;
+  --theme-plain-line: #e8e8ea;
+  --theme-plain-ink: #17171c;
 
-  --theme-azure-wash: #f3f6ff;
-  --theme-azure-line: #d7e0fb;
-  --theme-azure-ink: #1a56c4;
+  --theme-azure-wash: #f1f5ff;
+  --theme-azure-line: #d5dffb;
+  --theme-azure-ink: #1863dc;
 
-  --theme-sage-wash: #f1faf0;
-  --theme-sage-line: #d3e8ce;
-  --theme-sage-ink: #0a4a3e;
+  --theme-sage-wash: #edfce9;
+  --theme-sage-line: #cfe7c8;
+  --theme-sage-ink: #003c33;
 
-  --theme-sand-wash: #faf7f1;
-  --theme-sand-line: #e6dfd0;
-  --theme-sand-ink: #5f4a24;
+  --theme-sand-wash: #f7f4ed;
+  --theme-sand-line: #e2dbcb;
+  --theme-sand-ink: #6b5326;
 
-  --theme-aurora-wash: linear-gradient(135deg, #f5f3ff 0%, #f0f6ff 48%, #fff4f6 100%);
-  --theme-aurora-line: #e2def4;
-  --theme-aurora-ink: #4f45a8;
+  --theme-aurora-wash: linear-gradient(135deg, #f3f0ff 0%, #eef6ff 48%, #fff1f4 100%);
+  --theme-aurora-line: #e0dcf5;
+  --theme-aurora-ink: #5b4bc4;
 }
 
-/* Soft dusk dark — lifted surfaces, airy note papers (not near-black). */
+/* Site chrome stays near-black. Only note paper colors are lifted (color × black). */
 .dark {
-  --canvas: #17171c;
-  --surface: #222229;
-  --surface-sunken: #1c1c22;
-  --stone: #2c2c35;
-  --pale-green: #1c2e28;
-  --pale-blue: #1c2436;
+  --canvas: #0d0d11;
+  --surface: #14141a;
+  --surface-sunken: #101015;
+  --stone: #1e1e26;
+  --pale-green: #0c2420;
+  --pale-blue: #131a2b;
 
-  --ink: #f4f4f6;
-  --body-muted: #c0c0ca;
-  --slate: #a4a4b2;
-  --muted: #8a8a98;
+  --ink: #f2f2f4;
+  --body-muted: #b6b6c1;
+  --slate: #9a9aab;
+  --muted: #7c7c8c;
 
-  --primary: #f4f4f6;
-  --primary-ink: #1c1c22;
-  --deep-green: #b6edd9;
+  --primary: #f2f2f4;
+  --primary-ink: #14141a;
+  --deep-green: #a7e8d5;
 
-  --hairline: #363640;
-  --card-border: #2e2e38;
-  --border-light: #32323c;
+  --hairline: #2a2a33;
+  --card-border: #21212a;
+  --border-light: #272730;
 
-  --action-blue: #8bb0ff;
-  --focus-blue: #8fa6ff;
-  --coral: #ff9a82;
-  --coral-soft: #6e3f35;
-  --error: #ff7a7a;
+  --action-blue: #7ba6ff;
+  --focus-blue: #7f9bff;
+  --coral: #ff8f75;
+  --coral-soft: #7a4235;
+  --error: #ff6b6b;
 
-  --accent-wash: #26262e;
-  --accent-line: #3a3a46;
-  --accent-ink: #f4f4f6;
+  --accent-wash: #14141a;
+  --accent-line: #2a2a33;
+  --accent-ink: #f2f2f4;
 
-  --theme-plain-wash: #26262e;
-  --theme-plain-line: #3a3a46;
-  --theme-plain-ink: #f4f4f6;
+  --theme-plain-wash: #14141a;
+  --theme-plain-line: #262630;
+  --theme-plain-ink: #f2f2f4;
 
-  --theme-azure-wash: #222a3c;
-  --theme-azure-line: #364564;
-  --theme-azure-ink: #b4c9ff;
+  /* Colorful papers: muted mid-tones (not swamp-black, not white). */
+  --theme-azure-wash: #151c2c;
+  --theme-azure-line: #2a3754;
+  --theme-azure-ink: #a8c0ff;
 
-  --theme-sage-wash: #22352e;
-  --theme-sage-line: #3a554b;
-  --theme-sage-ink: #c6f0df;
+  --theme-sage-wash: #14241f;
+  --theme-sage-line: #2a433a;
+  --theme-sage-ink: #b5e8d4;
 
-  --theme-sand-wash: #2c2820;
-  --theme-sand-line: #4a4336;
-  --theme-sand-ink: #edd7a8;
+  --theme-sand-wash: #221e18;
+  --theme-sand-line: #3a3428;
+  --theme-sand-ink: #e2cb96;
 
-  --theme-aurora-wash: linear-gradient(135deg, #2a2540 0%, #222a3c 52%, #33242c 100%);
-  --theme-aurora-line: #45405e;
-  --theme-aurora-ink: #cbbfff;
+  --theme-aurora-wash: linear-gradient(135deg, #1c1830 0%, #151c2c 52%, #271820 100%);
+  --theme-aurora-line: #342e4c;
+  --theme-aurora-ink: #c0b0ff;
 }
 
 @theme inline {
@@ -354,13 +355,6 @@
   background: var(--accent-wash);
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-lg);
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--ink) 4%, transparent);
-}
-
-.dark .ns-paper {
-  box-shadow:
-    0 1px 0 color-mix(in oklab, #fff 5%, transparent),
-    0 18px 40px -28px color-mix(in oklab, #000 55%, transparent);
 }
 
 .ns-paper[data-theme="plain"] {

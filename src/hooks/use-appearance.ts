@@ -11,7 +11,7 @@ function readStored(): Appearance {
   } catch {
     // ignore
   }
-  return "light";
+  return "system";
 }
 
 function resolveDark(appearance: Appearance): boolean {

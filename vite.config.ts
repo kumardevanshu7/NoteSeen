@@ -56,8 +56,8 @@ export default defineConfig({
         display: "standalone",
         display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
         orientation: "any",
-        background_color: "#f7f7f5",
-        theme_color: "#f7f7f5",
+        background_color: "#0d0d11",
+        theme_color: "#17171c",
         categories: ["productivity", "utilities"],
         icons: [
           { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
