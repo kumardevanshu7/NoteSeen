@@ -184,8 +184,7 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
             disabled={!note}
             onSelect={() => {
               if (!note) return;
-              downloadHtml(note);
-              toast.success("HTML downloaded");
+              void downloadHtml(note).then(() => toast.success("HTML downloaded"));
             }}
           >
             <FileCode2 />
@@ -195,9 +194,10 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
             disabled={!note}
             onSelect={() => {
               if (!note) return;
-              const ok = exportPdf(note);
-              if (ok) toast.message("Print dialog open — choose Save as PDF");
-              else toast.error("Allow pop-ups to export PDF");
+              void exportPdf(note).then((ok) => {
+                if (ok) toast.message("Print dialog open — choose Save as PDF");
+                else toast.error("Could not open PDF export");
+              });
             }}
           >
             <FileType2 />
@@ -221,7 +221,15 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
             {note?.pinned ? <PinOff /> : <Pin />}
             {note?.pinned ? "Unpin" : "Pin to top"}
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={!note} onSelect={() => window.print()}>
+          <DropdownMenuItem
+            disabled={!note}
+            onSelect={() => {
+              if (!note) return;
+              void exportPdf(note).then((ok) => {
+                if (!ok) toast.error("Could not open print dialog");
+              });
+            }}
+          >
             <Printer />
             Print
           </DropdownMenuItem>

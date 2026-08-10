@@ -3,6 +3,8 @@ import { TYPEFACES } from "@/lib/note-themes";
 
 const LOGO_URL = "/android-chrome-192x192.png";
 
+let logoDataUrlCache: string | null = null;
+
 function fontFamily(typeface: Note["typeface"]): string {
   const map: Record<string, string> = {
     inter: "Inter, system-ui, sans-serif",
@@ -37,7 +39,37 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-export function buildExportHtml(note: Note, logoAbsoluteUrl: string): string {
+async function getLogoDataUrl(): Promise<string> {
+  if (logoDataUrlCache) return logoDataUrlCache;
+  try {
+    const res = await fetch(new URL(LOGO_URL, window.location.origin).href);
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    logoDataUrlCache = dataUrl;
+    return dataUrl;
+  } catch {
+    return new URL(LOGO_URL, window.location.origin).href;
+  }
+}
+
+function noteBodyHtml(note: Note): string {
+  const html = (note.html || "").trim();
+  if (html && html !== "<p></p>" && html !== "<p><br></p>") return html;
+  if (note.text.trim()) {
+    return note.text
+      .split(/\n+/)
+      .map((line) => `<p>${escapeHtml(line)}</p>`)
+      .join("");
+  }
+  return "<p><em>Empty note</em></p>";
+}
+
+export function buildExportHtml(note: Note, logoUrl: string): string {
   const title = note.title.trim() || "Untitled";
   const labels =
     note.tags.length > 0
@@ -50,16 +82,16 @@ export function buildExportHtml(note: Note, logoAbsoluteUrl: string): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light only" />
   <title>${escapeHtml(title)} · NoteSeen</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Lato:wght@400;700&family=Merriweather:wght@400;700&family=Montserrat:wght@400;600;700&family=Nunito:wght@400;600;700&family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;600;700&family=Roboto:wght@400;500;700&family=Source+Code+Pro:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    :root { color-scheme: light; }
-    body {
+    html, body {
       margin: 0;
-      background: #f4f2ee;
-      color: #14171a;
+      padding: 0;
+      background: #ffffff !important;
+      color: #14171a !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
       font-family: ${fontFamily(note.typeface)};
       line-height: 1.65;
     }
@@ -67,8 +99,8 @@ export function buildExportHtml(note: Note, logoAbsoluteUrl: string): string {
       max-width: 720px;
       margin: 0 auto;
       padding: 40px 28px 56px;
-      background: #fff;
-      min-height: 100vh;
+      background: #ffffff !important;
+      color: #14171a !important;
       box-sizing: border-box;
     }
     .brand {
@@ -80,20 +112,31 @@ export function buildExportHtml(note: Note, logoAbsoluteUrl: string): string {
       border-bottom: 1px solid #e6e2dc;
     }
     .brand img { width: 36px; height: 36px; border-radius: 8px; }
-    .brand span { font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: #5c6570; }
-    h1 { font-size: 1.75rem; margin: 0 0 8px; line-height: 1.25; }
+    .brand span {
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #5c6570;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin: 0 0 8px;
+      line-height: 1.25;
+      color: #14171a !important;
+    }
     .meta { font-size: 12px; color: #8a9199; margin-bottom: 24px; }
-    .content { font-size: 1rem; }
+    .content { font-size: 1rem; color: #14171a !important; }
+    .content p { margin: 0 0 0.85em; }
     .content pre {
       background: #14171a;
       color: #f4f2ee;
       padding: 14px 16px;
       border-radius: 8px;
       overflow-x: auto;
-      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-family: ui-monospace, "Courier New", monospace;
       font-size: 0.875rem;
     }
-    .content code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.9em; }
+    .content code { font-family: ui-monospace, "Courier New", monospace; font-size: 0.9em; }
     .content img { max-width: 100%; height: auto; }
     .footer {
       margin-top: 48px;
@@ -107,23 +150,26 @@ export function buildExportHtml(note: Note, logoAbsoluteUrl: string): string {
     }
     .footer img { width: 22px; height: 22px; border-radius: 5px; }
     @media print {
-      body { background: #fff; }
-      .page { padding: 0; max-width: none; box-shadow: none; }
+      html, body, .page {
+        background: #ffffff !important;
+        color: #14171a !important;
+      }
+      .page { padding: 0; max-width: none; }
     }
   </style>
 </head>
 <body>
   <article class="page">
     <header class="brand">
-      <img src="${logoAbsoluteUrl}" alt="Arigato Labs" />
+      <img src="${logoUrl}" alt="Arigato Labs" width="36" height="36" />
       <span>NoteSeen · Arigato Labs</span>
     </header>
     <h1>${escapeHtml(title)}</h1>
     <p class="meta">${escapeHtml(hint)} · ${note.kind === "prompt" ? "Prompt" : "Note"} · ${new Date(note.updatedAt).toLocaleString()}</p>
     ${labels}
-    <div class="content">${note.html || `<p>${escapeHtml(note.text)}</p>`}</div>
+    <div class="content">${noteBodyHtml(note)}</div>
     <footer class="footer">
-      <img src="${logoAbsoluteUrl}" alt="" />
+      <img src="${logoUrl}" alt="" width="22" height="22" />
       <span>Made with NoteSeen · Product of Arigato Labs</span>
     </footer>
   </article>
@@ -131,8 +177,8 @@ export function buildExportHtml(note: Note, logoAbsoluteUrl: string): string {
 </html>`;
 }
 
-export function downloadHtml(note: Note) {
-  const logo = new URL(LOGO_URL, window.location.origin).href;
+export async function downloadHtml(note: Note) {
+  const logo = await getLogoDataUrl();
   const html = buildExportHtml(note, logo);
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -144,18 +190,49 @@ export function downloadHtml(note: Note) {
   URL.revokeObjectURL(url);
 }
 
-/** Opens a print window so the user can Save as PDF (includes logo + branding). */
-export function exportPdf(note: Note) {
-  const logo = new URL(LOGO_URL, window.location.origin).href;
+/**
+ * Print / Save-as-PDF via a hidden iframe (avoids blank noopener popups).
+ */
+export async function exportPdf(note: Note): Promise<boolean> {
+  const logo = await getLogoDataUrl();
   const html = buildExportHtml(note, logo);
-  const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
-  if (!win) return false;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  setTimeout(() => {
-    win.print();
-  }, 350);
+
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", "NoteSeen PDF export");
+  iframe.style.cssText =
+    "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+  document.body.appendChild(iframe);
+
+  const frame = iframe.contentWindow;
+  if (!frame) {
+    iframe.remove();
+    return false;
+  }
+
+  frame.document.open();
+  frame.document.write(html);
+  frame.document.close();
+
+  await new Promise<void>((resolve) => {
+    const done = () => resolve();
+    if (frame.document.readyState === "complete") {
+      // Wait a tick so layout paints before print.
+      setTimeout(done, 200);
+    } else {
+      iframe.addEventListener("load", () => setTimeout(done, 200), { once: true });
+      setTimeout(done, 800);
+    }
+  });
+
+  try {
+    frame.focus();
+    frame.print();
+  } catch {
+    iframe.remove();
+    return false;
+  }
+
+  // Keep iframe briefly so the print dialog can read it.
+  setTimeout(() => iframe.remove(), 60_000);
   return true;
 }
