@@ -27,12 +27,25 @@ import { SelectionMenu } from "./SelectionMenu";
 const CONTENT_DEBOUNCE_MS = 320;
 const MAX_NOTE_HTML = 500_000;
 
+function isEmptyNote(note: Note): boolean {
+  return !note.title.trim() && !note.text.trim();
+}
+
 export function NoteEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const setEditor = useEditorStore((state) => state.setEditor);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
-  const isNew = !note.title && !note.text;
-  const canEdit = isNew || sessionUnlocked;
+
+  /**
+   * Whether the note was empty when it was opened. Deriving this from the
+   * current text would re-lock the note mid-sentence, the moment the first
+   * word made it non-empty; the vault should only guard a revisit.
+   */
+  const openedEmpty = useRef({ id: note.id, empty: isEmptyNote(note) });
+  if (openedEmpty.current.id !== note.id) {
+    openedEmpty.current = { id: note.id, empty: isEmptyNote(note) };
+  }
+  const canEdit = openedEmpty.current.empty || sessionUnlocked;
 
   useEffect(() => {
     setSessionUnlocked(false);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Lock, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,19 @@ import { requireVault } from "@/store/vault";
 export function PromptEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
-  const isNew = !note.title && !note.text;
-  const canEdit = isNew || sessionUnlocked;
+
+  /** Empty at open means it is brand new, so the first write stays unlocked. */
+  const openedEmpty = useRef({
+    id: note.id,
+    empty: !note.title.trim() && !note.text.trim(),
+  });
+  if (openedEmpty.current.id !== note.id) {
+    openedEmpty.current = {
+      id: note.id,
+      empty: !note.title.trim() && !note.text.trim(),
+    };
+  }
+  const canEdit = openedEmpty.current.empty || sessionUnlocked;
 
   const [title, setTitle] = useState(note.title);
   const [tags, setTags] = useState(note.tags);
