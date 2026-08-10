@@ -61,10 +61,7 @@ export function VaultGateDialog() {
           setBusy(false);
           return;
         }
-        toast.success("Verified", {
-          description:
-            reason === "delete" ? "You can delete now." : "You can edit this item now.",
-        });
+        toast.success(reason === "delete" ? "Ready to delete" : "Ready to edit");
         reset();
       }
     } catch (err) {
@@ -79,7 +76,7 @@ export function VaultGateDialog() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="size-5 text-deep-green" />
-            {isSetup ? "Set your vault" : "Unlock to continue"}
+            {isSetup ? "Set your vault" : "Confirm to continue"}
           </DialogTitle>
           <DialogDescription>
             {isSetup
@@ -128,7 +125,7 @@ export function VaultGateDialog() {
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={busy}>
-              {isSetup ? "Save vault" : "Unlock"}
+              {isSetup ? "Save vault" : "Confirm"}
             </Button>
           </DialogFooter>
         </form>

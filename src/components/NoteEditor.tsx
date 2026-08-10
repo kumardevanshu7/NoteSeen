@@ -235,7 +235,7 @@ export function NoteEditor({ note }: { note: Note }) {
           {!canEdit ? (
             <Button variant="outline" size="sm" onClick={() => void unlockForEdit()}>
               <Lock className="size-3.5" />
-              Unlock to edit
+              Confirm to edit
             </Button>
           ) : null}
         </div>

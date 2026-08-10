@@ -162,7 +162,7 @@ export function NotesGrid() {
                 <li key={note.id}>
                   <div
                     className={cn(
-                      "group flex h-56 flex-col rounded-sm border p-4 transition-transform hover:-translate-y-0.5",
+                      "group flex h-56 flex-col overflow-hidden rounded-sm border p-4 transition-transform hover:-translate-y-0.5",
                       isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-canvas",
                     )}
                     style={{ background: theme.wash, borderColor: theme.line }}
@@ -185,51 +185,60 @@ export function NotesGrid() {
                     <button
                       type="button"
                       onClick={() => setActive(note.id)}
-                      className="min-h-0 flex-1 text-left"
+                      className="min-h-0 flex-1 overflow-hidden text-left"
                     >
                       <span className="line-clamp-2 block text-[15px] font-medium text-ink">
                         {noteLabel(note)}
                       </span>
-                      <span className="ns-caption mt-2 line-clamp-3 block text-body-muted">
+                      <span
+                        className={cn(
+                          "ns-caption mt-2 block text-body-muted",
+                          note.tags.length > 0 ? "line-clamp-2" : "line-clamp-3",
+                        )}
+                      >
                         {excerpt(note.text, 140) || (note.kind === "prompt" ? "Empty prompt" : "Empty note")}
                       </span>
+                    </button>
+
+                    <div className="mt-auto shrink-0 space-y-2 pt-2">
                       {note.tags.length > 0 ? (
-                        <span className="mt-2 flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {note.tags.slice(0, 3).map((tag) => (
                             <span
                               key={tag}
-                              className="rounded-full border border-hairline bg-surface/70 px-2 py-px text-[11px] text-slate"
+                              className="max-w-full truncate rounded-full border border-hairline bg-surface/70 px-2 py-px text-[11px] text-slate"
                             >
                               {tag}
                             </span>
                           ))}
-                        </span>
+                        </div>
                       ) : null}
-                    </button>
-
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="ns-mono text-muted">{formatRelative(note.updatedAt)}</span>
-                      <div className="flex items-center gap-0.5">
-                        <CopyButton note={note} size="icon-sm" />
-                        <button
-                          type="button"
-                          aria-label={note.pinned ? "Unpin" : "Pin"}
-                          onClick={() => togglePin(note.id)}
-                          className={cn(
-                            "flex size-7 items-center justify-center rounded-full",
-                            note.pinned ? "text-coral" : "text-muted",
-                          )}
-                        >
-                          <Pin className="size-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Delete"
-                          onClick={() => void trashNotes([note.id])}
-                          className="flex size-7 items-center justify-center rounded-full text-muted hover:text-error"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="ns-mono shrink-0 text-muted">
+                          {formatRelative(note.updatedAt)}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <CopyButton note={note} size="icon-sm" />
+                          <button
+                            type="button"
+                            aria-label={note.pinned ? "Unpin" : "Pin"}
+                            onClick={() => togglePin(note.id)}
+                            className={cn(
+                              "flex size-7 items-center justify-center rounded-full",
+                              note.pinned ? "text-coral" : "text-muted",
+                            )}
+                          >
+                            <Pin className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label="Delete"
+                            onClick={() => void trashNotes([note.id])}
+                            className="flex size-7 items-center justify-center rounded-full text-muted hover:text-error"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -79,7 +79,7 @@ export function PromptEditor({ note }: { note: Note }) {
           ) : (
             <Button variant="outline" size="sm" onClick={() => void unlockForEdit()}>
               <Lock className="size-3.5" />
-              Unlock to edit
+              Confirm to edit
             </Button>
           )}
         </div>
