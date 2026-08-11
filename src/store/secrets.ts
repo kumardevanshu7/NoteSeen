@@ -287,7 +287,7 @@ export const useSecrets = create<SecretsState>((set, get) => ({
       username: draft.username.trim(),
       valueCipher: cipherHex,
       valueIv: ivHex,
-      notes: draft.notes.trim().slice(0, 500),
+      notes: draft.notes.trim().slice(0, 20_000),
       createdAt: now,
       updatedAt: now,
     };
@@ -334,7 +334,7 @@ export const useSecrets = create<SecretsState>((set, get) => ({
       username: draft.username.trim(),
       valueCipher,
       valueIv,
-      notes: draft.notes.trim().slice(0, 500),
+      notes: draft.notes.trim().slice(0, 20_000),
       updatedAt: Date.now(),
     };
 

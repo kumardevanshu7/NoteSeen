@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import {
   AlignLeft,
   Check,
@@ -117,6 +117,7 @@ export function SecretVaultView() {
   const [error, setError] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<SecretEntry | null>(null);
+  const [viewing, setViewing] = useState<SecretEntry | null>(null);
   const [filter, setFilter] = useState<SecretCategory | "all">("all");
   const [prefs, setPrefs] = useState<VaultPrefs>(readPrefs);
   const [safetyOpen, setSafetyOpen] = useState(false);
@@ -219,6 +220,15 @@ export function SecretVaultView() {
     setEditing(entry);
     setEditorOpen(true);
   };
+
+  const openDetail = (entry: SecretEntry) => {
+    setViewing(entry);
+  };
+
+  // Keep the open detail card in sync after edits/deletes.
+  const viewingLive = viewing
+    ? (entries.find((entry) => entry.id === viewing.id) ?? null)
+    : null;
 
   if (!ready) {
     return (
@@ -442,6 +452,7 @@ export function SecretVaultView() {
                 key={entry.id}
                 entry={entry}
                 variant="list"
+                onOpen={() => openDetail(entry)}
                 onEdit={() => openEditor(entry)}
                 onDelete={() => void removeEntry(entry.id)}
                 onReveal={() => revealValue(entry.id)}
@@ -455,6 +466,7 @@ export function SecretVaultView() {
                 key={entry.id}
                 entry={entry}
                 variant="details"
+                onOpen={() => openDetail(entry)}
                 onEdit={() => openEditor(entry)}
                 onDelete={() => void removeEntry(entry.id)}
                 onReveal={() => revealValue(entry.id)}
@@ -471,6 +483,7 @@ export function SecretVaultView() {
                 key={entry.id}
                 entry={entry}
                 variant="grid"
+                onOpen={() => openDetail(entry)}
                 onEdit={() => openEditor(entry)}
                 onDelete={() => void removeEntry(entry.id)}
                 onReveal={() => revealValue(entry.id)}
@@ -479,6 +492,24 @@ export function SecretVaultView() {
           </ul>
         )}
       </div>
+
+      <SecretDetailDialog
+        entry={viewingLive}
+        open={Boolean(viewingLive)}
+        onOpenChange={(open) => {
+          if (!open) setViewing(null);
+        }}
+        onEdit={() => {
+          if (!viewingLive) return;
+          setViewing(null);
+          openEditor(viewingLive);
+        }}
+        onDelete={() => {
+          if (!viewingLive) return;
+          void removeEntry(viewingLive.id).then(() => setViewing(null));
+        }}
+        onReveal={() => (viewingLive ? revealValue(viewingLive.id) : Promise.resolve(null))}
+      />
 
       <SecretEditorDialog
         open={editorOpen}
@@ -534,12 +565,14 @@ function PinField({
 function SecretCard({
   entry,
   variant,
+  onOpen,
   onEdit,
   onDelete,
   onReveal,
 }: {
   entry: SecretEntry;
   variant: "list" | "details" | "grid";
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onReveal: () => Promise<string | null>;
@@ -570,11 +603,15 @@ function SecretCard({
     }
   };
 
+  const stop = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
+
   const categoryLabel =
     CATEGORIES.find((cat) => cat.id === entry.category)?.label ?? entry.category;
 
   const actions = (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-0.5" onClick={stop} onKeyDown={(e) => e.stopPropagation()}>
       <Button variant="ghost" size="icon-sm" aria-label="Show or hide" onClick={() => void toggleReveal()}>
         {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
       </Button>
@@ -598,71 +635,265 @@ function SecretCard({
 
   if (variant === "list") {
     return (
-      <li className="flex items-center gap-3 px-2 py-3 transition-colors hover:bg-stone/50">
-        <KeyRound className="size-3.5 shrink-0 text-slate" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium text-ink">{entry.title}</p>
-          <p className="ns-caption truncate text-body-muted">
-            {entry.username || categoryLabel} · {shown && value ? value : "••••••••"}
-          </p>
-        </div>
-        <span className="ns-mono hidden w-20 shrink-0 text-right text-muted sm:block">
-          {formatRelative(entry.updatedAt)}
-        </span>
-        {actions}
+      <li>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex w-full items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-stone/50"
+        >
+          <KeyRound className="size-3.5 shrink-0 text-slate" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[14px] font-medium text-ink">{entry.title}</p>
+            <p className="ns-caption truncate text-body-muted">
+              {entry.username || categoryLabel}
+              {entry.notes ? ` · ${entry.notes.split("\n")[0]}` : ""}
+            </p>
+          </div>
+          <span className="ns-mono hidden w-20 shrink-0 text-right text-muted sm:block">
+            {formatRelative(entry.updatedAt)}
+          </span>
+          <div onClick={stop}>{actions}</div>
+        </button>
       </li>
     );
   }
 
   if (variant === "grid") {
     return (
-      <li className="flex h-40 flex-col rounded-sm border border-hairline bg-surface p-3">
-        <div className="flex items-start justify-between gap-2">
+      <li>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex h-44 w-full flex-col rounded-sm border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/20"
+        >
           <div className="min-w-0">
             <p className="truncate text-[13.5px] font-medium text-ink">{entry.title}</p>
             <span className="ns-mono mt-1 inline-block rounded-full border border-hairline px-2 py-px text-muted">
               {categoryLabel}
             </span>
           </div>
-        </div>
-        {entry.username ? (
-          <p className="ns-caption mt-2 truncate text-body-muted">{entry.username}</p>
-        ) : null}
-        <p className="ns-mono mt-auto truncate text-[12px] text-ink">
-          {shown && value ? value : "••••••••••••"}
-        </p>
-        <div className="mt-2 flex items-center justify-between gap-1">
-          <span className="ns-mono text-muted">{formatRelative(entry.updatedAt)}</span>
-          {actions}
-        </div>
+          {entry.username ? (
+            <p className="ns-caption mt-2 truncate text-body-muted">{entry.username}</p>
+          ) : null}
+          {entry.notes ? (
+            <p className="ns-caption mt-2 line-clamp-2 whitespace-pre-wrap text-body-muted">
+              {entry.notes}
+            </p>
+          ) : (
+            <p className="ns-mono mt-auto truncate text-[12px] text-ink">
+              {shown && value ? value : "••••••••••••"}
+            </p>
+          )}
+          <div className="mt-auto flex items-center justify-between gap-1 pt-2">
+            <span className="ns-mono text-muted">{formatRelative(entry.updatedAt)}</span>
+            <div onClick={stop}>{actions}</div>
+          </div>
+        </button>
       </li>
     );
   }
 
   return (
-    <li className="rounded-sm border border-hairline bg-surface p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full rounded-sm border border-hairline bg-surface p-4 text-left transition-colors hover:border-ink/20"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-[15px] font-medium text-ink">{entry.title}</h2>
+              <span className="ns-mono rounded-full border border-hairline px-2 py-px text-muted">
+                {categoryLabel}
+              </span>
+            </div>
+            {entry.username ? (
+              <p className="ns-caption mt-1 truncate text-body-muted">{entry.username}</p>
+            ) : null}
+            <p className="ns-mono mt-2 break-all text-[13px] text-ink">
+              {shown && value ? value : "••••••••••••••••"}
+            </p>
+            {entry.notes ? (
+              <p className="ns-caption mt-2 line-clamp-4 whitespace-pre-wrap text-body-muted">
+                {entry.notes}
+              </p>
+            ) : null}
+            <p className="ns-mono mt-2 text-muted">{formatRelative(entry.updatedAt)}</p>
+          </div>
+          <div onClick={stop}>{actions}</div>
+        </div>
+      </button>
+    </li>
+  );
+}
+
+async function copyText(text: string, label = "Copied") {
+  if (!text.trim()) {
+    toast("Nothing to copy");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(label);
+  } catch {
+    toast.error("Could not copy");
+  }
+}
+
+function SecretDetailDialog({
+  entry,
+  open,
+  onOpenChange,
+  onEdit,
+  onDelete,
+  onReveal,
+}: {
+  entry: SecretEntry | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onReveal: () => Promise<string | null>;
+}) {
+  const [shown, setShown] = useState(false);
+  const [value, setValue] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setShown(false);
+      setValue(null);
+    }
+  }, [open, entry?.id]);
+
+  if (!entry) return null;
+
+  const categoryLabel =
+    CATEGORIES.find((cat) => cat.id === entry.category)?.label ?? entry.category;
+
+  const toggleReveal = async () => {
+    if (shown) {
+      setShown(false);
+      setValue(null);
+      return;
+    }
+    const plain = await onReveal();
+    if (plain == null) return;
+    setValue(plain);
+    setShown(true);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="pr-6">{entry.title}</DialogTitle>
+          <DialogDescription>
+            Full secret details — description is plain text so you can remember context.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="ns-scroll max-h-[65vh] space-y-4 overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-[15px] font-medium text-ink">{entry.title}</h2>
-            <span className="ns-mono rounded-full border border-hairline px-2 py-px text-muted">
+            <span className="ns-mono rounded-full border border-hairline px-2.5 py-0.5 text-muted">
               {categoryLabel}
             </span>
+            <span className="ns-mono text-muted">{formatRelative(entry.updatedAt)}</span>
           </div>
+
           {entry.username ? (
-            <p className="ns-caption mt-1 truncate text-body-muted">{entry.username}</p>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="ns-caption text-ink">Username / account</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Copy username"
+                  onClick={() => void copyText(entry.username, "Username copied")}
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
+              <p className="rounded-sm border border-hairline bg-stone/50 px-3 py-2 text-sm text-ink">
+                {entry.username}
+              </p>
+            </div>
           ) : null}
-          <p className="ns-mono mt-2 break-all text-[13px] text-ink">
-            {shown && value ? value : "••••••••••••••••"}
-          </p>
-          {entry.notes ? (
-            <p className="ns-caption mt-2 line-clamp-3 text-body-muted">{entry.notes}</p>
-          ) : null}
-          <p className="ns-mono mt-2 text-muted">{formatRelative(entry.updatedAt)}</p>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="ns-caption text-ink">Secret value</span>
+              <div className="flex items-center gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Show or hide"
+                  onClick={() => void toggleReveal()}
+                >
+                  {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Copy secret"
+                  onClick={() =>
+                    void (async () => {
+                      const plain = value ?? (await onReveal());
+                      if (plain) await copyText(plain, "Secret copied");
+                    })()
+                  }
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+            <p className="break-all rounded-sm border border-hairline bg-stone/50 px-3 py-2 font-mono text-[13px] text-ink">
+              {shown && value ? value : "••••••••••••••••••••"}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="ns-caption text-ink">Description</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Copy description"
+                disabled={!entry.notes.trim()}
+                onClick={() => void copyText(entry.notes, "Description copied")}
+              >
+                <Copy className="size-3.5" />
+              </Button>
+            </div>
+            {entry.notes.trim() ? (
+              <div className="whitespace-pre-wrap rounded-sm border border-hairline bg-stone/50 px-3 py-3 text-sm leading-relaxed text-ink">
+                {entry.notes}
+              </div>
+            ) : (
+              <p className="ns-caption text-muted">No description yet.</p>
+            )}
+          </div>
         </div>
-        {actions}
-      </div>
-    </li>
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" className="text-error" onClick={onDelete}>
+            <Trash2 className="size-3.5" />
+            Delete
+          </Button>
+          <Button type="button" variant="outline" onClick={onEdit}>
+            <Pencil className="size-3.5" />
+            Edit
+          </Button>
+          <Button type="button" variant="primary" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -769,12 +1000,17 @@ function SecretEditorDialog({
           </label>
 
           <label className="block space-y-1.5">
-            <span className="ns-caption text-ink">Notes (optional)</span>
-            <Input
+            <span className="ns-caption text-ink">Description (optional)</span>
+            <textarea
               value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Where this is used"
+              onChange={(event) => setNotes(event.target.value.slice(0, 20_000))}
+              placeholder={
+                "Write as many lines as you need — press Enter for a new line.\nPortal URL, employee id, how to use this key…"
+              }
+              rows={6}
+              className="ns-scroll min-h-[8rem] w-full resize-y rounded-sm border border-hairline bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/20"
             />
+            <span className="ns-micro text-muted">{notes.length.toLocaleString()} / 20,000</span>
           </label>
 
           <DialogFooter>
@@ -869,8 +1105,9 @@ function SafetyInfoDialog({
           <section className="space-y-1.5">
             <h3 className="font-medium text-ink">What is still plain?</h3>
             <p>
-              Title, category, username, and notes are readable so you can find secrets. Only the
-              secret <em>value</em> is encrypted. Don’t put the actual key inside the title or notes.
+              Title, category, username, and description are readable so you can find secrets. Only
+              the secret <em>value</em> is encrypted. Don’t put the actual key inside the title or
+              description.
             </p>
           </section>
 

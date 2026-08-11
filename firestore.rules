@@ -176,7 +176,7 @@ service cloud.firestore {
         && stringLen(d.username, 0, 200)
         && stringLen(d.valueCipher, 1, 20000)
         && stringLen(d.valueIv, 16, 64)
-        && stringLen(d.notes, 0, 500)
+        && stringLen(d.notes, 0, 20000)
         && d.createdAt is number
         && d.updatedAt is number;
     }
