@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
+  AlignLeft,
+  Check,
+  Columns3,
   Copy,
   Eye,
   EyeOff,
   KeyRound,
+  LayoutGrid,
+  List,
   Lock,
   Pencil,
   Plus,
@@ -21,6 +26,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useNotes } from "@/store/notes";
 import { useSecrets } from "@/store/secrets";
 import type { SecretCategory, SecretEntry } from "@/lib/types";
 import { cn, formatRelative } from "@/lib/utils";
@@ -30,6 +43,57 @@ const CATEGORIES: { id: SecretCategory; label: string }[] = [
   { id: "password", label: "Password" },
   { id: "other", label: "Other" },
 ];
+
+type VaultViewMode = "list" | "details" | "grid";
+const COLUMN_CHOICES = [4, 5, 6, 7] as const;
+const PREFS_KEY = "noteseen.secrets-view";
+const IDLE_MS = 60_000;
+
+interface VaultPrefs {
+  view: VaultViewMode;
+  cols: number;
+}
+
+function readPrefs(): VaultPrefs {
+  const fallback: VaultPrefs = { view: "list", cols: 4 };
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw) as Partial<VaultPrefs>;
+    return {
+      view:
+        parsed.view === "details" || parsed.view === "grid" || parsed.view === "list"
+          ? parsed.view
+          : "list",
+      cols: COLUMN_CHOICES.includes(parsed.cols as (typeof COLUMN_CHOICES)[number])
+        ? (parsed.cols as number)
+        : 4,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+function columnCeiling(width: number): number {
+  if (width < 640) return 1;
+  if (width < 900) return 2;
+  if (width < 1200) return 3;
+  if (width < 1500) return 4;
+  return COLUMN_CHOICES[COLUMN_CHOICES.length - 1];
+}
+
+function useColumnCeiling(): number {
+  const [ceiling, setCeiling] = useState(() =>
+    typeof window === "undefined" ? 4 : columnCeiling(window.innerWidth),
+  );
+  useEffect(() => {
+    const onResize = () => setCeiling(columnCeiling(window.innerWidth));
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return ceiling;
+}
 
 export function SecretVaultView() {
   const ready = useSecrets((state) => state.ready);
@@ -44,6 +108,7 @@ export function SecretVaultView() {
   const updateEntry = useSecrets((state) => state.updateEntry);
   const removeEntry = useSecrets((state) => state.removeEntry);
   const revealValue = useSecrets((state) => state.revealValue);
+  const setView = useNotes((state) => state.setView);
 
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -52,10 +117,60 @@ export function SecretVaultView() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<SecretEntry | null>(null);
   const [filter, setFilter] = useState<SecretCategory | "all">("all");
+  const [prefs, setPrefs] = useState<VaultPrefs>(readPrefs);
+  const ceiling = useColumnCeiling();
+  const effectiveCols =
+    prefs.view === "grid" ? Math.min(prefs.cols, ceiling) : prefs.view === "list" ? 1 : 1;
+
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void initSecrets();
   }, [initSecrets]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // ignore
+    }
+  }, [prefs]);
+
+  /** 1 minute of no activity while unlocked → lock + leave vault. */
+  const bumpIdle = useCallback(() => {
+    if (!unlocked) return;
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      lock();
+      setView("all");
+      toast("Secret vault locked", {
+        description: "No activity for 1 minute — sent you back to My Notes.",
+      });
+    }, IDLE_MS);
+  }, [unlocked, lock, setView]);
+
+  useEffect(() => {
+    if (!unlocked) {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      return;
+    }
+
+    bumpIdle();
+    const events: (keyof WindowEventMap)[] = [
+      "pointerdown",
+      "keydown",
+      "mousemove",
+      "touchstart",
+      "scroll",
+      "wheel",
+    ];
+    const onActivity = () => bumpIdle();
+    for (const event of events) window.addEventListener(event, onActivity, { passive: true });
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      for (const event of events) window.removeEventListener(event, onActivity);
+    };
+  }, [unlocked, bumpIdle]);
 
   const visible = useMemo(() => {
     if (filter === "all") return entries;
@@ -96,6 +211,11 @@ export function SecretVaultView() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const openEditor = (entry: SecretEntry | null) => {
+    setEditing(entry);
+    setEditorOpen(true);
   };
 
   if (!ready) {
@@ -156,61 +276,123 @@ export function SecretVaultView() {
 
   return (
     <div className="ns-scroll flex-1 overflow-y-auto px-5 py-8 sm:px-10">
-      <div className="mx-auto max-w-3xl">
+      <div className={cn("mx-auto", prefs.view === "grid" ? "max-w-[110rem]" : "max-w-3xl")}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="ns-display text-ink">Secret vault</h1>
             <p className="ns-caption mt-2 text-body-muted">
-              {entries.length} {entries.length === 1 ? "secret" : "secrets"} · PIN protected
+              {entries.length} {entries.length === 1 ? "secret" : "secrets"} · PIN protected · locks
+              after 1 min idle
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={lock}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                lock();
+                setView("all");
+              }}
+            >
               <Lock className="size-3.5" />
               Lock
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setEditing(null);
-                setEditorOpen(true);
-              }}
-            >
+            <Button variant="primary" size="sm" onClick={() => openEditor(null)}>
               <Plus className="size-3.5" />
               Add secret
             </Button>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFilter("all")}
-            className={cn(
-              "rounded-full border px-3 py-1 text-[12px] transition-colors",
-              filter === "all"
-                ? "border-primary bg-primary text-primary-ink"
-                : "border-hairline bg-surface text-slate hover:bg-stone",
-            )}
-          >
-            All
-          </button>
-          {CATEGORIES.map((cat) => (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              key={cat.id}
               type="button"
-              onClick={() => setFilter(cat.id)}
+              onClick={() => setFilter("all")}
               className={cn(
                 "rounded-full border px-3 py-1 text-[12px] transition-colors",
-                filter === cat.id
+                filter === "all"
                   ? "border-primary bg-primary text-primary-ink"
                   : "border-hairline bg-surface text-slate hover:bg-stone",
               )}
             >
-              {cat.label}
+              All
             </button>
-          ))}
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setFilter(cat.id)}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-[12px] transition-colors",
+                  filter === cat.id
+                    ? "border-primary bg-primary text-primary-ink"
+                    : "border-hairline bg-surface text-slate hover:bg-stone",
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-full border border-hairline p-1">
+              {(
+                [
+                  { id: "list", label: "List view", icon: List },
+                  { id: "details", label: "Details view", icon: AlignLeft },
+                  { id: "grid", label: "Grid view", icon: LayoutGrid },
+                ] as { id: VaultViewMode; label: string; icon: typeof List }[]
+              ).map((option) => {
+                const active = prefs.view === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    aria-label={option.label}
+                    aria-pressed={active}
+                    onClick={() => setPrefs((prev) => ({ ...prev, view: option.id }))}
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-full transition-colors",
+                      active
+                        ? "bg-primary text-primary-ink"
+                        : "text-slate hover:bg-stone hover:text-ink",
+                    )}
+                  >
+                    <option.icon className="size-4" />
+                  </button>
+                );
+              })}
+            </div>
+
+            {prefs.view === "grid" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Columns3 className="size-3.5" />
+                    {prefs.cols} cols
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Columns</DropdownMenuLabel>
+                  {COLUMN_CHOICES.map((count) => (
+                    <DropdownMenuItem
+                      key={count}
+                      onSelect={() => setPrefs((prev) => ({ ...prev, cols: count }))}
+                    >
+                      <span className="flex-1">{count} columns</span>
+                      {prefs.cols === count ? <Check className="size-3.5" /> : null}
+                    </DropdownMenuItem>
+                  ))}
+                  {ceiling < prefs.cols ? (
+                    <p className="ns-micro px-2.5 pt-2 pb-1 text-muted">
+                      Showing {ceiling} — screen is too narrow for {prefs.cols}.
+                    </p>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         </div>
 
         {visible.length === 0 ? (
@@ -220,29 +402,48 @@ export function SecretVaultView() {
             <p className="ns-caption mx-auto mt-2 max-w-sm text-body-muted">
               Store API keys, account passwords, and tokens here. Only the secret value is encrypted.
             </p>
-            <Button
-              variant="primary"
-              size="sm"
-              className="mt-6"
-              onClick={() => {
-                setEditing(null);
-                setEditorOpen(true);
-              }}
-            >
+            <Button variant="primary" size="sm" className="mt-6" onClick={() => openEditor(null)}>
               <Plus className="size-3.5" />
               Add your first secret
             </Button>
           </div>
-        ) : (
+        ) : prefs.view === "list" ? (
+          <ul className="mt-8 divide-y divide-hairline border-y border-hairline">
+            {visible.map((entry) => (
+              <SecretCard
+                key={entry.id}
+                entry={entry}
+                variant="list"
+                onEdit={() => openEditor(entry)}
+                onDelete={() => void removeEntry(entry.id)}
+                onReveal={() => revealValue(entry.id)}
+              />
+            ))}
+          </ul>
+        ) : prefs.view === "details" ? (
           <ul className="mt-8 space-y-3">
             {visible.map((entry) => (
               <SecretCard
                 key={entry.id}
                 entry={entry}
-                onEdit={() => {
-                  setEditing(entry);
-                  setEditorOpen(true);
-                }}
+                variant="details"
+                onEdit={() => openEditor(entry)}
+                onDelete={() => void removeEntry(entry.id)}
+                onReveal={() => revealValue(entry.id)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <ul
+            className="mt-8 grid gap-3"
+            style={{ gridTemplateColumns: `repeat(${effectiveCols}, minmax(0, 1fr))` }}
+          >
+            {visible.map((entry) => (
+              <SecretCard
+                key={entry.id}
+                entry={entry}
+                variant="grid"
+                onEdit={() => openEditor(entry)}
                 onDelete={() => void removeEntry(entry.id)}
                 onReveal={() => revealValue(entry.id)}
               />
@@ -303,11 +504,13 @@ function PinField({
 
 function SecretCard({
   entry,
+  variant,
   onEdit,
   onDelete,
   onReveal,
 }: {
   entry: SecretEntry;
+  variant: "list" | "details" | "grid";
   onEdit: () => void;
   onDelete: () => void;
   onReveal: () => Promise<string | null>;
@@ -341,6 +544,72 @@ function SecretCard({
   const categoryLabel =
     CATEGORIES.find((cat) => cat.id === entry.category)?.label ?? entry.category;
 
+  const actions = (
+    <div className="flex items-center gap-0.5">
+      <Button variant="ghost" size="icon-sm" aria-label="Show or hide" onClick={() => void toggleReveal()}>
+        {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Copy secret" onClick={() => void copyValue()}>
+        <Copy className="size-3.5" />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Edit" onClick={onEdit}>
+        <Pencil className="size-3.5" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Delete"
+        className="text-muted hover:text-error"
+        onClick={onDelete}
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </div>
+  );
+
+  if (variant === "list") {
+    return (
+      <li className="flex items-center gap-3 px-2 py-3 transition-colors hover:bg-stone/50">
+        <KeyRound className="size-3.5 shrink-0 text-slate" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-medium text-ink">{entry.title}</p>
+          <p className="ns-caption truncate text-body-muted">
+            {entry.username || categoryLabel} · {shown && value ? value : "••••••••"}
+          </p>
+        </div>
+        <span className="ns-mono hidden w-20 shrink-0 text-right text-muted sm:block">
+          {formatRelative(entry.updatedAt)}
+        </span>
+        {actions}
+      </li>
+    );
+  }
+
+  if (variant === "grid") {
+    return (
+      <li className="flex h-40 flex-col rounded-sm border border-hairline bg-surface p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-[13.5px] font-medium text-ink">{entry.title}</p>
+            <span className="ns-mono mt-1 inline-block rounded-full border border-hairline px-2 py-px text-muted">
+              {categoryLabel}
+            </span>
+          </div>
+        </div>
+        {entry.username ? (
+          <p className="ns-caption mt-2 truncate text-body-muted">{entry.username}</p>
+        ) : null}
+        <p className="ns-mono mt-auto truncate text-[12px] text-ink">
+          {shown && value ? value : "••••••••••••"}
+        </p>
+        <div className="mt-2 flex items-center justify-between gap-1">
+          <span className="ns-mono text-muted">{formatRelative(entry.updatedAt)}</span>
+          {actions}
+        </div>
+      </li>
+    );
+  }
+
   return (
     <li className="rounded-sm border border-hairline bg-surface p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -358,30 +627,11 @@ function SecretCard({
             {shown && value ? value : "••••••••••••••••"}
           </p>
           {entry.notes ? (
-            <p className="ns-caption mt-2 line-clamp-2 text-body-muted">{entry.notes}</p>
+            <p className="ns-caption mt-2 line-clamp-3 text-body-muted">{entry.notes}</p>
           ) : null}
           <p className="ns-mono mt-2 text-muted">{formatRelative(entry.updatedAt)}</p>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon-sm" aria-label="Show or hide" onClick={() => void toggleReveal()}>
-            {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Copy secret" onClick={() => void copyValue()}>
-            <Copy className="size-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Edit" onClick={onEdit}>
-            <Pencil className="size-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Delete"
-            className="text-muted hover:text-error"
-            onClick={onDelete}
-          >
-            <Trash2 className="size-3.5" />
-          </Button>
-        </div>
+        {actions}
       </div>
     </li>
   );
