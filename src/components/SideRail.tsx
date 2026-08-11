@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   FileText,
+  KeyRound,
   NotebookPen,
   Pin,
   Search,
@@ -26,6 +27,7 @@ const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "editor", label: "Notes Editor", icon: NotebookPen },
   { id: "all", label: "My Notes", icon: FileText },
   { id: "labels", label: "Labels", icon: Tags },
+  { id: "secrets", label: "Secret Vault", icon: KeyRound },
   { id: "shared", label: "Shared Notes", icon: Users },
 ];
 

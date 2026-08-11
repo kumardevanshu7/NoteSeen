@@ -23,9 +23,10 @@ export type Typeface =
   | "mono";
 export type TextSize = "s" | "m" | "l";
 export type LineSpacing = "tight" | "normal" | "relaxed";
-export type View = "editor" | "all" | "shared" | "trash" | "labels";
+export type View = "editor" | "all" | "shared" | "trash" | "labels" | "secrets";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type NoteKind = "note" | "prompt";
+export type SecretCategory = "api" | "password" | "other";
 
 export interface Note {
   id: string;
@@ -78,6 +79,30 @@ export interface VaultConfig {
   /** SHA-256 hex of the normalized answer. */
   answerHash: string;
   createdAt: number;
+}
+
+/** Separate 4-digit PIN vault for API keys and passwords. */
+export interface SecretPinConfig {
+  /** SHA-256 hex of the PIN (with salt). */
+  pinHash: string;
+  /** Hex salt used for both hash verify and AES key derivation. */
+  salt: string;
+  createdAt: number;
+}
+
+export interface SecretEntry {
+  id: string;
+  title: string;
+  category: SecretCategory;
+  /** Optional username / account label (plain). */
+  username: string;
+  /** AES-GCM ciphertext of the secret value (hex). */
+  valueCipher: string;
+  /** AES-GCM IV (hex). */
+  valueIv: string;
+  notes: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export function normalizeNote(raw: Partial<Note> & { id: string }): Note {

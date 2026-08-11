@@ -3,6 +3,7 @@ import {
   FileDown,
   FileText,
   FolderOpen,
+  KeyRound,
   Moon,
   Plus,
   Save,
@@ -136,6 +137,13 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
               <CommandItem value="my notes all" onSelect={() => run(() => setView("all"))}>
                 <FileText />
                 My Notes
+              </CommandItem>
+              <CommandItem
+                value="secret vault pin api password"
+                onSelect={() => run(() => setView("secrets"))}
+              >
+                <KeyRound />
+                Secret Vault
               </CommandItem>
               <CommandItem value="shared notes" onSelect={() => run(() => setView("shared"))}>
                 <Users />

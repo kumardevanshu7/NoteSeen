@@ -24,7 +24,8 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
         'uid', 'email', 'displayName', 'photoURL', 'updatedAt',
         'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt',
-        'vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt'
+        'vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt',
+        'secretPinHash', 'secretPinSalt', 'secretPinCreatedAt'
       ])
       && request.resource.data.keys().hasAll(['uid', 'updatedAt']);
     }
@@ -39,6 +40,21 @@ service cloud.firestore {
         && d.vaultAnswerHash.size() >= 32
         && d.vaultAnswerHash.size() <= 128
         && d.vaultCreatedAt is number
+      );
+    }
+
+    function secretPinFieldsOk() {
+      let d = request.resource.data;
+      let hasPin = d.keys().hasAny(['secretPinHash', 'secretPinSalt', 'secretPinCreatedAt']);
+      return !hasPin || (
+        d.keys().hasAll(['secretPinHash', 'secretPinSalt', 'secretPinCreatedAt'])
+        && d.secretPinHash is string
+        && d.secretPinHash.size() >= 32
+        && d.secretPinHash.size() <= 128
+        && d.secretPinSalt is string
+        && d.secretPinSalt.size() >= 16
+        && d.secretPinSalt.size() <= 128
+        && d.secretPinCreatedAt is number
       );
     }
 
@@ -87,6 +103,7 @@ service cloud.firestore {
         && userDocKeysOk()
         && userIdentityOk(uid)
         && vaultFieldsOk()
+        && secretPinFieldsOk()
         && (!profileFieldsPresent() || validProfile());
     }
 
@@ -140,6 +157,34 @@ service cloud.firestore {
       return request.resource.data.createdAt == resource.data.createdAt;
     }
 
+    function validSecret(secretId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'id', 'title', 'category', 'username',
+          'valueCipher', 'valueIv', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasAll([
+          'id', 'title', 'category', 'username',
+          'valueCipher', 'valueIv', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && d.id == secretId
+        && stringLen(d.id, 1, 128)
+        && stringLen(d.title, 1, 200)
+        && d.category in ['api', 'password', 'other']
+        && stringLen(d.username, 0, 200)
+        && stringLen(d.valueCipher, 1, 20000)
+        && stringLen(d.valueIv, 16, 64)
+        && stringLen(d.notes, 0, 500)
+        && d.createdAt is number
+        && d.updatedAt is number;
+    }
+
+    function secretCreatedAtImmutable() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create, update: if validUserWrite(uid);
@@ -149,6 +194,13 @@ service cloud.firestore {
         allow read: if isOwner(uid);
         allow create: if isOwner(uid) && validNote(noteId);
         allow update: if isOwner(uid) && validNote(noteId) && createdAtImmutable();
+        allow delete: if isOwner(uid);
+      }
+
+      match /secrets/{secretId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validSecret(secretId);
+        allow update: if isOwner(uid) && validSecret(secretId) && secretCreatedAtImmutable();
         allow delete: if isOwner(uid);
       }
     }

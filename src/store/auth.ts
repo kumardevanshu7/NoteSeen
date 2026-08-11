@@ -13,6 +13,7 @@ import { createFirestoreAdapter } from "@/lib/sync/firestore";
 import { navigate } from "@/lib/nav";
 import { useNotes } from "@/store/notes";
 import { useVault } from "@/store/vault";
+import { useSecrets } from "@/store/secrets";
 
 interface AuthState {
   ready: boolean;
@@ -115,11 +116,13 @@ export const useAuth = create<AuthState>((set, get) => ({
             set({ profile: null, profileReady: true });
           }
           await useVault.getState().syncVaultFromCloud();
+          await useSecrets.getState().syncFromCloud();
           await startCloudSync(user);
           set({ syncing: false });
         })();
       } else {
         stopCloudSync();
+        useSecrets.getState().lock();
         set({ syncing: false, profile: null, profileReady: true });
       }
     });
@@ -193,6 +196,7 @@ export const useAuth = create<AuthState>((set, get) => ({
     }
 
     stopCloudSync();
+    useSecrets.getState().lock();
 
     try {
       await firebaseSignOut(getFirebaseAuth());
