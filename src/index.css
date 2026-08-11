@@ -706,11 +706,82 @@
   overflow: hidden;
 }
 
+.ns-landing-caret {
+  display: inline-block;
+  margin-left: 1px;
+  color: var(--deep-green);
+  animation: ns-landing-blink 1s steps(1) infinite;
+}
+
+@keyframes ns-landing-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.ns-landing-flow-track {
+  display: grid;
+  gap: 1.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+@media (min-width: 900px) {
+  .ns-landing-flow-track {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+.ns-landing-flow-step {
+  position: relative;
+  min-width: 0;
+}
+
+.ns-landing-flow-node {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.ns-landing-flow-line {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .ns-landing-flow-line {
+    display: block;
+    position: absolute;
+    top: 1.1rem;
+    left: 2.4rem;
+    right: -0.35rem;
+    height: 1px;
+    background: linear-gradient(90deg, var(--hairline), color-mix(in oklab, var(--deep-green) 35%, var(--hairline)));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ns-landing-rise,
   .ns-landing-paper {
     animation: none !important;
     opacity: 1;
     transform: none;
+  }
+
+  .ns-landing-caret {
+    animation: none;
+    opacity: 1;
   }
 }
