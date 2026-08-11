@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Info,
   KeyRound,
   LayoutGrid,
   List,
@@ -118,6 +119,7 @@ export function SecretVaultView() {
   const [editing, setEditing] = useState<SecretEntry | null>(null);
   const [filter, setFilter] = useState<SecretCategory | "all">("all");
   const [prefs, setPrefs] = useState<VaultPrefs>(readPrefs);
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const ceiling = useColumnCeiling();
   const effectiveCols =
     prefs.view === "grid" ? Math.min(prefs.cols, ceiling) : prefs.view === "list" ? 1 : 1;
@@ -237,6 +239,14 @@ export function SecretVaultView() {
               Set a separate 4-digit PIN for API keys and passwords. This is not the same as your
               note edit question.
             </p>
+            <button
+              type="button"
+              onClick={() => setSafetyOpen(true)}
+              className="ns-caption mt-3 inline-flex items-center gap-1.5 text-slate underline-offset-2 hover:text-ink hover:underline"
+            >
+              <Info className="size-3.5" />
+              How is this safe?
+            </button>
           </div>
           <form onSubmit={(event) => void onSetup(event)} className="space-y-4">
             <PinField label="Create 4-digit PIN" value={pin} onChange={setPin} autoFocus />
@@ -246,6 +256,7 @@ export function SecretVaultView() {
               Create vault
             </Button>
           </form>
+          <SafetyInfoDialog open={safetyOpen} onOpenChange={setSafetyOpen} />
         </div>
       </div>
     );
@@ -261,6 +272,14 @@ export function SecretVaultView() {
             <p className="ns-caption mt-3 text-body-muted">
               Unlock to view or add secrets. Values stay encrypted until you unlock.
             </p>
+            <button
+              type="button"
+              onClick={() => setSafetyOpen(true)}
+              className="ns-caption mt-3 inline-flex items-center gap-1.5 text-slate underline-offset-2 hover:text-ink hover:underline"
+            >
+              <Info className="size-3.5" />
+              How is this safe?
+            </button>
           </div>
           <form onSubmit={(event) => void onUnlock(event)} className="space-y-4">
             <PinField label="4-digit PIN" value={pin} onChange={setPin} autoFocus />
@@ -269,6 +288,7 @@ export function SecretVaultView() {
               Unlock
             </Button>
           </form>
+          <SafetyInfoDialog open={safetyOpen} onOpenChange={setSafetyOpen} />
         </div>
       </div>
     );
@@ -286,6 +306,14 @@ export function SecretVaultView() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="How is this safe?"
+              onClick={() => setSafetyOpen(true)}
+            >
+              <Info className="size-3.5" />
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -467,6 +495,7 @@ export function SecretVaultView() {
           return Boolean(created);
         }}
       />
+      <SafetyInfoDialog open={safetyOpen} onOpenChange={setSafetyOpen} />
     </div>
   );
 }
@@ -761,3 +790,107 @@ function SecretEditorDialog({
     </Dialog>
   );
 }
+
+function SafetyInfoDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="size-5 text-deep-green" />
+            How your secrets stay safe
+          </DialogTitle>
+          <DialogDescription>
+            Short version: Firebase never stores your real password or API key — only gibberish.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="ns-scroll max-h-[60vh] space-y-4 overflow-y-auto pr-1 text-sm leading-relaxed text-body-muted">
+          <section className="space-y-1.5">
+            <h3 className="font-medium text-ink">What you see vs what the database sees</h3>
+            <p>
+              When you save a secret, NoteSeen encrypts it <strong className="text-ink">on your
+              device</strong> before upload. In Firestore you only see fields like{" "}
+              <code className="rounded bg-stone px-1 text-[12px] text-ink">valueCipher</code> and{" "}
+              <code className="rounded bg-stone px-1 text-[12px] text-ink">valueIv</code> — random
+              looking hex, not <code className="rounded bg-stone px-1 text-[12px] text-ink">sk-…</code>{" "}
+              or your password.
+            </p>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="font-medium text-ink">Your 4-digit PIN</h3>
+            <p>
+              The PIN is never stored as plain digits. We keep a salted hash so NoteSeen can check
+              “is this the right PIN?” without remembering the PIN itself. The real PIN stays in
+              memory only while the vault is unlocked, then clears on Lock, idle timeout, or sign-out.
+            </p>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="font-medium text-ink">AES-GCM — the lock we use</h3>
+            <p>
+              Secrets are encrypted with <strong className="text-ink">AES-GCM</strong> (Advanced
+              Encryption Standard in Galois/Counter Mode). In plain words:
+            </p>
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>
+                <strong className="text-ink">AES</strong> turns your text into ciphertext that looks
+                like nonsense without the key.
+              </li>
+              <li>
+                <strong className="text-ink">GCM</strong> also adds an integrity check — if someone
+                tampers with the gibberish in the database, decrypt fails instead of showing wrong
+                data quietly.
+              </li>
+              <li>
+                Each secret gets a fresh random <strong className="text-ink">IV</strong> (like a
+                one-time salt for that encryption), so two identical passwords still look different
+                in the database.
+              </li>
+            </ul>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="font-medium text-ink">Where the encryption key comes from</h3>
+            <p>
+              Your PIN + a random salt go through <strong className="text-ink">PBKDF2</strong>{" "}
+              (120,000 rounds) to stretch a short PIN into a strong AES-256 key. That key never
+              leaves the browser; Firestore only gets ciphertext.
+            </p>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="font-medium text-ink">What is still plain?</h3>
+            <p>
+              Title, category, username, and notes are readable so you can find secrets. Only the
+              secret <em>value</em> is encrypted. Don’t put the actual key inside the title or notes.
+            </p>
+          </section>
+
+          <section className="space-y-1.5">
+            <h3 className="font-medium text-ink">Honest limits</h3>
+            <p>
+              A 4-digit PIN is convenient, not bank-grade. Anyone with your unlocked session (or
+              your PIN) can reveal secrets. Keep the PIN private, use Lock when you step away, and
+              remember the vault auto-locks after 1 minute of no activity.
+            </p>
+          </section>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="primary" onClick={() => onOpenChange(false)}>
+            Got it
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
