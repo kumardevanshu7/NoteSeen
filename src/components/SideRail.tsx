@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ChevronDown,
+  ChevronRight,
   FileText,
   KeyRound,
   NotebookPen,
@@ -31,6 +33,18 @@ const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "shared", label: "Shared Notes", icon: Users },
 ];
 
+const LABELS_EXPANDED_KEY = "noteseen.sidebar-labels";
+
+function readLabelsExpanded(): boolean {
+  try {
+    const raw = localStorage.getItem(LABELS_EXPANDED_KEY);
+    if (raw === null) return false;
+    return raw === "true";
+  } catch {
+    return false;
+  }
+}
+
 export function SideRail({ onClose }: { onClose?: () => void }) {
   const dismiss = () => onClose?.();
   const notes = useNotes((state) => state.notes);
@@ -42,6 +56,15 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
   const setActive = useNotes((state) => state.setActive);
   const createItem = useNotes((state) => state.createItem);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [labelsExpanded, setLabelsExpanded] = useState(readLabelsExpanded);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LABELS_EXPANDED_KEY, String(labelsExpanded));
+    } catch {
+      // ignore
+    }
+  }, [labelsExpanded]);
 
   const live = useMemo(() => liveNotes(notes), [notes]);
   const trashed = useMemo(() => trashedNotes(notes), [notes]);
@@ -95,24 +118,39 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
 
         {allLabels.length > 0 ? (
           <div className="mt-3 px-1">
-            <p className="ns-mono mb-2 px-1.5 text-muted">Your labels</p>
-            <div className="ns-scroll flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
-              {allLabels.slice(0, 12).map(({ label, count }) => (
-                <button
-                  key={label.toLowerCase()}
-                  type="button"
-                  title={`${count} note${count === 1 ? "" : "s"}`}
-                  onClick={() => {
-                    setQuery(label);
-                    setView("all");
-                    dismiss();
-                  }}
-                  className="max-w-full truncate rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-[11px] text-slate transition-colors hover:border-ink/20 hover:text-ink"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setLabelsExpanded((open) => !open)}
+              aria-expanded={labelsExpanded}
+              className="flex w-full items-center gap-1.5 rounded-xs px-1.5 py-1 text-left transition-colors hover:bg-stone/55"
+            >
+              {labelsExpanded ? (
+                <ChevronDown className="size-3.5 shrink-0 text-muted" />
+              ) : (
+                <ChevronRight className="size-3.5 shrink-0 text-muted" />
+              )}
+              <span className="ns-mono flex-1 text-muted">Your labels</span>
+              <span className="ns-mono text-muted">{allLabels.length}</span>
+            </button>
+            {labelsExpanded ? (
+              <div className="ns-scroll mt-1.5 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+                {allLabels.slice(0, 12).map(({ label, count }) => (
+                  <button
+                    key={label.toLowerCase()}
+                    type="button"
+                    title={`${count} note${count === 1 ? "" : "s"}`}
+                    onClick={() => {
+                      setQuery(label);
+                      setView("all");
+                      dismiss();
+                    }}
+                    className="max-w-full truncate rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-[11px] text-slate transition-colors hover:border-ink/20 hover:text-ink"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -149,7 +187,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
         </button>
       </nav>
 
-      <div className="shrink-0 px-4 pt-6 pb-3">
+      <div className="shrink-0 px-4 pt-3 pb-3">
         <label className="relative block">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
           <input
