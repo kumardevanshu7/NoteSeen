@@ -16,6 +16,7 @@ import { NewItemDialog } from "./NewItemDialog";
 import { PromptEditor } from "./PromptEditor";
 import { SaveIndicator } from "./SaveIndicator";
 import { SharedView } from "./SharedView";
+import { NoteTabs } from "./NoteTabs";
 import { SideRail } from "./SideRail";
 import { ToolRail } from "./ToolRail";
 import { TopBar } from "./TopBar";
@@ -267,7 +268,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-canvas">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
       <TopBar
         note={note}
         onOpenNav={() => setNavOpen(true)}
@@ -275,8 +276,8 @@ export function AppShell() {
         onOpenFiles={() => void openFromDisk()}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <div className="ns-no-print hidden lg:block">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="ns-no-print hidden h-full min-h-0 lg:block">
           <SideRail />
         </div>
 
@@ -293,7 +294,8 @@ export function AppShell() {
           </div>
         ) : null}
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <NoteTabs />
           {view === "all" ? <NotesGrid /> : null}
           {view === "labels" ? <LabelsView /> : null}
           {view === "secrets" ? <SecretVaultView /> : null}
@@ -302,7 +304,7 @@ export function AppShell() {
           {view === "editor" ? (
             note ? (
               <>
-                <div className="ns-scroll flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
+                <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
                     <article
                     className="ns-paper mx-auto w-full max-w-[46rem] px-5 py-7 sm:px-12 sm:py-12"
                     data-theme={note.theme}
@@ -334,8 +336,8 @@ export function AppShell() {
 
         {view === "editor" && note && note.kind === "note" ? (
           <>
-            <div className="ns-no-print hidden xl:block">
-              <ToolRail note={note} />
+            <div className="ns-no-print hidden h-full min-h-0 xl:block">
+              <ToolRail note={note} className="h-full" />
             </div>
 
             {!styleOpen ? (

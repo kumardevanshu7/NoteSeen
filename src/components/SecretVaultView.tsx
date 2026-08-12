@@ -240,7 +240,7 @@ export function SecretVaultView() {
 
   if (!pinConfig) {
     return (
-      <div className="ns-scroll flex-1 overflow-y-auto px-5 py-10 sm:px-10">
+      <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-5 py-10 sm:px-10">
         <div className="mx-auto max-w-md">
           <div className="mb-8 text-center">
             <KeyRound className="mx-auto size-8 text-deep-green" />
@@ -274,7 +274,7 @@ export function SecretVaultView() {
 
   if (!unlocked) {
     return (
-      <div className="ns-scroll flex-1 overflow-y-auto px-5 py-10 sm:px-10">
+      <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-5 py-10 sm:px-10">
         <div className="mx-auto max-w-md">
           <div className="mb-8 text-center">
             <Lock className="mx-auto size-8 text-deep-green" />
@@ -305,7 +305,7 @@ export function SecretVaultView() {
   }
 
   return (
-    <div className="ns-scroll flex-1 overflow-y-auto px-5 py-8 sm:px-10">
+    <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10">
       <div className={cn("mx-auto", prefs.view === "grid" ? "max-w-[110rem]" : "max-w-3xl")}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

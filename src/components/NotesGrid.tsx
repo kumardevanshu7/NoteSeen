@@ -168,7 +168,7 @@ export function NotesGrid() {
     prefs.kind === "note" ? "My Notes" : prefs.kind === "prompt" ? "My Prompts" : "Everything";
 
   return (
-    <div className="ns-scroll flex-1 overflow-y-auto px-5 py-8 sm:px-10">
+    <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10">
       <div className={cn("mx-auto", effectiveCols >= 4 ? "max-w-[110rem]" : "max-w-5xl")}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

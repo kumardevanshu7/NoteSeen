@@ -30,6 +30,26 @@ const IDB_DEBOUNCE_MS = 250;
 const FILE_DEBOUNCE_MS = 1200;
 const SNAPSHOT_KEY = "noteseen.snapshot";
 const ACTIVE_KEY = "activeNoteId";
+const TABS_KEY = "openTabs";
+const MAX_OPEN_TABS = 12;
+
+function withOpenTab(tabs: string[], id: string | null): string[] {
+  if (!id) return tabs;
+  if (tabs.includes(id)) return tabs;
+  return [...tabs, id].slice(-MAX_OPEN_TABS);
+}
+
+function withoutTabs(tabs: string[], gone: Iterable<string>): string[] {
+  const drop = new Set(gone);
+  return tabs.filter((id) => !drop.has(id));
+}
+
+function nextTabAfterClose(tabs: string[], closingId: string): string | null {
+  const index = tabs.indexOf(closingId);
+  const remaining = tabs.filter((id) => id !== closingId);
+  if (index < 0) return remaining[0] ?? null;
+  return remaining[index] ?? remaining[index - 1] ?? null;
+}
 
 interface Snapshot {
   id: string;
@@ -122,6 +142,8 @@ interface NotesState {
   notes: Record<string, Note>;
   handles: Record<string, NsFileHandle>;
   activeId: string | null;
+  /** Recently opened notes, Chrome-tab style — most recent first. */
+  openTabs: string[];
   view: View;
   query: string;
   status: SaveStatus;
@@ -135,6 +157,7 @@ interface NotesState {
   openForEdit: (id: string) => Promise<boolean>;
   patchNote: (id: string, patch: Partial<Note>, options?: { touch?: boolean }) => void;
   setActive: (id: string | null) => void;
+  closeTab: (id: string) => void;
   setView: (view: View) => void;
   setQuery: (query: string) => void;
   togglePin: (id: string) => void;
@@ -233,20 +256,23 @@ export const useNotes = create<NotesState>((set, get) => {
       notes: { ...state.notes, [note.id]: note },
       handles: handle ? { ...state.handles, [note.id]: handle } : state.handles,
       activeId: note.id,
+      openTabs: withOpenTab(state.openTabs, note.id),
       view: "editor",
     }));
 
     dirtyNotes.add(note.id);
     scheduleIdb();
+    void setMeta(TABS_KEY, get().openTabs);
     if (handle) void putFileHandle(note.id, handle);
     return note.id;
   }
 
   async function loadEverything() {
-    const [stored, handles, activeId] = await Promise.all([
+    const [stored, handles, activeId, storedTabs] = await Promise.all([
       loadNotes(),
       loadFileHandles(),
       getMeta<string>(ACTIVE_KEY),
+      getMeta<string[]>(TABS_KEY),
     ]);
 
     const notes: Record<string, Note> = {};
@@ -277,8 +303,14 @@ export const useNotes = create<NotesState>((set, get) => {
       .sort((a, b) => b.updatedAt - a.updatedAt);
     const resolvedActive =
       activeId && notes[activeId] && !notes[activeId].deletedAt ? activeId : (live[0]?.id ?? null);
+    const liveIds = new Set(live.map((note) => note.id));
+    const openTabs = withOpenTab(
+      (Array.isArray(storedTabs) ? storedTabs : []).filter((id) => liveIds.has(id)),
+      resolvedActive,
+    );
 
-    set({ notes, handles, activeId: resolvedActive, ready: true });
+    set({ notes, handles, activeId: resolvedActive, openTabs, ready: true });
+    void setMeta(TABS_KEY, openTabs);
     if (dirtyNotes.size > 0) void get().flush({ toDisk: false });
   }
 
@@ -287,6 +319,7 @@ export const useNotes = create<NotesState>((set, get) => {
     notes: {},
     handles: {},
     activeId: null,
+    openTabs: [],
     view: "editor",
     query: "",
     status: "idle",
@@ -303,12 +336,14 @@ export const useNotes = create<NotesState>((set, get) => {
       set((state) => ({
         notes: { ...state.notes, [note.id]: note },
         activeId: note.id,
+        openTabs: withOpenTab(state.openTabs, note.id),
         view: "editor",
         query: "",
       }));
       dirtyNotes.add(note.id);
       scheduleIdb();
       void setMeta(ACTIVE_KEY, note.id);
+      void setMeta(TABS_KEY, get().openTabs);
       return note.id;
     },
 
@@ -352,10 +387,29 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     setActive(id) {
-      if (get().activeId === id) return;
+      if (get().activeId === id && get().view === "editor") return;
       void get().flush({ toDisk: true });
-      set({ activeId: id, view: "editor" });
+      set((state) => ({
+        activeId: id,
+        view: "editor",
+        openTabs: withOpenTab(state.openTabs, id),
+      }));
       void setMeta(ACTIVE_KEY, id);
+      void setMeta(TABS_KEY, get().openTabs);
+    },
+
+    closeTab(id) {
+      const { openTabs, activeId, view } = get();
+      if (!openTabs.includes(id)) return;
+      const nextTabs = openTabs.filter((tab) => tab !== id);
+      const nextActive = activeId === id ? nextTabAfterClose(openTabs, id) : activeId;
+      set({
+        openTabs: nextTabs,
+        activeId: nextActive,
+        view: activeId === id && !nextActive ? "all" : view,
+      });
+      void setMeta(TABS_KEY, nextTabs);
+      if (nextActive !== activeId) void setMeta(ACTIVE_KEY, nextActive);
     },
 
     setView(view) {
@@ -410,12 +464,19 @@ export const useNotes = create<NotesState>((set, get) => {
         const remaining = Object.values(notes)
           .filter((candidate) => !candidate.deletedAt)
           .sort((a, b) => b.updatedAt - a.updatedAt);
+        const nextTabs = withoutTabs(state.openTabs, unique);
         const activeGone = state.activeId ? unique.includes(state.activeId) : false;
+        const nextActive = activeGone
+          ? (nextTabAfterClose(state.openTabs, state.activeId!) ?? remaining[0]?.id ?? null)
+          : state.activeId;
         return {
           notes,
-          activeId: activeGone ? (remaining[0]?.id ?? null) : state.activeId,
+          activeId: nextActive,
+          openTabs: withOpenTab(nextTabs, nextActive),
         };
       });
+      void setMeta(TABS_KEY, get().openTabs);
+      void setMeta(ACTIVE_KEY, get().activeId);
 
       for (const id of unique) dirtyNotes.add(id);
       scheduleIdb();
@@ -443,8 +504,11 @@ export const useNotes = create<NotesState>((set, get) => {
           [id]: { ...note, deletedAt: null, updatedAt: stamp },
         },
         activeId: id,
+        openTabs: withOpenTab(state.openTabs, id),
         view: "editor",
       }));
+      void setMeta(TABS_KEY, get().openTabs);
+      void setMeta(ACTIVE_KEY, id);
       dirtyNotes.add(id);
       scheduleIdb();
       void get()
@@ -465,12 +529,20 @@ export const useNotes = create<NotesState>((set, get) => {
         const handles = { ...state.handles };
         delete notes[id];
         delete handles[id];
+        const nextTabs = withoutTabs(state.openTabs, [id]);
+        const nextActive =
+          state.activeId === id
+            ? (nextTabAfterClose(state.openTabs, id) ?? remaining[0]?.id ?? null)
+            : state.activeId;
         return {
           notes,
           handles,
-          activeId: state.activeId === id ? (remaining[0]?.id ?? null) : state.activeId,
+          activeId: nextActive,
+          openTabs: withOpenTab(nextTabs, nextActive),
         };
       });
+      void setMeta(TABS_KEY, get().openTabs);
+      void setMeta(ACTIVE_KEY, get().activeId);
       dirtyNotes.delete(id);
       dirtyFiles.delete(id);
       await removeNote(id);
@@ -493,8 +565,9 @@ export const useNotes = create<NotesState>((set, get) => {
           delete notes[id];
           delete handles[id];
         }
-        return { notes, handles };
+        return { notes, handles, openTabs: withoutTabs(state.openTabs, ids) };
       });
+      void setMeta(TABS_KEY, get().openTabs);
       await removeNotes(ids);
       void syncAdapter().removeNotes(ids);
       toast.success(`Deleted ${ids.length} note${ids.length === 1 ? "" : "s"} for good`);

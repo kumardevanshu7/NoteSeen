@@ -14,7 +14,7 @@ export function TrashView() {
   const trashed = useMemo(() => trashedNotes(notes), [notes]);
 
   return (
-    <div className="ns-scroll flex-1 overflow-y-auto px-5 py-8 sm:px-10">
+    <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10">
       <div className="mx-auto max-w-3xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

@@ -49,8 +49,8 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
   const allLabels = useMemo(() => collectLabels(notes), [notes]);
 
   return (
-    <div className="flex h-full w-[268px] shrink-0 flex-col border-r border-hairline bg-canvas">
-      <nav className="px-4 pt-5">
+    <div className="flex h-full min-h-0 w-[268px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-canvas">
+      <nav className="shrink-0 px-4 pt-5">
         {onClose ? (
           <div className="mb-3 flex justify-end lg:hidden">
             <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close navigation">
@@ -96,7 +96,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
         {allLabels.length > 0 ? (
           <div className="mt-3 px-1">
             <p className="ns-mono mb-2 px-1.5 text-muted">Your labels</p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="ns-scroll flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
               {allLabels.slice(0, 12).map(({ label, count }) => (
                 <button
                   key={label.toLowerCase()}
@@ -149,7 +149,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
         </button>
       </nav>
 
-      <div className="px-4 pt-6 pb-3">
+      <div className="shrink-0 px-4 pt-6 pb-3">
         <label className="relative block">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted" />
           <input
@@ -162,7 +162,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
         </label>
       </div>
 
-      <div className="ns-scroll flex-1 overflow-y-auto px-2 pb-4">
+      <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-4">
         <p className="ns-mono px-2.5 pb-2 text-muted">
           {query ? `${visible.length} result${visible.length === 1 ? "" : "s"}` : "Recent"}
         </p>
@@ -241,7 +241,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
-      <div className="ns-micro border-t border-hairline px-4 py-3 text-muted">
+      <div className="ns-micro shrink-0 border-t border-hairline px-4 py-3 text-muted">
         <span className="flex items-center gap-1.5">
           <Kbd>{modKeyLabel()}</Kbd>
           <Kbd>K</Kbd>
