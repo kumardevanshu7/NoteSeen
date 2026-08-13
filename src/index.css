@@ -521,6 +521,10 @@
   overflow: visible;
 }
 
+.ns-editor .ns-img-wrap.is-transforming {
+  padding-top: 26px;
+}
+
 .ns-editor .ns-img-box {
   position: relative;
   display: block;
@@ -535,11 +539,16 @@
 }
 
 .ns-editor .ns-img-frame {
+  display: none;
   position: absolute;
   inset: 0;
   z-index: 2;
-  border: 2px solid #7eb6ff;
+  border: 1.5px solid #7eb6ff;
   pointer-events: none;
+}
+
+.ns-editor .ns-img-wrap.is-transforming .ns-img-frame {
+  display: block;
 }
 
 .ns-editor .ns-img-box-handle,
@@ -560,58 +569,69 @@
 }
 
 .ns-editor .ns-img-box-handle.is-n {
-  top: 6px;
+  top: -7px;
   left: 50%;
   cursor: ns-resize;
   translate: -50% 0;
 }
 .ns-editor .ns-img-box-handle.is-s {
-  bottom: 6px;
+  bottom: -7px;
   left: 50%;
   cursor: ns-resize;
   translate: -50% 0;
 }
 .ns-editor .ns-img-box-handle.is-e {
   top: 50%;
-  right: 6px;
+  right: -7px;
   cursor: ew-resize;
   translate: 0 -50%;
 }
 .ns-editor .ns-img-box-handle.is-w {
   top: 50%;
-  left: 6px;
+  left: -7px;
   cursor: ew-resize;
   translate: 0 -50%;
 }
 .ns-editor .ns-img-box-handle.is-ne {
-  top: 6px;
-  right: 6px;
+  top: -7px;
+  right: -7px;
   cursor: nesw-resize;
 }
 .ns-editor .ns-img-box-handle.is-nw {
-  top: 6px;
-  left: 6px;
+  top: -7px;
+  left: -7px;
   cursor: nwse-resize;
 }
 .ns-editor .ns-img-box-handle.is-se {
-  right: 6px;
-  bottom: 6px;
+  right: -7px;
+  bottom: -7px;
   cursor: nwse-resize;
 }
 .ns-editor .ns-img-box-handle.is-sw {
-  bottom: 6px;
-  left: 6px;
+  bottom: -7px;
+  left: -7px;
   cursor: nesw-resize;
 }
 
 .ns-editor .ns-img-rotate {
-  top: 6px;
-  left: calc(50% + 22px);
-  width: 14px;
-  height: 14px;
+  top: -26px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
   cursor: grab;
-  translate: 0 0;
+  translate: -50% 0;
+}
+
+.ns-editor .ns-img-rotate::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 1.5px;
+  height: 12px;
+  background: #7eb6ff;
+  translate: -50% 0;
 }
 
 .ns-editor .ns-img-tools {
@@ -621,8 +641,7 @@
   margin-top: 0.55rem;
 }
 
-.ns-editor .ns-img-wrap.is-selected .ns-img-tools,
-.ns-editor .ns-img-wrap:hover .ns-img-tools {
+.ns-editor .ns-img-wrap.is-transforming .ns-img-tools {
   display: flex;
 }
 

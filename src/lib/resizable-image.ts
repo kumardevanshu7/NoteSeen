@@ -265,7 +265,14 @@ export const ResizableImage = Node.create({
         if (target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider")) return;
         selectSelf();
       };
+      const onDblClick = (event: MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        wrap.classList.add("is-transforming");
+        selectSelf();
+      };
       box.addEventListener("mousedown", onBoxDown);
+      box.addEventListener("dblclick", onDblClick);
 
       return {
         dom: wrap,
@@ -288,13 +295,14 @@ export const ResizableImage = Node.create({
           wrap.classList.add("is-selected");
         },
         deselectNode() {
-          wrap.classList.remove("is-selected");
+          wrap.classList.remove("is-selected", "is-transforming");
         },
         destroy() {
           slider.removeEventListener("input", onSlide);
           slider.removeEventListener("change", onSlideEnd);
           rotator.removeEventListener("pointerdown", onRotateDown);
           box.removeEventListener("mousedown", onBoxDown);
+          box.removeEventListener("dblclick", onDblClick);
           for (const [el, onDown] of handleListeners) {
             el.removeEventListener("pointerdown", onDown);
           }
