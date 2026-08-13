@@ -13,7 +13,10 @@ export function NoteTabs() {
 
   const tabs = openTabs
     .map((id) => notes[id])
-    .filter((note): note is NonNullable<typeof note> => Boolean(note) && !note.deletedAt);
+    .filter(
+      (note): note is NonNullable<typeof note> =>
+        Boolean(note) && !note.deletedAt && note.kind !== "promptCard",
+    );
 
   if (tabs.length === 0) return null;
 

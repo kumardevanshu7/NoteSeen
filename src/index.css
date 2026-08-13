@@ -926,6 +926,29 @@
   }
 }
 
+.ns-masonry {
+  column-count: 2;
+  column-gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .ns-masonry {
+    column-count: 3;
+  }
+}
+
+@media (min-width: 1280px) {
+  .ns-masonry {
+    column-count: 4;
+  }
+}
+
+.ns-masonry-item {
+  break-inside: avoid;
+  margin-bottom: 1rem;
+  display: inline-block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ns-landing-rise,
   .ns-landing-paper {

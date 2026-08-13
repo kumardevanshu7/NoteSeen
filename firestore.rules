@@ -117,7 +117,7 @@ service cloud.firestore {
     function validNote(noteId) {
       let d = request.resource.data;
       return d.keys().hasOnly([
-          'id', 'kind', 'title', 'tags', 'html', 'text',
+          'id', 'kind', 'title', 'tags', 'html', 'text', 'coverUrl',
           'theme', 'typeface', 'size', 'spacing',
           'pinned', 'createdAt', 'updatedAt', 'deletedAt', 'fileName'
         ])
@@ -130,7 +130,7 @@ service cloud.firestore {
         && d.id is string
         && d.id.size() > 0
         && d.id.size() <= 128
-        && d.kind in ['note', 'prompt']
+        && d.kind in ['note', 'prompt', 'promptCard']
         && stringLen(d.title, 0, 500)
         && stringLen(d.html, 0, 500000)
         && stringLen(d.text, 0, 500000)
@@ -150,7 +150,10 @@ service cloud.firestore {
         && (d.deletedAt == null || d.deletedAt is number)
         && (!d.keys().hasAny(['fileName'])
           || d.fileName == null
-          || stringLen(d.fileName, 1, 260));
+          || stringLen(d.fileName, 1, 260))
+        && (!d.keys().hasAny(['coverUrl'])
+          || d.coverUrl == null
+          || stringLen(d.coverUrl, 1, 2048));
     }
 
     function createdAtImmutable() {

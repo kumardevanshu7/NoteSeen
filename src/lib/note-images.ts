@@ -34,7 +34,7 @@ function assertImageFile(file: File): void {
   }
 }
 
-async function uploadNoteImage(file: File, noteId: string): Promise<string> {
+export async function uploadPublicImage(file: File, noteId: string): Promise<string> {
   if (!isImageStorageConfigured()) {
     throw new Error("Image hosting is not configured.");
   }
@@ -77,7 +77,7 @@ export async function insertImagesIntoEditor(
   try {
     for (const file of images) {
       try {
-        const src = await uploadNoteImage(file, noteId);
+        const src = await uploadPublicImage(file, noteId);
         const alt = file.name.replace(/\.[^.]+$/, "") || "image";
         editor.chain().focus().setImage({ src, alt, width: "100%" }).run();
         ok += 1;

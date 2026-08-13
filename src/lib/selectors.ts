@@ -15,6 +15,14 @@ export function liveNotes(notes: Record<string, Note>): Note[] {
     .sort(pinnedFirst);
 }
 
+export function editorNotes(notes: Record<string, Note>): Note[] {
+  return liveNotes(notes).filter((note) => note.kind !== "promptCard");
+}
+
+export function promptCards(notes: Record<string, Note>): Note[] {
+  return liveNotes(notes).filter((note) => note.kind === "promptCard");
+}
+
 export function trashedNotes(notes: Record<string, Note>): Note[] {
   return Object.values(notes)
     .filter((note) => note.deletedAt)
@@ -35,6 +43,7 @@ export function noteLabel(note: Note): string {
   if (note.title.trim()) return note.title.trim();
   const line = note.text.split("\n").find((value) => value.trim().length > 0);
   if (line?.trim()) return line.trim();
+  if (note.kind === "promptCard") return "Untitled prompt card";
   return note.kind === "prompt" ? "Untitled prompt" : "Untitled note";
 }
 

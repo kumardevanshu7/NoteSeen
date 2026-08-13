@@ -3,6 +3,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Images,
   KeyRound,
   NotebookPen,
   Pin,
@@ -20,7 +21,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { NewItemDialog } from "@/components/NewItemDialog";
 import { ArigatoMark, LogoMark } from "@/components/Logo";
 import { useNotes } from "@/store/notes";
-import { collectLabels, liveNotes, noteLabel, searchNotes, trashedNotes } from "@/lib/selectors";
+import { collectLabels, editorNotes, liveNotes, noteLabel, searchNotes, trashedNotes } from "@/lib/selectors";
 import type { NoteKind, View } from "@/lib/types";
 import { cn, excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
 import { navigate } from "@/lib/nav";
@@ -28,6 +29,7 @@ import { navigate } from "@/lib/nav";
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "editor", label: "Notes Editor", icon: NotebookPen },
   { id: "all", label: "My Notes", icon: FileText },
+  { id: "cards", label: "Prompt Cards", icon: Images },
   { id: "labels", label: "Labels", icon: Tags },
   { id: "secrets", label: "Secret Vault", icon: KeyRound },
   { id: "shared", label: "Shared Notes", icon: Users },
@@ -67,8 +69,12 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
   }, [labelsExpanded]);
 
   const live = useMemo(() => liveNotes(notes), [notes]);
+  const recent = useMemo(() => editorNotes(notes), [notes]);
   const trashed = useMemo(() => trashedNotes(notes), [notes]);
-  const visible = useMemo(() => searchNotes(live, query), [live, query]);
+  const visible = useMemo(
+    () => searchNotes(query.trim() ? live : recent, query),
+    [live, recent, query],
+  );
   const allLabels = useMemo(() => collectLabels(notes), [notes]);
 
   return (
@@ -228,7 +234,8 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                   <button
                     type="button"
                     onClick={() => {
-                      setActive(note.id);
+                      if (note.kind === "promptCard") setView("cards");
+                      else setActive(note.id);
                       dismiss();
                     }}
                     className={cn(
@@ -237,7 +244,9 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                     )}
                   >
                     <span className="flex items-center gap-1.5">
-                      {note.kind === "prompt" ? (
+                      {note.kind === "promptCard" ? (
+                        <Images className="size-3 shrink-0 text-slate" />
+                      ) : note.kind === "prompt" ? (
                         <Sparkles className="size-3 shrink-0 text-slate" />
                       ) : note.pinned ? (
                         <Pin className="size-3 shrink-0 text-coral" />

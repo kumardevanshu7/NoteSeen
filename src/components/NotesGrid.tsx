@@ -107,7 +107,10 @@ export function NotesGrid() {
     }
   }, [prefs]);
 
-  const allLive = useMemo(() => liveNotes(notes), [notes]);
+  const allLive = useMemo(
+    () => liveNotes(notes).filter((note) => note.kind !== "promptCard"),
+    [notes],
+  );
 
   const counts = useMemo(
     () => ({

@@ -23,9 +23,9 @@ export type Typeface =
   | "mono";
 export type TextSize = "s" | "m" | "l";
 export type LineSpacing = "tight" | "normal" | "relaxed";
-export type View = "editor" | "all" | "shared" | "trash" | "labels" | "secrets";
+export type View = "editor" | "all" | "cards" | "shared" | "trash" | "labels" | "secrets";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
-export type NoteKind = "note" | "prompt";
+export type NoteKind = "note" | "prompt" | "promptCard";
 export type SecretCategory = "api" | "password" | "other";
 
 export interface Note {
@@ -39,6 +39,8 @@ export interface Note {
   html: string;
   /** Flattened text kept alongside html for search and previews. */
   text: string;
+  /** Cover image for prompt cards (public URL). Notes/prompts leave this null. */
+  coverUrl: string | null;
   theme: NoteTheme;
   typeface: Typeface;
   size: TextSize;
@@ -131,13 +133,19 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     (legacy ? aliases[legacy] : undefined) ||
     "inter";
 
+  const kind: NoteKind =
+    raw.kind === "promptCard" ? "promptCard" : raw.kind === "prompt" ? "prompt" : "note";
+  const cover =
+    typeof raw.coverUrl === "string" && raw.coverUrl.trim() ? raw.coverUrl.trim() : null;
+
   return {
     id: raw.id,
-    kind: raw.kind === "prompt" ? "prompt" : "note",
+    kind,
     title: raw.title ?? "",
     tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean) : [],
     html: raw.html ?? "<p></p>",
     text: raw.text ?? "",
+    coverUrl: kind === "promptCard" ? cover : null,
     theme: raw.theme ?? "plain",
     typeface,
     size: raw.size ?? "m",

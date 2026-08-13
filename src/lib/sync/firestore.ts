@@ -33,6 +33,7 @@ function toDoc(note: Note): NoteDoc {
     tags: note.tags,
     html: note.html,
     text: note.text,
+    coverUrl: note.coverUrl,
     theme: note.theme,
     typeface: note.typeface,
     size: note.size,

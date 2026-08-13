@@ -3,6 +3,7 @@ import {
   FileDown,
   FileText,
   FolderOpen,
+  Images,
   KeyRound,
   Moon,
   Plus,
@@ -43,7 +44,10 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
   const saveToFile = useNotes((state) => state.saveToFile);
   const { toggle, isDark } = useAppearance();
 
-  const list = useMemo(() => liveNotes(notes).slice(0, 60), [notes]);
+  const list = useMemo(
+    () => liveNotes(notes).filter((note) => note.kind !== "promptCard").slice(0, 60),
+    [notes],
+  );
   const activeNote = activeId ? notes[activeId] : null;
   const mod = modKeyLabel();
 
@@ -93,7 +97,7 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
                 onSelect={() => run(() => onCreate?.())}
               >
                 <Plus />
-                <span className="flex-1">New note or prompt</span>
+                <span className="flex-1">New note, prompt, or card</span>
                 <span className="flex items-center gap-1">
                   <Kbd>{mod}</Kbd>
                   <Kbd>N</Kbd>
@@ -137,6 +141,10 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
               <CommandItem value="my notes all" onSelect={() => run(() => setView("all"))}>
                 <FileText />
                 My Notes
+              </CommandItem>
+              <CommandItem value="prompt cards gallery pinterest" onSelect={() => run(() => setView("cards"))}>
+                <Images />
+                Prompt Cards
               </CommandItem>
               <CommandItem
                 value="secret vault pin api password"

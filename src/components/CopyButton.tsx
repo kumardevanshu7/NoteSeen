@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * checklists survive a paste into apps that only accept text.
  */
 export function copyNoteContent(note: Note): string {
-  if (note.kind === "prompt") {
+  if (note.kind === "prompt" || note.kind === "promptCard") {
     return note.text.trim() || note.title.trim();
   }
   const body = (note.html ? htmlToMarkdown(note.html) : note.text).trim() || note.text.trim();
@@ -44,12 +44,12 @@ export async function copyNoteToClipboard(note: Note): Promise<boolean> {
   }
 
   const done = () => {
-    toast.success(note.kind === "prompt" ? "Prompt copied" : "Note copied");
+    toast.success(note.kind === "note" ? "Note copied" : "Prompt copied");
     return true;
   };
 
   // Prompts are plain text by design; notes carry both flavours.
-  if (note.kind !== "prompt" && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+  if (note.kind === "note" && typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
     try {
       await navigator.clipboard.write([
         new ClipboardItem({

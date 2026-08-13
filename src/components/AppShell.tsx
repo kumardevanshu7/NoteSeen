@@ -10,6 +10,7 @@ import { useVault } from "@/store/vault";
 import { CommandPalette } from "./CommandPalette";
 import { NoteEditor } from "./NoteEditor";
 import { NotesGrid } from "./NotesGrid";
+import { PromptCardsView } from "./PromptCardsView";
 import { LabelsView } from "./LabelsView";
 import { SecretVaultView } from "./SecretVaultView";
 import { NewItemDialog } from "./NewItemDialog";
@@ -55,6 +56,7 @@ export function AppShell() {
   const notes = useNotes((state) => state.notes);
   const activeId = useNotes((state) => state.activeId);
   const view = useNotes((state) => state.view);
+  const setView = useNotes((state) => state.setView);
   const createNote = useNotes((state) => state.createNote);
   const createItem = useNotes((state) => state.createItem);
   const saveToFile = useNotes((state) => state.saveToFile);
@@ -68,6 +70,10 @@ export function AppShell() {
   const [chooserOpen, setChooserOpen] = useState(false);
 
   const note = activeId ? (notes[activeId] ?? null) : null;
+
+  useEffect(() => {
+    if (note?.kind === "promptCard" && view === "editor") setView("cards");
+  }, [note?.kind, view, setView]);
 
   useEffect(() => {
     void init();
@@ -311,6 +317,7 @@ export function AppShell() {
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <NoteTabs />
           {view === "all" ? <NotesGrid /> : null}
+          {view === "cards" ? <PromptCardsView /> : null}
           {view === "labels" ? <LabelsView /> : null}
           {view === "secrets" ? <SecretVaultView /> : null}
           {view === "trash" ? <TrashView /> : null}

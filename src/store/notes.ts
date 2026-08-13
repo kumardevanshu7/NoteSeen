@@ -333,21 +333,28 @@ export const useNotes = create<NotesState>((set, get) => {
 
     createNote(seed) {
       const note = emptyNote(seed);
+      const isCard = note.kind === "promptCard";
       set((state) => ({
         notes: { ...state.notes, [note.id]: note },
-        activeId: note.id,
-        openTabs: withOpenTab(state.openTabs, note.id),
-        view: "editor",
-        query: "",
+        activeId: isCard ? state.activeId : note.id,
+        openTabs: isCard ? state.openTabs : withOpenTab(state.openTabs, note.id),
+        view: isCard ? "cards" : "editor",
+        query: isCard ? state.query : "",
       }));
       dirtyNotes.add(note.id);
       scheduleIdb();
-      void setMeta(ACTIVE_KEY, note.id);
-      void setMeta(TABS_KEY, get().openTabs);
+      if (!isCard) {
+        void setMeta(ACTIVE_KEY, note.id);
+        void setMeta(TABS_KEY, get().openTabs);
+      }
       return note.id;
     },
 
     createItem(kind) {
+      if (kind === "promptCard") {
+        set({ view: "cards" });
+        return "";
+      }
       return get().createNote({
         kind,
         title: "",
@@ -387,6 +394,13 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     setActive(id) {
+      if (id) {
+        const target = get().notes[id];
+        if (target?.kind === "promptCard") {
+          set({ view: "cards" });
+          return;
+        }
+      }
       if (get().activeId === id && get().view === "editor") return;
       void get().flush({ toDisk: true });
       set((state) => ({
@@ -435,6 +449,7 @@ export const useNotes = create<NotesState>((set, get) => {
         tags: [...note.tags],
         html: note.html,
         text: note.text,
+        coverUrl: note.coverUrl,
         theme: note.theme,
         typeface: note.typeface,
         size: note.size,
