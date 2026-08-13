@@ -48,7 +48,7 @@ export function SelectionMenu({ editor }: { editor: Editor }) {
     if (editor.isDestroyed) return setPosition(null);
 
     const { from, to, empty } = editor.state.selection;
-    if (empty || !editor.isEditable || editor.isActive("codeBlock")) {
+    if (empty || !editor.isEditable || editor.isActive("codeBlock") || editor.isActive("image")) {
       return setPosition(null);
     }
 

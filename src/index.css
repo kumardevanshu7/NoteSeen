@@ -515,10 +515,15 @@
 }
 
 .ns-editor .ns-img-wrap {
-  position: relative;
   display: block;
   max-width: 100%;
   margin: 0.85em 0;
+}
+
+.ns-editor .ns-img-box {
+  position: relative;
+  display: block;
+  width: 100%;
 }
 
 .ns-editor .ns-img-wrap img {
@@ -526,30 +531,105 @@
   height: auto;
 }
 
-.ns-editor .ns-img-wrap.is-selected {
-  outline: 2px solid color-mix(in oklab, var(--focus-blue) 70%, transparent);
-  outline-offset: 3px;
-  border-radius: var(--radius-sm);
+.ns-editor .ns-img-wrap.is-selected,
+.ns-editor .ns-img-wrap.ProseMirror-selectednode {
+  outline: none;
 }
 
-.ns-editor .ns-img-handle {
+.ns-editor .ns-img-frame {
   display: none;
   position: absolute;
-  top: 50%;
-  right: -5px;
+  inset: 0;
   z-index: 2;
-  width: 10px;
-  height: 2.25rem;
-  translate: 0 -50%;
-  cursor: ew-resize;
-  border: 0;
-  border-radius: 999px;
-  background: var(--focus-blue);
-  box-shadow: 0 0 0 3px var(--surface);
+  border: 1.5px solid color-mix(in oklab, var(--focus-blue) 85%, white);
+  pointer-events: none;
 }
 
-.ns-editor .ns-img-wrap.is-selected .ns-img-handle {
+.ns-editor .ns-img-wrap.is-selected .ns-img-frame {
   display: block;
+}
+
+.ns-editor .ns-img-box-handle,
+.ns-editor .ns-img-rotate {
+  pointer-events: auto;
+  position: absolute;
+  z-index: 3;
+  padding: 0;
+  border: 1.5px solid color-mix(in oklab, var(--focus-blue) 85%, white);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.2);
+}
+
+.ns-editor .ns-img-box-handle {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+}
+
+.ns-editor .ns-img-box-handle.is-n {
+  top: -5px;
+  left: 50%;
+  cursor: ns-resize;
+  translate: -50% 0;
+}
+.ns-editor .ns-img-box-handle.is-s {
+  bottom: -5px;
+  left: 50%;
+  cursor: ns-resize;
+  translate: -50% 0;
+}
+.ns-editor .ns-img-box-handle.is-e {
+  top: 50%;
+  right: -5px;
+  cursor: ew-resize;
+  translate: 0 -50%;
+}
+.ns-editor .ns-img-box-handle.is-w {
+  top: 50%;
+  left: -5px;
+  cursor: ew-resize;
+  translate: 0 -50%;
+}
+.ns-editor .ns-img-box-handle.is-ne {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+.ns-editor .ns-img-box-handle.is-nw {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+.ns-editor .ns-img-box-handle.is-se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+.ns-editor .ns-img-box-handle.is-sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+
+.ns-editor .ns-img-rotate {
+  top: -26px;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  cursor: grab;
+  translate: -50% 0;
+}
+
+.ns-editor .ns-img-rotate::before {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  width: 1.5px;
+  height: 14px;
+  background: color-mix(in oklab, var(--focus-blue) 85%, white);
+  translate: -50% 0;
 }
 
 .ns-editor .ns-img-tools {
