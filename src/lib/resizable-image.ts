@@ -31,6 +31,10 @@ function parseRotate(element: HTMLElement): number {
 }
 
 export const ResizableImage = Image.extend({
+  atom: true,
+  selectable: true,
+  draggable: true,
+
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -61,7 +65,7 @@ export const ResizableImage = Image.extend({
   },
 
   addNodeView() {
-    return ({ node, editor }: NodeViewRendererProps) => {
+    return ({ node, editor, getPos }: NodeViewRendererProps) => {
       const wrap = document.createElement("div");
       wrap.className = "ns-img-wrap";
       wrap.contentEditable = "false";
@@ -217,8 +221,25 @@ export const ResizableImage = Image.extend({
       const onRotateDown = (event: PointerEvent) => startDrag(event, "rotate");
       rotator.addEventListener("pointerdown", onRotateDown);
 
+      const selectSelf = () => {
+        if (typeof getPos !== "function") return;
+        const pos = getPos();
+        if (typeof pos === "number") editor.chain().focus().setNodeSelection(pos).run();
+      };
+
+      const onBoxDown = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        if (target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider")) return;
+        selectSelf();
+      };
+      box.addEventListener("mousedown", onBoxDown);
+
       return {
         dom: wrap,
+        stopEvent(event) {
+          const target = event.target as HTMLElement;
+          return Boolean(target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider"));
+        },
         update(updated) {
           if (updated.type.name !== "image") return false;
           img.src = updated.attrs.src ?? "";
@@ -239,6 +260,7 @@ export const ResizableImage = Image.extend({
           slider.removeEventListener("input", onSlide);
           slider.removeEventListener("change", onSlideEnd);
           rotator.removeEventListener("pointerdown", onRotateDown);
+          box.removeEventListener("mousedown", onBoxDown);
           for (const [el, onDown] of handleListeners) {
             el.removeEventListener("pointerdown", onDown);
           }

@@ -536,16 +536,21 @@
   outline: none;
 }
 
+.ns-editor .ns-img-wrap {
+  overflow: visible;
+}
+
 .ns-editor .ns-img-frame {
   display: none;
   position: absolute;
   inset: 0;
   z-index: 2;
-  border: 1.5px solid color-mix(in oklab, var(--focus-blue) 85%, white);
+  border: 1.5px solid #7eb6ff;
   pointer-events: none;
 }
 
-.ns-editor .ns-img-wrap.is-selected .ns-img-frame {
+.ns-editor .ns-img-wrap.is-selected .ns-img-frame,
+.ns-editor .ns-img-wrap.ProseMirror-selectednode .ns-img-frame {
   display: block;
 }
 
@@ -555,59 +560,59 @@
   position: absolute;
   z-index: 3;
   padding: 0;
-  border: 1.5px solid color-mix(in oklab, var(--focus-blue) 85%, white);
-  background: var(--surface);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.2);
+  border: 1.5px solid #7eb6ff;
+  background: #f4f7fb;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
 }
 
 .ns-editor .ns-img-box-handle {
-  width: 9px;
-  height: 9px;
-  border-radius: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
 }
 
 .ns-editor .ns-img-box-handle.is-n {
-  top: -5px;
+  top: -6px;
   left: 50%;
   cursor: ns-resize;
   translate: -50% 0;
 }
 .ns-editor .ns-img-box-handle.is-s {
-  bottom: -5px;
+  bottom: -6px;
   left: 50%;
   cursor: ns-resize;
   translate: -50% 0;
 }
 .ns-editor .ns-img-box-handle.is-e {
   top: 50%;
-  right: -5px;
+  right: -6px;
   cursor: ew-resize;
   translate: 0 -50%;
 }
 .ns-editor .ns-img-box-handle.is-w {
   top: 50%;
-  left: -5px;
+  left: -6px;
   cursor: ew-resize;
   translate: 0 -50%;
 }
 .ns-editor .ns-img-box-handle.is-ne {
-  top: -5px;
-  right: -5px;
+  top: -6px;
+  right: -6px;
   cursor: nesw-resize;
 }
 .ns-editor .ns-img-box-handle.is-nw {
-  top: -5px;
-  left: -5px;
+  top: -6px;
+  left: -6px;
   cursor: nwse-resize;
 }
 .ns-editor .ns-img-box-handle.is-se {
-  right: -5px;
-  bottom: -5px;
+  right: -6px;
+  bottom: -6px;
   cursor: nwse-resize;
 }
 .ns-editor .ns-img-box-handle.is-sw {
-  bottom: -5px;
-  left: -5px;
+  bottom: -6px;
+  left: -6px;
   cursor: nesw-resize;
 }
 
@@ -639,7 +644,8 @@
   margin-top: 0.55rem;
 }
 
-.ns-editor .ns-img-wrap.is-selected .ns-img-tools {
+.ns-editor .ns-img-wrap.is-selected .ns-img-tools,
+.ns-editor .ns-img-wrap.ProseMirror-selectednode .ns-img-tools {
   display: flex;
 }
 

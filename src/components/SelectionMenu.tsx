@@ -8,6 +8,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
+import { NodeSelection } from "@tiptap/pm/state";
 import {
   Bold,
   Check,
@@ -48,7 +49,13 @@ export function SelectionMenu({ editor }: { editor: Editor }) {
     if (editor.isDestroyed) return setPosition(null);
 
     const { from, to, empty } = editor.state.selection;
-    if (empty || !editor.isEditable || editor.isActive("codeBlock") || editor.isActive("image")) {
+    if (
+      empty ||
+      !editor.isEditable ||
+      editor.isActive("codeBlock") ||
+      editor.isActive("image") ||
+      editor.state.selection instanceof NodeSelection
+    ) {
       return setPosition(null);
     }
 
