@@ -117,9 +117,9 @@ service cloud.firestore {
     function validNote(noteId) {
       let d = request.resource.data;
       return d.keys().hasOnly([
-          'id', 'kind', 'title', 'tags', 'html', 'text', 'coverUrl',
+          'id', 'kind', 'title', 'subtitle', 'tags', 'html', 'text', 'coverUrl',
           'theme', 'typeface', 'size', 'spacing',
-          'pinned', 'createdAt', 'updatedAt', 'deletedAt', 'fileName'
+          'pinned', 'createdAt', 'updatedAt', 'openedAt', 'deletedAt', 'fileName'
         ])
         && d.keys().hasAll([
           'id', 'kind', 'title', 'tags', 'html', 'text',
@@ -153,7 +153,13 @@ service cloud.firestore {
           || stringLen(d.fileName, 1, 260))
         && (!d.keys().hasAny(['coverUrl'])
           || d.coverUrl == null
-          || stringLen(d.coverUrl, 1, 2048));
+          || stringLen(d.coverUrl, 1, 2048))
+        && (!d.keys().hasAny(['subtitle'])
+          || d.subtitle == null
+          || stringLen(d.subtitle, 0, 200))
+        && (!d.keys().hasAny(['openedAt'])
+          || d.openedAt == null
+          || d.openedAt is number);
     }
 
     function createdAtImmutable() {

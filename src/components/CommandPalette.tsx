@@ -5,6 +5,7 @@ import {
   FolderOpen,
   Images,
   KeyRound,
+  Lightbulb,
   Moon,
   Plus,
   Save,
@@ -138,6 +139,10 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
             </CommandGroup>
 
             <CommandGroup heading="Go to">
+              <CommandItem value="suggestions quiet inactive" onSelect={() => run(() => setView("suggestions"))}>
+                <Lightbulb />
+                Suggestions
+              </CommandItem>
               <CommandItem value="my notes all" onSelect={() => run(() => setView("all"))}>
                 <FileText />
                 My Notes

@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette";
 import { NoteEditor } from "./NoteEditor";
 import { NotesGrid } from "./NotesGrid";
 import { PromptCardsView } from "./PromptCardsView";
+import { SuggestionsView } from "./SuggestionsView";
 import { LabelsView } from "./LabelsView";
 import { SecretVaultView } from "./SecretVaultView";
 import { NewItemDialog } from "./NewItemDialog";
@@ -316,6 +317,7 @@ export function AppShell() {
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <NoteTabs />
+          {view === "suggestions" ? <SuggestionsView /> : null}
           {view === "all" ? <NotesGrid /> : null}
           {view === "cards" ? <PromptCardsView /> : null}
           {view === "labels" ? <LabelsView /> : null}

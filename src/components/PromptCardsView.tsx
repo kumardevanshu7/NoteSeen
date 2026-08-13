@@ -132,6 +132,9 @@ export function PromptCardsView() {
                   )}
                   <span className="block px-3 py-3">
                     <span className="block text-[14px] font-medium text-ink">{noteLabel(card)}</span>
+                    {card.subtitle.trim() ? (
+                      <span className="ns-caption mt-1 block text-body-muted">{card.subtitle.trim()}</span>
+                    ) : null}
                     {card.tags.length > 0 ? (
                       <span className="mt-2 flex flex-wrap gap-1">
                         {card.tags.slice(0, 4).map((tag) => (
@@ -195,7 +198,8 @@ export function PromptCardsView() {
               <DialogHeader>
                 <DialogTitle>{noteLabel(viewingLive)}</DialogTitle>
                 <DialogDescription>
-                  {viewingLive.tags.length > 0 ? viewingLive.tags.join(" · ") : "Prompt card"}
+                  {[viewingLive.subtitle.trim(), viewingLive.tags.join(" · ")].filter(Boolean).join(" · ") ||
+                    "Prompt card"}
                 </DialogDescription>
               </DialogHeader>
 

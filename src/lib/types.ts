@@ -23,7 +23,7 @@ export type Typeface =
   | "mono";
 export type TextSize = "s" | "m" | "l";
 export type LineSpacing = "tight" | "normal" | "relaxed";
-export type View = "editor" | "all" | "cards" | "shared" | "trash" | "labels" | "secrets";
+export type View = "editor" | "all" | "cards" | "suggestions" | "shared" | "trash" | "labels" | "secrets";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type NoteKind = "note" | "prompt" | "promptCard";
 export type SecretCategory = "api" | "password" | "other";
@@ -33,6 +33,8 @@ export interface Note {
   /** Regular notepad entry or a reusable prompt. */
   kind: NoteKind;
   title: string;
+  /** Short caption under a prompt-card title. Empty on notes/prompts. */
+  subtitle: string;
   /** Tags — especially useful for prompts. */
   tags: string[];
   /** Rich text, the source of truth for rendering. */
@@ -48,6 +50,8 @@ export interface Note {
   pinned: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Last time the note was opened in the editor. Falls back to updatedAt. */
+  openedAt: number;
   /** Set when the note is in the trash; null while it is live. */
   deletedAt: number | null;
   /** Name of the .noteseen file this note is linked to, when opened from disk. */
@@ -142,6 +146,7 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     id: raw.id,
     kind,
     title: raw.title ?? "",
+    subtitle: typeof raw.subtitle === "string" ? raw.subtitle : "",
     tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean) : [],
     html: raw.html ?? "<p></p>",
     text: raw.text ?? "",
@@ -153,6 +158,12 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     pinned: Boolean(raw.pinned),
     createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
     updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
+    openedAt:
+      typeof raw.openedAt === "number"
+        ? raw.openedAt
+        : typeof raw.updatedAt === "number"
+          ? raw.updatedAt
+          : Date.now(),
     deletedAt: raw.deletedAt ?? null,
     fileName: raw.fileName ?? null,
   };

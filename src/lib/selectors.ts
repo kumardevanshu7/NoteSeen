@@ -1,4 +1,4 @@
-import type { Note } from "./types";
+import type { Note, NoteTheme } from "./types";
 
 function byRecency(a: Note, b: Note): number {
   return b.updatedAt - a.updatedAt;
@@ -23,6 +23,34 @@ export function promptCards(notes: Record<string, Note>): Note[] {
   return liveNotes(notes).filter((note) => note.kind === "promptCard");
 }
 
+/** Quiet for a week — shown on the Suggestions page. */
+export const INACTIVE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function lastActiveAt(note: Note): number {
+  return Math.max(note.updatedAt, note.openedAt || 0);
+}
+
+export function inactiveNotes(notes: Record<string, Note>, now = Date.now()): Note[] {
+  return editorNotes(notes)
+    .filter((note) => now - lastActiveAt(note) >= INACTIVE_AFTER_MS)
+    .sort((a, b) => lastActiveAt(a) - lastActiveAt(b));
+}
+
+const SUGGEST_THEMES: NoteTheme[] = ["azure", "sage", "sand", "aurora"];
+
+/** Stable color for a suggestion card — not the note's own paper theme. */
+export function suggestionTheme(note: Note): NoteTheme {
+  let n = 0;
+  for (let i = 0; i < note.id.length; i += 1) {
+    n = (n + note.id.charCodeAt(i) * (i + 1)) % SUGGEST_THEMES.length;
+  }
+  return SUGGEST_THEMES[n];
+}
+
+export function quietDays(note: Note, now = Date.now()): number {
+  return Math.max(7, Math.floor((now - lastActiveAt(note)) / 86_400_000));
+}
+
 export function trashedNotes(notes: Record<string, Note>): Note[] {
   return Object.values(notes)
     .filter((note) => note.deletedAt)
@@ -34,7 +62,7 @@ export function searchNotes(notes: Note[], query: string): Note[] {
   if (!needle) return notes;
   const terms = needle.split(/\s+/);
   return notes.filter((note) => {
-    const haystack = `${note.title}\n${note.text}\n${note.tags.join(" ")}\n${note.kind}`.toLowerCase();
+    const haystack = `${note.title}\n${note.subtitle}\n${note.text}\n${note.tags.join(" ")}\n${note.kind}`.toLowerCase();
     return terms.every((term) => haystack.includes(term));
   });
 }

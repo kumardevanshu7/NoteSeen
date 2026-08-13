@@ -309,7 +309,7 @@ export const useNotes = create<NotesState>((set, get) => {
       resolvedActive,
     );
 
-    set({ notes, handles, activeId: resolvedActive, openTabs, ready: true });
+    set({ notes, handles, activeId: resolvedActive, openTabs, ready: true, view: "suggestions" });
     void setMeta(TABS_KEY, openTabs);
     if (dirtyNotes.size > 0) void get().flush({ toDisk: false });
   }
@@ -320,7 +320,7 @@ export const useNotes = create<NotesState>((set, get) => {
     handles: {},
     activeId: null,
     openTabs: [],
-    view: "editor",
+    view: "suggestions",
     query: "",
     status: "idle",
     lastSavedAt: null,
@@ -410,6 +410,12 @@ export const useNotes = create<NotesState>((set, get) => {
       }));
       void setMeta(ACTIVE_KEY, id);
       void setMeta(TABS_KEY, get().openTabs);
+      if (id) {
+        const opened = get().notes[id];
+        if (opened && Date.now() - (opened.openedAt || 0) > 60_000) {
+          get().patchNote(id, { openedAt: Date.now() }, { touch: false });
+        }
+      }
     },
 
     closeTab(id) {
@@ -446,6 +452,7 @@ export const useNotes = create<NotesState>((set, get) => {
       return get().createNote({
         kind: note.kind,
         title: note.title ? `${note.title} (copy)` : "",
+        subtitle: note.subtitle,
         tags: [...note.tags],
         html: note.html,
         text: note.text,

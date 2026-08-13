@@ -29,6 +29,7 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(note?.coverUrl ?? null);
   const [title, setTitle] = useState(note?.title ?? "");
+  const [detail, setDetail] = useState(note?.subtitle ?? "");
   const [body, setBody] = useState(note?.text ?? "");
   const [tags, setTags] = useState<string[]>(note?.tags ?? []);
   const [saving, setSaving] = useState(false);
@@ -57,7 +58,7 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
       return;
     }
     if (!title.trim()) {
-      toast.error("Add a short detail.");
+      toast.error("Add a card title.");
       return;
     }
     if (!body.trim()) {
@@ -70,12 +71,13 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
       const text = body.trim();
       const html = plainTextToHtmlFriendly(text);
       const nextTitle = title.trim();
+      const subtitle = detail.trim().slice(0, 160);
 
       if (note) {
         const ok = await requireVault("edit");
         if (!ok) return;
         const coverUrl = file ? await uploadPublicImage(file, note.id) : note.coverUrl;
-        patchNote(note.id, { title: nextTitle, tags, text, html, coverUrl });
+        patchNote(note.id, { title: nextTitle, subtitle, tags, text, html, coverUrl });
         toast.success("Prompt card saved");
       } else {
         if (!file) {
@@ -88,6 +90,7 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
           id,
           kind: "promptCard",
           title: nextTitle,
+          subtitle,
           tags,
           text,
           html,
@@ -160,12 +163,22 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
       ) : null}
 
       <label className="block space-y-1.5">
-        <span className="ns-caption text-ink">Short detail</span>
+        <span className="ns-caption text-ink">Card title</span>
         <Input
           value={title}
-          onChange={(event) => setTitle(event.target.value.slice(0, 120))}
+          onChange={(event) => setTitle(event.target.value.slice(0, 80))}
+          placeholder="Name this card"
+          maxLength={80}
+        />
+      </label>
+
+      <label className="block space-y-1.5">
+        <span className="ns-caption text-ink">Short detail</span>
+        <Input
+          value={detail}
+          onChange={(event) => setDetail(event.target.value.slice(0, 160))}
           placeholder="What this prompt does"
-          maxLength={120}
+          maxLength={160}
         />
       </label>
 

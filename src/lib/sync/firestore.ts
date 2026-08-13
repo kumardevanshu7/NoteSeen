@@ -30,6 +30,7 @@ function toDoc(note: Note): NoteDoc {
     id: note.id,
     kind: note.kind,
     title: note.title,
+    subtitle: note.subtitle,
     tags: note.tags,
     html: note.html,
     text: note.text,
@@ -41,6 +42,7 @@ function toDoc(note: Note): NoteDoc {
     pinned: note.pinned,
     createdAt: note.createdAt,
     updatedAt: note.updatedAt,
+    openedAt: note.openedAt,
     deletedAt: note.deletedAt,
     fileName: note.fileName,
   };

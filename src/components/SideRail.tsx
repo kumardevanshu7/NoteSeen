@@ -5,6 +5,7 @@ import {
   FileText,
   Images,
   KeyRound,
+  Lightbulb,
   NotebookPen,
   Pin,
   Search,
@@ -27,6 +28,7 @@ import { cn, excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
 import { navigate } from "@/lib/nav";
 
 const NAV: { id: View; label: string; icon: LucideIcon }[] = [
+  { id: "suggestions", label: "Suggestions", icon: Lightbulb },
   { id: "editor", label: "Notes Editor", icon: NotebookPen },
   { id: "all", label: "My Notes", icon: FileText },
   { id: "cards", label: "Prompt Cards", icon: Images },
