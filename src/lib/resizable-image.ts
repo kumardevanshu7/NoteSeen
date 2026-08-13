@@ -1,10 +1,24 @@
-import Image from "@tiptap/extension-image";
+import { mergeAttributes, Node, nodeInputRule } from "@tiptap/core";
 import type { NodeViewRendererProps } from "@tiptap/core";
 
 const MIN_PCT = 20;
 const MAX_PCT = 100;
 const HANDLES = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
 type HandleDir = (typeof HANDLES)[number];
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    image: {
+      setImage: (options: {
+        src: string;
+        alt?: string;
+        title?: string;
+        width?: string;
+        rotate?: number;
+      }) => ReturnType;
+    };
+  }
+}
 
 function clampPct(value: number): number {
   return Math.min(MAX_PCT, Math.max(MIN_PCT, Math.round(value)));
@@ -23,45 +37,63 @@ function rotateToDeg(rotate: unknown): number {
   return ((Math.round(value) % 360) + 360) % 360;
 }
 
-function parseRotate(element: HTMLElement): number {
-  const attr = element.getAttribute("data-rotate");
-  if (attr) return rotateToDeg(attr);
-  const match = element.style.transform.match(/rotate\((-?\d+(?:\.\d+)?)deg\)/);
-  return match ? rotateToDeg(match[1]) : 0;
-}
-
-export const ResizableImage = Image.extend({
+export const ResizableImage = Node.create({
+  name: "image",
+  group: "block",
   atom: true,
-  selectable: true,
   draggable: true,
+  selectable: true,
 
   addAttributes() {
     return {
-      ...this.parent?.(),
+      src: { default: null },
+      alt: { default: null },
+      title: { default: null },
       width: {
         default: "100%",
-        parseHTML: (element) => {
-          const style = element.style.width;
-          if (style) return style;
-          const attr = element.getAttribute("width");
-          if (attr) return attr.includes("%") ? attr : `${attr}px`;
-          return "100%";
-        },
-        renderHTML: (attributes) => {
-          if (!attributes.width) return {};
-          return { style: `width: ${attributes.width}; height: auto;` };
-        },
+        parseHTML: (element) => element.style.width || element.getAttribute("width") || "100%",
+        renderHTML: (attributes) =>
+          attributes.width ? { style: `width: ${attributes.width}; height: auto;` } : {},
       },
       rotate: {
         default: 0,
-        parseHTML: parseRotate,
+        parseHTML: (element) => rotateToDeg(element.getAttribute("data-rotate")),
         renderHTML: (attributes) => {
           const deg = rotateToDeg(attributes.rotate);
-          if (!deg) return {};
-          return { "data-rotate": String(deg) };
+          return deg ? { "data-rotate": String(deg) } : {};
         },
       },
     };
+  },
+
+  parseHTML() {
+    return [{ tag: "img[src]:not([src^='data:'])" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["img", mergeAttributes(HTMLAttributes)];
+  },
+
+  addCommands() {
+    return {
+      setImage:
+        (options) =>
+        ({ commands }) =>
+          commands.insertContent({ type: this.name, attrs: options }),
+    };
+  },
+
+  addInputRules() {
+    return [
+      nodeInputRule({
+        find: /(?:^|\s)(!\[(.+|:?)]\((\S+)(?:(?:\s+)["'](\S+)["'])?\))$/,
+        type: this.type,
+        getAttributes: (match) => {
+          const [, , alt, src, title] = match;
+          return { src, alt, title };
+        },
+      }),
+    ];
   },
 
   addNodeView() {
@@ -77,6 +109,7 @@ export const ResizableImage = Image.extend({
       img.src = node.attrs.src ?? "";
       img.alt = node.attrs.alt ?? "";
       if (node.attrs.title) img.title = node.attrs.title;
+      img.draggable = false;
 
       const frame = document.createElement("div");
       frame.className = "ns-img-frame";
@@ -118,22 +151,22 @@ export const ResizableImage = Image.extend({
       box.append(img, frame);
       wrap.append(box, tools);
 
-      const apply = (pct: number, deg: number) => {
-        const nextPct = clampPct(pct);
-        const nextDeg = rotateToDeg(deg);
-        wrap.style.width = `${nextPct}%`;
-        img.style.transform = nextDeg ? `rotate(${nextDeg}deg)` : "";
-        slider.value = String(nextPct);
-        label.textContent = nextDeg ? `${nextPct}% · ${nextDeg}°` : `${nextPct}%`;
-        return { pct: nextPct, deg: nextDeg };
+      const apply = (nextPct: number, nextDeg: number) => {
+        const pct = clampPct(nextPct);
+        const deg = rotateToDeg(nextDeg);
+        wrap.style.width = `${pct}%`;
+        img.style.transform = deg ? `rotate(${deg}deg)` : "";
+        slider.value = String(pct);
+        label.textContent = deg ? `${pct}% · ${deg}°` : `${pct}%`;
+        return { pct, deg };
       };
 
-      const commit = (pct: number, deg: number) => {
-        const next = apply(pct, deg);
+      const commit = (nextPct: number, nextDeg: number) => {
+        const value = apply(nextPct, nextDeg);
         if (!editor.isEditable) return;
         editor.commands.updateAttributes("image", {
-          width: `${next.pct}%`,
-          rotate: next.deg,
+          width: `${value.pct}%`,
+          rotate: value.deg,
         });
       };
 
@@ -181,8 +214,7 @@ export const ResizableImage = Image.extend({
         const ySign = dir.includes("s") ? 1 : dir.includes("n") ? -1 : 0;
         const fromX = xSign * dx;
         const fromY = ySign * dy * (parentW / Math.max(boxH, 1));
-        const delta =
-          xSign && ySign ? (fromX + fromY) / 2 : xSign ? fromX : fromY;
+        const delta = xSign && ySign ? (fromX + fromY) / 2 : xSign ? fromX : fromY;
         pct = apply(drag.startPct + (delta / parentW) * 100, deg).pct;
       };
 
@@ -197,6 +229,7 @@ export const ResizableImage = Image.extend({
         if (!editor.isEditable) return;
         event.preventDefault();
         event.stopPropagation();
+        selectSelf();
         const rect = box.getBoundingClientRect();
         drag = {
           kind,
@@ -236,6 +269,7 @@ export const ResizableImage = Image.extend({
 
       return {
         dom: wrap,
+        ignoreMutation: () => true,
         stopEvent(event) {
           const target = event.target as HTMLElement;
           return Boolean(target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider"));

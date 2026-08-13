@@ -518,123 +518,100 @@
   display: block;
   max-width: 100%;
   margin: 0.85em 0;
+  overflow: visible;
 }
 
 .ns-editor .ns-img-box {
   position: relative;
   display: block;
   width: 100%;
+  overflow: visible;
 }
 
 .ns-editor .ns-img-wrap img {
   width: 100%;
   height: auto;
-}
-
-.ns-editor .ns-img-wrap.is-selected,
-.ns-editor .ns-img-wrap.ProseMirror-selectednode {
-  outline: none;
-}
-
-.ns-editor .ns-img-wrap {
-  overflow: visible;
-}
-
-.ns-editor .ns-img-frame {
-  display: none;
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border: 1.5px solid #7eb6ff;
   pointer-events: none;
 }
 
-.ns-editor .ns-img-wrap.is-selected .ns-img-frame,
-.ns-editor .ns-img-wrap.ProseMirror-selectednode .ns-img-frame {
-  display: block;
+.ns-editor .ns-img-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 2px solid #7eb6ff;
+  pointer-events: none;
 }
 
 .ns-editor .ns-img-box-handle,
 .ns-editor .ns-img-rotate {
   pointer-events: auto;
   position: absolute;
-  z-index: 3;
+  z-index: 5;
   padding: 0;
-  border: 1.5px solid #7eb6ff;
-  background: #f4f7fb;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.35);
+  border: 2px solid #7eb6ff;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
 }
 
 .ns-editor .ns-img-box-handle {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 2px;
 }
 
 .ns-editor .ns-img-box-handle.is-n {
-  top: -6px;
+  top: 6px;
   left: 50%;
   cursor: ns-resize;
   translate: -50% 0;
 }
 .ns-editor .ns-img-box-handle.is-s {
-  bottom: -6px;
+  bottom: 6px;
   left: 50%;
   cursor: ns-resize;
   translate: -50% 0;
 }
 .ns-editor .ns-img-box-handle.is-e {
   top: 50%;
-  right: -6px;
+  right: 6px;
   cursor: ew-resize;
   translate: 0 -50%;
 }
 .ns-editor .ns-img-box-handle.is-w {
   top: 50%;
-  left: -6px;
+  left: 6px;
   cursor: ew-resize;
   translate: 0 -50%;
 }
 .ns-editor .ns-img-box-handle.is-ne {
-  top: -6px;
-  right: -6px;
+  top: 6px;
+  right: 6px;
   cursor: nesw-resize;
 }
 .ns-editor .ns-img-box-handle.is-nw {
-  top: -6px;
-  left: -6px;
+  top: 6px;
+  left: 6px;
   cursor: nwse-resize;
 }
 .ns-editor .ns-img-box-handle.is-se {
-  right: -6px;
-  bottom: -6px;
+  right: 6px;
+  bottom: 6px;
   cursor: nwse-resize;
 }
 .ns-editor .ns-img-box-handle.is-sw {
-  bottom: -6px;
-  left: -6px;
+  bottom: 6px;
+  left: 6px;
   cursor: nesw-resize;
 }
 
 .ns-editor .ns-img-rotate {
-  top: -26px;
-  left: 50%;
-  width: 11px;
-  height: 11px;
+  top: 6px;
+  left: calc(50% + 22px);
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
   cursor: grab;
-  translate: -50% 0;
-}
-
-.ns-editor .ns-img-rotate::before {
-  content: "";
-  position: absolute;
-  top: 11px;
-  left: 50%;
-  width: 1.5px;
-  height: 14px;
-  background: color-mix(in oklab, var(--focus-blue) 85%, white);
-  translate: -50% 0;
+  translate: 0 0;
 }
 
 .ns-editor .ns-img-tools {
@@ -645,7 +622,7 @@
 }
 
 .ns-editor .ns-img-wrap.is-selected .ns-img-tools,
-.ns-editor .ns-img-wrap.ProseMirror-selectednode .ns-img-tools {
+.ns-editor .ns-img-wrap:hover .ns-img-tools {
   display: flex;
 }
 
@@ -682,6 +659,12 @@
 .ns-editor .ProseMirror-selectednode {
   outline: 2px solid var(--focus-blue);
   border-radius: 4px;
+}
+
+.ns-editor .ns-img-wrap,
+.ns-editor .ns-img-wrap.ProseMirror-selectednode,
+.ns-editor .ns-img-wrap img {
+  outline: none !important;
 }
 
 /* Density + spacing knobs exposed in the right rail. */

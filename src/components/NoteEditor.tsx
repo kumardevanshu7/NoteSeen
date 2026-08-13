@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
@@ -77,13 +77,8 @@ export function NoteEditor({ note }: { note: Note }) {
     if (edit) patchNote(edit.id, { html: edit.html });
   }, [patchNote]);
 
-  const editor = useEditor({
-    // ProseMirror owns this subtree. Rendering it during React's first pass made
-    // React and PM disagree on ownership, which surfaced as removeChild crashes.
-    immediatelyRender: false,
-    shouldRerenderOnTransaction: false,
-    editable: canEdit,
-    extensions: [
+  const extensions = useMemo(
+    () => [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         dropcursor: { color: "var(--focus-blue)", width: 2 },
@@ -99,10 +94,20 @@ export function NoteEditor({ note }: { note: Note }) {
         protocols: ["http", "https", "mailto"],
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
-      ResizableImage.configure({ allowBase64: false }),
+      ResizableImage,
       Placeholder.configure({ placeholder: "Start typing. It saves itself." }),
       CharacterCount,
     ],
+    [],
+  );
+
+  const editor = useEditor({
+    // ProseMirror owns this subtree. Rendering it during React's first pass made
+    // React and PM disagree on ownership, which surfaced as removeChild crashes.
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: false,
+    editable: canEdit,
+    extensions,
     content: note.html || "<p></p>",
     onCreate({ editor: instance }) {
       editorRef.current = instance;
