@@ -22,7 +22,7 @@ export function NoteTabs() {
 
   return (
     <div
-      className="ns-no-print ns-scroll flex h-9 shrink-0 items-end gap-px overflow-x-auto border-b border-hairline bg-canvas px-1.5"
+      className="ns-no-print ns-scroll ns-note-tabs flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b px-2"
       onWheel={(event) => {
         if (event.deltaY === 0 || event.shiftKey) return;
         event.currentTarget.scrollLeft += event.deltaY;
@@ -56,10 +56,8 @@ export function NoteTabs() {
               }
             }}
             className={cn(
-              "group relative mb-[-1px] flex h-8 max-w-[13.5rem] min-w-[7.5rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-left transition-colors",
-              active
-                ? "border-hairline bg-surface text-ink"
-                : "border-transparent text-body-muted hover:bg-stone/55 hover:text-ink",
+              "ns-note-tab group relative mb-[-1px] flex h-8 max-w-[13.5rem] min-w-[7.5rem] shrink-0 cursor-pointer items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 text-left transition-colors",
+              active && "is-active",
             )}
           >
             {note.kind === "prompt" ? (
@@ -74,7 +72,7 @@ export function NoteTabs() {
                 closeTab(note.id);
               }}
               className={cn(
-                "flex size-4 shrink-0 items-center justify-center rounded-sm text-muted transition-opacity hover:bg-stone hover:text-ink",
+                "flex size-4 shrink-0 items-center justify-center rounded-sm text-muted transition-opacity hover:bg-black/15 hover:text-ink dark:hover:bg-white/10",
                 active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
               )}
             >

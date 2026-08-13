@@ -79,6 +79,12 @@
   --card-border: #f2f2f2;
   --border-light: #e5e7eb;
 
+  --tab-strip: #e4e2dc;
+  --tab-idle: #d4d2cc;
+  --tab-idle-hover: #c8c6c0;
+  --tab-active: #ffffff;
+  --tab-edge: #bdbbb5;
+
   --action-blue: #1863dc;
   --focus-blue: #4c6ee6;
   --coral: #ff7759;
@@ -132,6 +138,12 @@
   --hairline: #2a2a33;
   --card-border: #21212a;
   --border-light: #272730;
+
+  --tab-strip: #0a0a0e;
+  --tab-idle: #1f1f27;
+  --tab-idle-hover: #2a2a33;
+  --tab-active: #353540;
+  --tab-edge: #4a4a56;
 
   --action-blue: #7ba6ff;
   --focus-blue: #7f9bff;
@@ -924,6 +936,40 @@
     height: 1px;
     background: linear-gradient(90deg, var(--hairline), color-mix(in oklab, var(--deep-green) 35%, var(--hairline)));
   }
+}
+
+.ns-note-tabs {
+  background: var(--tab-strip);
+  border-bottom-color: var(--tab-edge);
+}
+
+.ns-note-tab {
+  background: var(--tab-idle);
+  border-color: var(--tab-edge);
+  color: var(--slate);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--ink) 6%, transparent);
+}
+
+.ns-note-tab:hover {
+  background: var(--tab-idle-hover);
+  color: var(--ink);
+}
+
+.ns-note-tab.is-active {
+  background: var(--tab-active);
+  color: var(--ink);
+  border-color: var(--tab-edge);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, var(--ink) 12%, transparent);
+}
+
+.ns-note-tab.is-active::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 1px;
+  background: var(--tab-active);
 }
 
 .ns-masonry {
