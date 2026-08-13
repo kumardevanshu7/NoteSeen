@@ -3,7 +3,7 @@ import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import CharacterCount from "@tiptap/extension-character-count";
 import Highlight from "@tiptap/extension-highlight";
-import Image from "@tiptap/extension-image";
+import { ResizableImage } from "@/lib/resizable-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
@@ -99,7 +99,7 @@ export function NoteEditor({ note }: { note: Note }) {
         protocols: ["http", "https", "mailto"],
         HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" },
       }),
-      Image.configure({ allowBase64: false }),
+      ResizableImage.configure({ allowBase64: false }),
       Placeholder.configure({ placeholder: "Start typing. It saves itself." }),
       CharacterCount,
     ],

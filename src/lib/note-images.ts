@@ -79,7 +79,7 @@ export async function insertImagesIntoEditor(
       try {
         const src = await uploadNoteImage(file, noteId);
         const alt = file.name.replace(/\.[^.]+$/, "") || "image";
-        editor.chain().focus().setImage({ src, alt }).run();
+        editor.chain().focus().setImage({ src, alt, width: "100%" }).run();
         ok += 1;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Upload failed";

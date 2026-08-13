@@ -514,6 +514,70 @@
   border-radius: var(--radius-sm);
 }
 
+.ns-editor .ns-img-wrap {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  margin: 0.85em 0;
+}
+
+.ns-editor .ns-img-wrap img {
+  width: 100%;
+  height: auto;
+}
+
+.ns-editor .ns-img-wrap.is-selected {
+  outline: 2px solid color-mix(in oklab, var(--focus-blue) 70%, transparent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.ns-editor .ns-img-handle {
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  z-index: 2;
+  width: 10px;
+  height: 2.25rem;
+  translate: 0 -50%;
+  cursor: ew-resize;
+  border: 0;
+  border-radius: 999px;
+  background: var(--focus-blue);
+  box-shadow: 0 0 0 3px var(--surface);
+}
+
+.ns-editor .ns-img-wrap.is-selected .ns-img-handle {
+  display: block;
+}
+
+.ns-editor .ns-img-tools {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.55rem;
+}
+
+.ns-editor .ns-img-wrap.is-selected .ns-img-tools {
+  display: flex;
+}
+
+.ns-editor .ns-img-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--focus-blue);
+  cursor: pointer;
+}
+
+.ns-editor .ns-img-size {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
 .ns-editor .tiptap mark {
   background-color: color-mix(in oklab, var(--coral) 32%, transparent);
   color: inherit;
