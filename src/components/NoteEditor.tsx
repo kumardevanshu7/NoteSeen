@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
-import { imageFilesFromData, insertImagesIntoEditor } from "@/lib/note-images";
+import { imageFilesFromData, queueNoteImages } from "@/lib/note-images";
 import { clipboardHasImageFile, sanitizePastedHtml } from "@/lib/paste-html";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
@@ -134,7 +134,7 @@ export function NoteEditor({ note }: { note: Note }) {
             toast("Unlock the note to add images");
             return true;
           }
-          void insertImagesIntoEditor(ed, images, noteIdRef.current);
+          queueNoteImages(images, noteIdRef.current);
           return true;
         }
 
@@ -180,7 +180,7 @@ export function NoteEditor({ note }: { note: Note }) {
           toast("Unlock the note to add images");
           return true;
         }
-        void insertImagesIntoEditor(ed, images, noteIdRef.current);
+        queueNoteImages(images, noteIdRef.current);
         return true;
       },
     },

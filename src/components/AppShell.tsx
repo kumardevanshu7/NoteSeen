@@ -23,10 +23,23 @@ import { TopBar } from "./TopBar";
 import { TrashView } from "./TrashView";
 import { VaultGateDialog } from "./VaultGateDialog";
 import { EditorErrorBoundary } from "./EditorErrorBoundary";
+import { ImageEditDialog } from "./ImageEditDialog";
 import { hideBootSplash } from "@/lib/boot";
 import type { NoteKind } from "@/lib/types";
 
 const NOTE_FILE_PATTERN = /\.(noteseen|md|markdown|txt|html?)$/i;
+const STYLE_PANEL_KEY = "noteseen.style-panel";
+
+function readStyleOpen(): boolean {
+  try {
+    const stored = localStorage.getItem(STYLE_PANEL_KEY);
+    if (stored === "hidden") return false;
+    if (stored === "open") return true;
+  } catch {
+    // ignore
+  }
+  return window.matchMedia("(min-width: 1280px)").matches;
+}
 
 function isNoteFileName(name: string): boolean {
   return NOTE_FILE_PATTERN.test(name);
@@ -50,7 +63,7 @@ export function AppShell() {
   const initVault = useVault((state) => state.initVault);
 
   const [navOpen, setNavOpen] = useState(false);
-  const [styleOpen, setStyleOpen] = useState(false);
+  const [styleOpen, setStyleOpen] = useState(readStyleOpen);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
 
@@ -67,8 +80,12 @@ export function AppShell() {
   }, [ready]);
 
   useEffect(() => {
-    setStyleOpen(false);
-  }, [activeId, view]);
+    try {
+      localStorage.setItem(STYLE_PANEL_KEY, styleOpen ? "open" : "hidden");
+    } catch {
+      // ignore
+    }
+  }, [styleOpen]);
 
   // Edge swipe (from left) opens the sidebar on phones.
   useEffect(() => {
@@ -333,15 +350,21 @@ export function AppShell() {
 
         {view === "editor" && note && note.kind === "note" ? (
           <>
-            <div className="ns-no-print hidden h-full min-h-0 xl:block">
-              <ToolRail note={note} className="h-full" />
-            </div>
+            {styleOpen ? (
+              <div className="ns-no-print hidden h-full min-h-0 xl:block">
+                <ToolRail
+                  note={note}
+                  onClose={() => setStyleOpen(false)}
+                  className="h-full"
+                />
+              </div>
+            ) : null}
 
             {!styleOpen ? (
               <button
                 type="button"
                 onClick={() => setStyleOpen(true)}
-                className="ns-no-print fixed right-4 bottom-16 z-30 flex items-center gap-2 rounded-full border border-hairline bg-surface px-4 py-2.5 text-[13px] font-medium text-ink shadow-lg xl:hidden"
+                className="ns-no-print fixed right-4 bottom-16 z-30 flex items-center gap-2 rounded-full border border-hairline bg-surface px-4 py-2.5 text-[13px] font-medium text-ink shadow-lg"
               >
                 <Palette className="size-4" />
                 Style
@@ -380,6 +403,7 @@ export function AppShell() {
         onChoose={(kind: NoteKind) => createItem(kind)}
       />
       <VaultGateDialog />
+      <ImageEditDialog />
     </div>
   );
 }

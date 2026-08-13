@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import type { Editor } from "@tiptap/react";
 import { useAuth } from "@/store/auth";
+import { useImageEdit } from "@/store/image-edit";
 import { getSupabase, isImageStorageConfigured, NOTE_IMAGE_BUCKET } from "@/lib/supabase";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -55,6 +56,12 @@ async function uploadNoteImage(file: File, noteId: string): Promise<string> {
   const { data } = supabase.storage.from(NOTE_IMAGE_BUCKET).getPublicUrl(path);
   if (!data.publicUrl) throw new Error("Could not get image URL.");
   return data.publicUrl;
+}
+
+export function queueNoteImages(files: File[], noteId: string): void {
+  const images = files.filter((file) => file.type.startsWith("image/"));
+  if (images.length === 0) return;
+  useImageEdit.getState().queue(images, noteId);
 }
 
 export async function insertImagesIntoEditor(

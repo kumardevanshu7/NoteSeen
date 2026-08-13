@@ -37,7 +37,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
-import { insertImagesIntoEditor } from "@/lib/note-images";
+import { queueNoteImages } from "@/lib/note-images";
 import { CODE_LANGUAGES, LINE_SPACINGS, NOTE_THEMES, TEXT_SIZES, TYPEFACES } from "@/lib/note-themes";
 import type { Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -311,7 +311,7 @@ export function ToolRail({ note, onClose, className }: ToolRailProps) {
               input.multiple = true;
               input.addEventListener("change", () => {
                 const files = Array.from(input.files ?? []);
-                if (files.length > 0) void insertImagesIntoEditor(editor, files, note.id);
+                if (files.length > 0) queueNoteImages(files, note.id);
               });
               input.click();
             }}
@@ -385,7 +385,7 @@ export function ToolRail({ note, onClose, className }: ToolRailProps) {
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
           />
         </div>
-        <p className="ns-micro mt-3 text-muted">Drop, paste, or pick an image — hosted on Supabase.</p>
+        <p className="ns-micro mt-3 text-muted">Image: crop, rotate, then add to the note.</p>
       </Section>
 
       <p className="ns-micro mt-8 flex items-center gap-2 text-muted">
