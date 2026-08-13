@@ -213,9 +213,6 @@ export function AppShell() {
 
       const images = files.filter((file) => file.type.startsWith("image/"));
       if (images.length > 0 && files.every((file) => file.type.startsWith("image/"))) {
-        toast("Images are off for now", {
-          description: "Drop a .noteseen, .md, or .txt file instead.",
-        });
         return;
       }
 

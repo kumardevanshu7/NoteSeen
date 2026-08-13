@@ -11,6 +11,7 @@ import {
   Code2,
   FileCode2,
   Heading2,
+  ImagePlus,
   Italic,
   Link2,
   List,
@@ -36,6 +37,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
+import { insertImagesIntoEditor } from "@/lib/note-images";
 import { CODE_LANGUAGES, LINE_SPACINGS, NOTE_THEMES, TEXT_SIZES, TYPEFACES } from "@/lib/note-themes";
 import type { Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -299,6 +301,22 @@ export function ToolRail({ note, onClose, className }: ToolRailProps) {
             </DropdownMenuContent>
           </DropdownMenu>
           <BlockTile
+            icon={ImagePlus}
+            label="Image"
+            onClick={() => {
+              if (!editor) return;
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "image/jpeg,image/png,image/gif,image/webp";
+              input.multiple = true;
+              input.addEventListener("change", () => {
+                const files = Array.from(input.files ?? []);
+                if (files.length > 0) void insertImagesIntoEditor(editor, files, note.id);
+              });
+              input.click();
+            }}
+          />
+          <BlockTile
             icon={Link2}
             label="Link"
             onClick={() => {
@@ -367,7 +385,7 @@ export function ToolRail({ note, onClose, className }: ToolRailProps) {
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
           />
         </div>
-        <p className="ns-micro mt-3 text-muted">Images are off for now — text and code only.</p>
+        <p className="ns-micro mt-3 text-muted">Drop, paste, or pick an image — hosted on Supabase.</p>
       </Section>
 
       <p className="ns-micro mt-8 flex items-center gap-2 text-muted">

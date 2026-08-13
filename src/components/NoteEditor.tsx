@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
+import { imageFilesFromData, insertImagesIntoEditor } from "@/lib/note-images";
 import { clipboardHasImageFile, sanitizePastedHtml } from "@/lib/paste-html";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
@@ -57,12 +58,14 @@ export function NoteEditor({ note }: { note: Note }) {
   };
 
   const noteIdRef = useRef(note.id);
+  const canEditRef = useRef(canEdit);
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const loadedIdRef = useRef<string | null>(null);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<{ id: string; html: string } | null>(null);
   noteIdRef.current = note.id;
+  canEditRef.current = canEdit;
 
   const commit = useCallback(() => {
     if (flushTimer.current) {
@@ -122,13 +125,22 @@ export function NoteEditor({ note }: { note: Note }) {
 
         const html = clipboard.getData("text/html");
         const text = clipboard.getData("text/plain");
-        const hasImage = clipboardHasImageFile(clipboard);
+        const images = imageFilesFromData(clipboard);
 
-        if (hasImage && !html.trim() && !text.trim()) {
+        if (images.length > 0) {
           event.preventDefault();
-          toast("Images are off for now", {
-            description: "Copy text from ChatGPT — not a screenshot.",
-          });
+          const ed = editorRef.current;
+          if (!ed || !canEditRef.current) {
+            toast("Unlock the note to add images");
+            return true;
+          }
+          void insertImagesIntoEditor(ed, images, noteIdRef.current);
+          return true;
+        }
+
+        if (clipboardHasImageFile(clipboard) && !html.trim() && !text.trim()) {
+          event.preventDefault();
+          toast("Could not read that image");
           return true;
         }
 
@@ -160,9 +172,15 @@ export function NoteEditor({ note }: { note: Note }) {
         return true;
       },
       handleDrop(_view, event) {
-        if (!clipboardHasImageFile(event.dataTransfer)) return false;
+        const images = imageFilesFromData(event.dataTransfer);
+        if (images.length === 0) return false;
         event.preventDefault();
-        toast("Images are off for now");
+        const ed = editorRef.current;
+        if (!ed || !canEditRef.current) {
+          toast("Unlock the note to add images");
+          return true;
+        }
+        void insertImagesIntoEditor(ed, images, noteIdRef.current);
         return true;
       },
     },
