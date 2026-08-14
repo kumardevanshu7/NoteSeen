@@ -101,6 +101,7 @@ export function SecretVaultView() {
   const pinConfig = useSecrets((state) => state.pinConfig);
   const unlocked = useSecrets((state) => state.unlocked);
   const entries = useSecrets((state) => state.entries);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const initSecrets = useSecrets((state) => state.initSecrets);
   const setupPin = useSecrets((state) => state.setupPin);
   const unlock = useSecrets((state) => state.unlock);
@@ -175,10 +176,15 @@ export function SecretVaultView() {
     };
   }, [unlocked, bumpIdle]);
 
+  const workspaceEntries = useMemo(
+    () => entries.filter((entry) => entry.workspaceId === activeWorkspaceId),
+    [entries, activeWorkspaceId],
+  );
+
   const visible = useMemo(() => {
-    if (filter === "all") return entries;
-    return entries.filter((entry) => entry.category === filter);
-  }, [entries, filter]);
+    if (filter === "all") return workspaceEntries;
+    return workspaceEntries.filter((entry) => entry.category === filter);
+  }, [workspaceEntries, filter]);
 
   const onSetup = async (event: FormEvent) => {
     event.preventDefault();
@@ -227,7 +233,7 @@ export function SecretVaultView() {
 
   // Keep the open detail card in sync after edits/deletes.
   const viewingLive = viewing
-    ? (entries.find((entry) => entry.id === viewing.id) ?? null)
+    ? (workspaceEntries.find((entry) => entry.id === viewing.id) ?? null)
     : null;
 
   if (!ready) {
@@ -311,7 +317,8 @@ export function SecretVaultView() {
           <div>
             <h1 className="ns-display text-ink">Secret vault</h1>
             <p className="ns-caption mt-2 text-body-muted">
-              {entries.length} {entries.length === 1 ? "secret" : "secrets"} · PIN protected · locks
+              {workspaceEntries.length}{" "}
+              {workspaceEntries.length === 1 ? "secret" : "secrets"} in this workspace · PIN protected · locks
               after 1 min idle
             </p>
           </div>
@@ -521,7 +528,7 @@ export function SecretVaultView() {
             if (ok) setEditorOpen(false);
             return ok;
           }
-          const created = await addEntry(draft);
+          const created = await addEntry(draft, activeWorkspaceId);
           if (created) setEditorOpen(false);
           return Boolean(created);
         }}

@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CopyButton } from "@/components/CopyButton";
+import { MoveToWorkspaceMenu } from "@/components/MoveToWorkspaceMenu";
 import { NewItemDialog } from "@/components/NewItemDialog";
 import { useNotes } from "@/store/notes";
 import { NOTE_THEMES } from "@/lib/note-themes";
@@ -473,6 +474,7 @@ function NoteCard({ note, compact, selected, onToggleSelect, onOpen, onTogglePin
             <span className="ns-mono shrink-0 text-muted">{formatRelative(note.updatedAt)}</span>
             <div className="flex items-center gap-0.5">
               <CopyButton note={note} size="icon-sm" />
+              <MoveToWorkspaceMenu noteId={note.id} currentWorkspaceId={note.workspaceId} />
               <button
                 type="button"
                 aria-label={note.pinned ? "Unpin" : "Pin"}

@@ -19,9 +19,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { WorkspaceColorPicker } from "@/components/MoveToWorkspaceMenu";
 import { useNotes } from "@/store/notes";
 import { noteCountInWorkspace, workspaceList } from "@/lib/selectors";
+import type { WorkspaceColor } from "@/lib/types";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/types";
+import { workspaceColorTheme } from "@/lib/workspace-colors";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceSwitcher({ className }: { className?: string }) {
@@ -36,14 +39,17 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [color, setColor] = useState<WorkspaceColor>("azure");
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
   const list = useMemo(() => workspaceList(workspaces), [workspaces]);
   const active = workspaces[activeWorkspaceId] ?? list[0];
+  const activeTheme = active ? workspaceColorTheme(active.color) : workspaceColorTheme("azure");
 
-  const openRename = (id: string, name: string) => {
+  const openRename = (id: string, name: string, wsColor: WorkspaceColor) => {
     setRenamingId(id);
     setDraft(name);
+    setColor(wsColor);
     setRenameOpen(true);
   };
 
@@ -53,9 +59,10 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
       toast.error("Give the workspace a name");
       return;
     }
-    createWorkspace(name);
+    createWorkspace(name, color);
     setCreateOpen(false);
     setDraft("");
+    setColor("azure");
     toast.success(`Workspace “${name}” created`);
   };
 
@@ -66,7 +73,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
       toast.error("Name cannot be empty");
       return;
     }
-    renameWorkspace(renamingId, name);
+    renameWorkspace(renamingId, name, color);
     setRenameOpen(false);
     setRenamingId(null);
     setDraft("");
@@ -79,10 +86,18 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
           <button
             type="button"
             className={cn(
-              "flex w-full items-center gap-2 rounded-sm border border-hairline bg-surface px-2.5 py-2 text-left transition-colors hover:bg-stone/60",
+              "flex w-full items-center gap-2 rounded-sm border px-2.5 py-2 text-left transition-colors hover:bg-stone/60",
               className,
             )}
+            style={{
+              borderColor: activeTheme.line,
+              background: `color-mix(in oklab, ${activeTheme.wash} 35%, var(--surface))`,
+            }}
           >
+            <span
+              className="size-2.5 shrink-0 rounded-full"
+              style={{ background: activeTheme.swatch }}
+            />
             <FolderKanban className="size-4 shrink-0 text-slate" />
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">
               {active?.name ?? "Workspace"}
@@ -95,6 +110,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
           {list.map((ws) => {
             const count = noteCountInWorkspace(notes, ws.id);
             const selected = ws.id === activeWorkspaceId;
+            const theme = workspaceColorTheme(ws.color);
             return (
               <DropdownMenuItem
                 key={ws.id}
@@ -102,7 +118,14 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
                 className="justify-between gap-2"
               >
                 <span className="flex min-w-0 items-center gap-2">
-                  {selected ? <Check className="size-3.5 shrink-0" /> : <span className="size-3.5 shrink-0" />}
+                  {selected ? (
+                    <Check className="size-3.5 shrink-0" />
+                  ) : (
+                    <span
+                      className="size-2.5 shrink-0 rounded-full"
+                      style={{ background: theme.swatch }}
+                    />
+                  )}
                   <span className="truncate">{ws.name}</span>
                 </span>
                 <span className="ns-mono shrink-0 text-muted">{count}</span>
@@ -113,6 +136,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
           <DropdownMenuItem
             onSelect={() => {
               setDraft("");
+              setColor("azure");
               setCreateOpen(true);
             }}
           >
@@ -121,9 +145,9 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
           </DropdownMenuItem>
           {active && active.id !== DEFAULT_WORKSPACE_ID ? (
             <>
-              <DropdownMenuItem onSelect={() => openRename(active.id, active.name)}>
+              <DropdownMenuItem onSelect={() => openRename(active.id, active.name, active.color)}>
                 <Pencil />
-                Rename workspace
+                Edit workspace
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-error focus:text-error"
@@ -142,19 +166,22 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
           <DialogHeader>
             <DialogTitle>New workspace</DialogTitle>
             <DialogDescription>
-              Group related notes, prompts, and cards in one place.
+              Fresh notes, prompt cards, and a separate secret vault.
             </DialogDescription>
           </DialogHeader>
-          <Input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="e.g. Arigato Site, Client X, Personal"
-            maxLength={80}
-            autoFocus
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submitCreate();
-            }}
-          />
+          <div className="space-y-4">
+            <Input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="e.g. Arigato Site, Client X, Personal"
+              maxLength={80}
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitCreate();
+              }}
+            />
+            <WorkspaceColorPicker value={color} onChange={(next) => setColor(next as WorkspaceColor)} />
+          </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
               Cancel
@@ -169,17 +196,20 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename workspace</DialogTitle>
+            <DialogTitle>Edit workspace</DialogTitle>
           </DialogHeader>
-          <Input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            maxLength={80}
-            autoFocus
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submitRename();
-            }}
-          />
+          <div className="space-y-4">
+            <Input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              maxLength={80}
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitRename();
+              }}
+            />
+            <WorkspaceColorPicker value={color} onChange={(next) => setColor(next as WorkspaceColor)} />
+          </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setRenameOpen(false)}>
               Cancel

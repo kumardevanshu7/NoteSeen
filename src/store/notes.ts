@@ -24,10 +24,11 @@ import {
   type ImportedNote,
 } from "@/lib/note-file";
 import { mergeRemote, mergeRemoteWorkspace, syncAdapter } from "@/lib/sync/adapter";
-import type { Note, NoteKind, SaveStatus, View, Workspace } from "@/lib/types";
+import type { Note, NoteKind, SaveStatus, View, Workspace, WorkspaceColor } from "@/lib/types";
 import { DEFAULT_WORKSPACE_ID, defaultWorkspace, normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { htmlToPlainText } from "@/lib/utils";
 import { requireVault } from "@/store/vault";
+import { useSecrets } from "@/store/secrets";
 
 const IDB_DEBOUNCE_MS = 250;
 const FILE_DEBOUNCE_MS = 1200;
@@ -158,10 +159,11 @@ interface NotesState {
   cloudUserId: string | null;
 
   init: () => Promise<void>;
-  createWorkspace: (name: string) => string;
-  renameWorkspace: (id: string, name: string) => void;
+  createWorkspace: (name: string, color?: WorkspaceColor) => string;
+  renameWorkspace: (id: string, name: string, color?: WorkspaceColor) => void;
   deleteWorkspace: (id: string) => Promise<boolean>;
   setActiveWorkspace: (id: string) => void;
+  moveNotesToWorkspace: (ids: string[], workspaceId: string) => number;
   createNote: (seed?: Partial<Note>) => string;
   createItem: (kind: NoteKind) => string;
   openForEdit: (id: string) => Promise<boolean>;
@@ -385,11 +387,17 @@ export const useNotes = create<NotesState>((set, get) => {
       return initPromise;
     },
 
-    createWorkspace(name) {
+    createWorkspace(name, color = "azure") {
       const trimmed = name.trim().slice(0, 80);
       if (!trimmed) return DEFAULT_WORKSPACE_ID;
       const now = Date.now();
-      const workspace = normalizeWorkspace({ id: nanoid(12), name: trimmed, createdAt: now, updatedAt: now });
+      const workspace = normalizeWorkspace({
+        id: nanoid(12),
+        name: trimmed,
+        color,
+        createdAt: now,
+        updatedAt: now,
+      });
       set((state) => ({
         workspaces: { ...state.workspaces, [workspace.id]: workspace },
         activeWorkspaceId: workspace.id,
@@ -401,11 +409,13 @@ export const useNotes = create<NotesState>((set, get) => {
       return workspace.id;
     },
 
-    renameWorkspace(id, name) {
+    renameWorkspace(id, name, color) {
       const trimmed = name.trim().slice(0, 80);
       const current = get().workspaces[id];
-      if (!current || !trimmed || trimmed === current.name) return;
-      const next = { ...current, name: trimmed, updatedAt: Date.now() };
+      if (!current || !trimmed) return;
+      const nextColor = color ?? current.color;
+      if (trimmed === current.name && nextColor === current.color) return;
+      const next = { ...current, name: trimmed, color: nextColor, updatedAt: Date.now() };
       set((state) => ({ workspaces: { ...state.workspaces, [id]: next } }));
       scheduleWorkspaceIdb(id);
     },
@@ -438,6 +448,7 @@ export const useNotes = create<NotesState>((set, get) => {
       scheduleIdb();
       dirtyWorkspaces.delete(id);
       await removeWorkspace(id);
+      await useSecrets.getState().moveSecretsToWorkspace(id, DEFAULT_WORKSPACE_ID);
       if (get().cloudUserId) {
         void syncAdapter().removeWorkspaces?.([id]);
         void get().flush({ toDisk: false });
@@ -453,6 +464,8 @@ export const useNotes = create<NotesState>((set, get) => {
       const { workspaces, notes, openTabs, activeId } = get();
       if (!workspaces[id]) return;
 
+      useSecrets.getState().lock();
+
       const inWorkspace = openTabs.filter((tabId) => notes[tabId]?.workspaceId === id);
       const nextActive =
         activeId && notes[activeId]?.workspaceId === id
@@ -466,6 +479,39 @@ export const useNotes = create<NotesState>((set, get) => {
         view: nextActive ? "editor" : "suggestions",
       });
       void setMeta(WORKSPACE_KEY, id);
+    },
+
+    moveNotesToWorkspace(ids, workspaceId) {
+      const { workspaces, activeWorkspaceId, openTabs, activeId } = get();
+      if (!workspaces[workspaceId]) return 0;
+
+      const stamp = Date.now();
+      let moved = 0;
+      let nextTabs = openTabs;
+      let nextActive = activeId;
+
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const id of ids) {
+          const note = notes[id];
+          if (!note || note.deletedAt || note.workspaceId === workspaceId) continue;
+          notes[id] = { ...note, workspaceId, updatedAt: stamp };
+          dirtyNotes.add(id);
+          moved += 1;
+          if (workspaceId !== activeWorkspaceId && nextTabs.includes(id)) {
+            nextTabs = nextTabs.filter((tab) => tab !== id);
+            if (nextActive === id) nextActive = nextTabs[nextTabs.length - 1] ?? null;
+          }
+        }
+        return { notes, openTabs: nextTabs, activeId: nextActive };
+      });
+
+      if (moved > 0) {
+        scheduleIdb();
+        void setMeta(TABS_KEY, get().openTabs);
+        if (nextActive !== activeId) void setMeta(ACTIVE_KEY, nextActive);
+      }
+      return moved;
     },
 
     createNote(seed) {

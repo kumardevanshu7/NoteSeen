@@ -21,6 +21,7 @@ import {
   verifySecretPin,
 } from "@/lib/secret-crypto";
 import type { SecretCategory, SecretEntry, SecretPinConfig } from "@/lib/types";
+import { DEFAULT_WORKSPACE_ID, normalizeSecretEntry } from "@/lib/types";
 
 const PIN_KEY = "secret.vault.pin";
 const ENTRIES_KEY = "secret.vault.entries";
@@ -46,10 +47,11 @@ interface SecretsState {
   setupPin: (pin: string, confirm: string) => Promise<void>;
   unlock: (pin: string) => Promise<boolean>;
   lock: () => void;
-  addEntry: (draft: SecretDraft) => Promise<SecretEntry | null>;
+  addEntry: (draft: SecretDraft, workspaceId?: string) => Promise<SecretEntry | null>;
   updateEntry: (id: string, draft: SecretDraft) => Promise<boolean>;
   removeEntry: (id: string) => Promise<boolean>;
   revealValue: (id: string) => Promise<string | null>;
+  moveSecretsToWorkspace: (fromWorkspaceId: string, toWorkspaceId: string) => Promise<void>;
 }
 
 async function currentUserWhenReady() {
@@ -123,17 +125,20 @@ async function loadEntriesFromCloud(uid: string): Promise<SecretEntry[]> {
     ) {
       return;
     }
-    list.push({
-      id: d.id,
-      title: d.title,
-      category: d.category === "password" || d.category === "other" ? d.category : "api",
-      username: typeof d.username === "string" ? d.username : "",
-      valueCipher: d.valueCipher,
-      valueIv: d.valueIv,
-      notes: typeof d.notes === "string" ? d.notes : "",
-      createdAt: typeof d.createdAt === "number" ? d.createdAt : Date.now(),
-      updatedAt: typeof d.updatedAt === "number" ? d.updatedAt : Date.now(),
-    });
+    list.push(
+      normalizeSecretEntry({
+        id: d.id,
+        workspaceId: typeof d.workspaceId === "string" ? d.workspaceId : DEFAULT_WORKSPACE_ID,
+        title: d.title,
+        category: d.category === "password" || d.category === "other" ? d.category : "api",
+        username: typeof d.username === "string" ? d.username : "",
+        valueCipher: d.valueCipher,
+        valueIv: d.valueIv,
+        notes: typeof d.notes === "string" ? d.notes : "",
+        createdAt: typeof d.createdAt === "number" ? d.createdAt : Date.now(),
+        updatedAt: typeof d.updatedAt === "number" ? d.updatedAt : Date.now(),
+      }),
+    );
   });
   return list.sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -171,7 +176,8 @@ export const useSecrets = create<SecretsState>((set, get) => ({
 
   async initSecrets() {
     const pinConfig = (await getMeta<SecretPinConfig>(PIN_KEY)) ?? null;
-    const entries = (await getMeta<SecretEntry[]>(ENTRIES_KEY)) ?? [];
+    const rawEntries = (await getMeta<SecretEntry[]>(ENTRIES_KEY)) ?? [];
+    const entries = rawEntries.map((entry) => normalizeSecretEntry(entry));
     if (!get().pinConfig && pinConfig) set({ pinConfig });
     if (get().entries.length === 0 && entries.length > 0) set({ entries });
     set({ ready: true });
@@ -265,7 +271,7 @@ export const useSecrets = create<SecretsState>((set, get) => ({
     set({ sessionPin: null, unlocked: false });
   },
 
-  async addEntry(draft) {
+  async addEntry(draft, workspaceId = DEFAULT_WORKSPACE_ID) {
     const { sessionPin, pinConfig, entries } = get();
     if (!sessionPin || !pinConfig) {
       toast.error("Unlock the secret vault first");
@@ -282,6 +288,7 @@ export const useSecrets = create<SecretsState>((set, get) => ({
     const now = Date.now();
     const entry: SecretEntry = {
       id: nanoid(12),
+      workspaceId,
       title,
       category: draft.category,
       username: draft.username.trim(),
@@ -375,6 +382,29 @@ export const useSecrets = create<SecretsState>((set, get) => ({
       toast.error("Could not decrypt — try unlocking again");
       set({ sessionPin: null, unlocked: false });
       return null;
+    }
+  },
+
+  async moveSecretsToWorkspace(fromWorkspaceId, toWorkspaceId) {
+    if (fromWorkspaceId === toWorkspaceId) return;
+    const stamp = Date.now();
+    const next = get().entries.map((entry) =>
+      entry.workspaceId === fromWorkspaceId
+        ? { ...entry, workspaceId: toWorkspaceId, updatedAt: stamp }
+        : entry,
+    );
+    if (next.every((entry, index) => entry === get().entries[index])) return;
+    await persistEntriesLocal(next);
+    set({ entries: next });
+    const touched = next.filter(
+      (entry) => entry.workspaceId === toWorkspaceId && entry.updatedAt === stamp,
+    );
+    for (const entry of touched) {
+      try {
+        await upsertEntryCloud(entry);
+      } catch (error) {
+        console.warn("NoteSeen: secret workspace move cloud sync failed", error);
+      }
     }
   },
 }));

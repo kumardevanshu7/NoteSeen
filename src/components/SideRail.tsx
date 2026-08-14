@@ -23,6 +23,7 @@ import { NewItemDialog } from "@/components/NewItemDialog";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { ArigatoMark, LogoMark } from "@/components/Logo";
 import { useNotes } from "@/store/notes";
+import { useSecrets } from "@/store/secrets";
 import {
   collectLabels,
   editorNotes,
@@ -92,6 +93,9 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
     [live, recent, query],
   );
   const allLabels = useMemo(() => collectLabels(scopedNotes), [scopedNotes]);
+  const secretCount = useSecrets((state) =>
+    state.entries.filter((entry) => entry.workspaceId === activeWorkspaceId).length,
+  );
 
   return (
     <div className="flex h-full min-h-0 w-[268px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-canvas">
@@ -136,6 +140,9 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                 ) : null}
                 {item.id === "labels" && allLabels.length > 0 ? (
                   <span className="ns-mono text-muted">{allLabels.length}</span>
+                ) : null}
+                {item.id === "secrets" && secretCount > 0 ? (
+                  <span className="ns-mono text-muted">{secretCount}</span>
                 ) : null}
               </button>
             </li>

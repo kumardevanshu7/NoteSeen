@@ -30,9 +30,13 @@ export type SecretCategory = "api" | "password" | "other";
 
 export const DEFAULT_WORKSPACE_ID = "default";
 
+/** Accent for workspace switcher + cards — six choices. */
+export type WorkspaceColor = "azure" | "sage" | "sand" | "aurora" | "coral" | "violet";
+
 export interface Workspace {
   id: string;
   name: string;
+  color: WorkspaceColor;
   createdAt: number;
   updatedAt: number;
 }
@@ -109,6 +113,7 @@ export interface SecretPinConfig {
 
 export interface SecretEntry {
   id: string;
+  workspaceId: string;
   title: string;
   category: SecretCategory;
   /** Optional username / account label (plain). */
@@ -122,18 +127,46 @@ export interface SecretEntry {
   updatedAt: number;
 }
 
+import { isWorkspaceColor } from "@/lib/workspace-colors";
+
 export function normalizeWorkspace(raw: Partial<Workspace> & { id: string }): Workspace {
   const name = (raw.name ?? "Workspace").trim().slice(0, 80);
+  const color = raw.color && isWorkspaceColor(raw.color) ? raw.color : "azure";
   return {
     id: raw.id,
     name: name || "Workspace",
+    color,
     createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
     updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
   };
 }
 
 export function defaultWorkspace(now = Date.now()): Workspace {
-  return normalizeWorkspace({ id: DEFAULT_WORKSPACE_ID, name: "General", createdAt: now, updatedAt: now });
+  return normalizeWorkspace({
+    id: DEFAULT_WORKSPACE_ID,
+    name: "General",
+    color: "sand",
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
+export function normalizeSecretEntry(raw: Partial<SecretEntry> & { id: string }): SecretEntry {
+  return {
+    id: raw.id,
+    workspaceId:
+      typeof raw.workspaceId === "string" && raw.workspaceId.trim()
+        ? raw.workspaceId.trim()
+        : DEFAULT_WORKSPACE_ID,
+    title: raw.title ?? "",
+    category: raw.category === "password" || raw.category === "other" ? raw.category : "api",
+    username: typeof raw.username === "string" ? raw.username : "",
+    valueCipher: raw.valueCipher ?? "",
+    valueIv: raw.valueIv ?? "",
+    notes: typeof raw.notes === "string" ? raw.notes : "",
+    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
+  };
 }
 
 export function normalizeNote(raw: Partial<Note> & { id: string }): Note {

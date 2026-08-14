@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NewItemDialog } from "@/components/NewItemDialog";
+import { MoveToWorkspaceMenu } from "@/components/MoveToWorkspaceMenu";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
@@ -221,6 +222,13 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
             {note?.pinned ? <PinOff /> : <Pin />}
             {note?.pinned ? "Unpin" : "Pin to top"}
           </DropdownMenuItem>
+          {note ? (
+            <MoveToWorkspaceMenu
+              noteId={note.id}
+              currentWorkspaceId={note.workspaceId}
+              trigger="item"
+            />
+          ) : null}
           <DropdownMenuItem
             disabled={!note}
             onSelect={() => {

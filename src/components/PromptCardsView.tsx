@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { MoveToWorkspaceMenu } from "@/components/MoveToWorkspaceMenu";
 import { useNotes } from "@/store/notes";
 import { noteLabel, notesForWorkspace, promptCards, searchNotes } from "@/lib/selectors";
 import type { Note } from "@/lib/types";
@@ -238,6 +239,11 @@ export function PromptCardsView() {
                   <Pencil className="size-3.5" />
                   Edit
                 </Button>
+                <MoveToWorkspaceMenu
+                  noteId={viewingLive.id}
+                  currentWorkspaceId={viewingLive.workspaceId}
+                  onMoved={() => setViewing(null)}
+                />
                 <CopyButton note={viewingLive} label="Copy prompt" />
                 <Button type="button" variant="ghost" size="sm" onClick={() => setViewing(null)}>
                   <X className="size-3.5" />

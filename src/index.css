@@ -115,6 +115,13 @@
   --theme-aurora-wash: linear-gradient(135deg, #f3f0ff 0%, #eef6ff 48%, #fff1f4 100%);
   --theme-aurora-line: #e0dcf5;
   --theme-aurora-ink: #5b4bc4;
+
+  --workspace-coral-wash: #fff4f0;
+  --workspace-coral-line: #ffd4c8;
+  --workspace-coral-ink: #ff7759;
+  --workspace-violet-wash: #f3f0ff;
+  --workspace-violet-line: #ddd6fe;
+  --workspace-violet-ink: #7c3aed;
 }
 
 /* Site chrome stays near-black. Only note paper colors are lifted (color × black). */
@@ -175,6 +182,13 @@
   --theme-aurora-wash: linear-gradient(135deg, #1c1830 0%, #151c2c 52%, #271820 100%);
   --theme-aurora-line: #342e4c;
   --theme-aurora-ink: #c0b0ff;
+
+  --workspace-coral-wash: #2a1814;
+  --workspace-coral-line: #4a2e26;
+  --workspace-coral-ink: #ff8f75;
+  --workspace-violet-wash: #1e1830;
+  --workspace-violet-line: #3b2f55;
+  --workspace-violet-ink: #a78bfa;
 }
 
 @theme inline {
