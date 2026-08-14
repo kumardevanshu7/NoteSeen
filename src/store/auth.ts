@@ -82,7 +82,7 @@ async function startCloudSync(user: User) {
 
     await useNotes.getState().pushAllToCloud();
 
-    const recovered = await useNotes.getState().recoverOrphanedPromptCards();
+    const recovered = await useNotes.getState().recoverOrphanedPromptCards(user.uid);
     if (recovered > 0) {
       toast.success(
         recovered === 1

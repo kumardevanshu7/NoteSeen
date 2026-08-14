@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
-import { Images, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { Images, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
 import { PromptCardForm } from "@/components/PromptCardForm";
@@ -12,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { MoveToWorkspaceMenu } from "@/components/MoveToWorkspaceMenu";
 import { useNotes } from "@/store/notes";
+import { useAuth } from "@/store/auth";
+import { isImageStorageConfigured } from "@/lib/supabase";
 import { noteLabel, promptCards, searchNotes, trashedNotes } from "@/lib/selectors";
 import type { Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -22,17 +25,59 @@ export function PromptCardsView() {
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const trashNote = useNotes((state) => state.trashNote);
+  const recoverOrphanedPromptCards = useNotes((state) => state.recoverOrphanedPromptCards);
+  const cloudUserId = useNotes((state) => state.cloudUserId);
+  const user = useAuth((state) => state.user);
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [editing, setEditing] = useState<Note | null>(null);
   const [viewing, setViewing] = useState<Note | null>(null);
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
+  const autoRecoverDone = useRef(false);
 
   const allCards = useMemo(() => promptCards(notes), [notes]);
   const trashedCards = useMemo(
     () => trashedNotes(notes).filter((note) => note.kind === "promptCard"),
     [notes],
   );
+
+  const runRecover = async (manual = false) => {
+    if (!user?.uid && !cloudUserId) {
+      if (manual) toast.error("Sign in with Google to restore prompt cards");
+      return 0;
+    }
+    if (!isImageStorageConfigured()) {
+      if (manual) toast.error("Image storage is not configured on this build");
+      return 0;
+    }
+    setRecovering(true);
+    try {
+      const count = await recoverOrphanedPromptCards(user?.uid ?? cloudUserId ?? undefined);
+      if (manual) {
+        if (count > 0) {
+          toast.success(count === 1 ? "Restored 1 card" : `Restored ${count} cards`);
+        } else {
+          toast("No images found to restore", {
+            description: "Check that you are signed in with the same Google account used when uploading.",
+          });
+        }
+      } else if (count > 0) {
+        toast.success(count === 1 ? "Restored 1 prompt card" : `Restored ${count} prompt cards`);
+      }
+      return count;
+    } finally {
+      setRecovering(false);
+    }
+  };
+
+  useEffect(() => {
+    if (autoRecoverDone.current || allCards.length > 0) return;
+    if (!user?.uid && !cloudUserId) return;
+    autoRecoverDone.current = true;
+    void runRecover(false);
+  }, [allCards.length, user?.uid, cloudUserId]);
+
   const viewingLive = viewing ? (notes[viewing.id] ?? null) : null;
 
   const allLabels = useMemo(() => {
@@ -116,11 +161,29 @@ export function PromptCardsView() {
                 in the sidebar to restore them.
               </p>
             ) : null}
+            {!user?.uid && !cloudUserId ? (
+              <p className="ns-caption mt-3 max-w-sm text-body-muted">
+                Sign in with Google — your cards are tied to your account and image library on Supabase.
+              </p>
+            ) : null}
             {!query && !labelFilter ? (
-              <Button variant="primary" size="sm" className="mt-6" onClick={() => setComposerOpen(true)}>
-                <Plus className="size-3.5" />
-                Create a card
-              </Button>
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <Button variant="primary" size="sm" onClick={() => setComposerOpen(true)}>
+                  <Plus className="size-3.5" />
+                  Create a card
+                </Button>
+                {(user?.uid || cloudUserId) && isImageStorageConfigured() ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={recovering}
+                    onClick={() => void runRecover(true)}
+                  >
+                    <RefreshCw className={cn("size-3.5", recovering && "animate-spin")} />
+                    {recovering ? "Checking Supabase…" : "Restore from image library"}
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : (

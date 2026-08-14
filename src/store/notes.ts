@@ -27,7 +27,7 @@ import { mergeRemote, mergeRemoteWorkspace, syncAdapter } from "@/lib/sync/adapt
 import type { Note, NoteKind, SaveStatus, View, Workspace, WorkspaceColor } from "@/lib/types";
 import { DEFAULT_WORKSPACE_ID, defaultWorkspace, normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { htmlToPlainText } from "@/lib/utils";
-import { listOrphanedPromptCardImages } from "@/lib/note-images";
+import { listPromptCardImagesFromStorage } from "@/lib/note-images";
 import { requireVault } from "@/store/vault";
 import { useSecrets } from "@/store/secrets";
 
@@ -195,7 +195,7 @@ interface NotesState {
   mergeRemoteNotes: (remoteNotes: Note[]) => void;
   mergeRemoteWorkspaces: (remoteWorkspaces: Workspace[]) => void;
   pushAllToCloud: () => Promise<void>;
-  recoverOrphanedPromptCards: () => Promise<number>;
+  recoverOrphanedPromptCards: (uid?: string) => Promise<number>;
 }
 
 const dirtyNotes = new Set<string>();
@@ -1106,29 +1106,53 @@ export const useNotes = create<NotesState>((set, get) => {
       await syncAdapter().flushCloud?.();
     },
 
-    async recoverOrphanedPromptCards() {
-      const state = get();
-      const existing = new Set(Object.keys(state.notes));
-      const orphans = await listOrphanedPromptCardImages(existing);
-      if (orphans.length === 0) return 0;
+    async recoverOrphanedPromptCards(uid?: string) {
+      const resolved = uid ?? get().cloudUserId;
+      if (!resolved) return 0;
 
-      const next = { ...state.notes };
-      for (const { noteId, coverUrl } of orphans) {
-        next[noteId] = emptyNote({
-          id: noteId,
-          kind: "promptCard",
-          title: "Recovered card",
-          coverUrl,
-          text: "",
-          html: "<p></p>",
-        });
+      const images = await listPromptCardImagesFromStorage(resolved);
+      if (images.length === 0) return 0;
+
+      const next = { ...get().notes };
+      let count = 0;
+
+      for (const { noteId, coverUrl } of images) {
+        const existing = next[noteId];
+        const healthy =
+          existing &&
+          existing.kind === "promptCard" &&
+          existing.coverUrl &&
+          !existing.deletedAt;
+        if (healthy) continue;
+
+        if (existing) {
+          next[noteId] = normalizeNote({
+            ...existing,
+            kind: "promptCard",
+            coverUrl,
+            deletedAt: null,
+            title: existing.title.trim() || "Recovered card",
+            updatedAt: Date.now(),
+          });
+        } else {
+          next[noteId] = emptyNote({
+            id: noteId,
+            kind: "promptCard",
+            title: "Recovered card",
+            coverUrl,
+            text: "",
+            html: "<p></p>",
+          });
+        }
         dirtyNotes.add(noteId);
+        count += 1;
       }
 
+      if (count === 0) return 0;
       set({ notes: next });
       scheduleIdb();
       void get().pushAllToCloud();
-      return orphans.length;
+      return count;
     },
   };
 });
