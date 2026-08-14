@@ -1,4 +1,4 @@
-import type { Note } from "@/lib/types";
+import type { Note, Workspace } from "@/lib/types";
 
 /**
  * Seam for remote sync. NoteSeen is local-first: IndexedDB is the source of
@@ -9,9 +9,13 @@ export interface SyncAdapter {
   connect(): Promise<void>;
   /** One-shot pull before live subscribe (avoids push-over-remote race). */
   pullNotes?(): Promise<Note[]>;
+  pullWorkspaces?(): Promise<Workspace[]>;
   pushNotes(notes: Note[]): Promise<void>;
+  pushWorkspaces?(workspaces: Workspace[]): Promise<void>;
   removeNotes(ids: string[]): Promise<void>;
+  removeWorkspaces?(ids: string[]): Promise<void>;
   subscribe(onRemoteNotes: (notes: Note[]) => void): () => void;
+  subscribeWorkspaces?(onRemote: (workspaces: Workspace[]) => void): () => void;
   flushCloud?(): Promise<void>;
 }
 
@@ -21,9 +25,17 @@ const localOnly: SyncAdapter = {
   async pullNotes() {
     return [];
   },
+  async pullWorkspaces() {
+    return [];
+  },
   async pushNotes() {},
+  async pushWorkspaces() {},
   async removeNotes() {},
+  async removeWorkspaces() {},
   subscribe() {
+    return () => {};
+  },
+  subscribeWorkspaces() {
     return () => {};
   },
 };
@@ -57,4 +69,11 @@ export function mergeRemote(local: Note | undefined, remote: Note): Note {
   if (remoteDelete && !localDelete) return remote;
   if (localDelete && !remoteDelete) return local;
   return remote.updatedAt >= local.updatedAt ? remote : local;
+}
+
+export function mergeRemoteWorkspace(local: Workspace | undefined, remote: Workspace): Workspace {
+  if (!local) return remote;
+  if (remote.updatedAt > local.updatedAt) return remote;
+  if (local.updatedAt > remote.updatedAt) return local;
+  return remote;
 }

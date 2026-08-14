@@ -20,9 +20,18 @@ import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
 import { Kbd } from "@/components/ui/kbd";
 import { NewItemDialog } from "@/components/NewItemDialog";
+import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { ArigatoMark, LogoMark } from "@/components/Logo";
 import { useNotes } from "@/store/notes";
-import { collectLabels, editorNotes, liveNotes, noteLabel, searchNotes, trashedNotes } from "@/lib/selectors";
+import {
+  collectLabels,
+  editorNotes,
+  liveNotes,
+  noteLabel,
+  notesForWorkspace,
+  searchNotes,
+  trashedNotes,
+} from "@/lib/selectors";
 import type { NoteKind, View } from "@/lib/types";
 import { cn, excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
 import { navigate } from "@/lib/nav";
@@ -52,6 +61,7 @@ function readLabelsExpanded(): boolean {
 export function SideRail({ onClose }: { onClose?: () => void }) {
   const dismiss = () => onClose?.();
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const activeId = useNotes((state) => state.activeId);
   const view = useNotes((state) => state.view);
   const query = useNotes((state) => state.query);
@@ -70,14 +80,18 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
     }
   }, [labelsExpanded]);
 
-  const live = useMemo(() => liveNotes(notes), [notes]);
-  const recent = useMemo(() => editorNotes(notes), [notes]);
-  const trashed = useMemo(() => trashedNotes(notes), [notes]);
+  const scopedNotes = useMemo(
+    () => notesForWorkspace(notes, activeWorkspaceId),
+    [notes, activeWorkspaceId],
+  );
+  const live = useMemo(() => liveNotes(scopedNotes), [scopedNotes]);
+  const recent = useMemo(() => editorNotes(scopedNotes), [scopedNotes]);
+  const trashed = useMemo(() => trashedNotes(scopedNotes), [scopedNotes]);
   const visible = useMemo(
     () => searchNotes(query.trim() ? live : recent, query),
     [live, recent, query],
   );
-  const allLabels = useMemo(() => collectLabels(notes), [notes]);
+  const allLabels = useMemo(() => collectLabels(scopedNotes), [scopedNotes]);
 
   return (
     <div className="flex h-full min-h-0 w-[268px] shrink-0 flex-col overflow-hidden border-r border-hairline bg-canvas">
@@ -93,6 +107,10 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
         <div className="mb-4 flex items-center gap-2 px-1">
           <LogoMark />
           <span className="font-display text-[15px] tracking-[-0.02em] text-ink">NoteSeen</span>
+        </div>
+
+        <div className="mb-4 px-1">
+          <WorkspaceSwitcher />
         </div>
 
         <ul className="space-y-0.5">

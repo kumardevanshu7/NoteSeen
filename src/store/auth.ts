@@ -29,6 +29,7 @@ interface AuthState {
 }
 
 let stopSync: (() => void) | null = null;
+let stopWorkspaceSync: (() => void) | null = null;
 
 function localOnlyAdapter() {
   return {
@@ -59,6 +60,8 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 async function startCloudSync(user: User) {
   stopSync?.();
   stopSync = null;
+  stopWorkspaceSync?.();
+  stopWorkspaceSync = null;
 
   const adapter = createFirestoreAdapter();
   setSyncAdapter(adapter);
@@ -67,13 +70,21 @@ async function startCloudSync(user: User) {
     await adapter.connect();
     useNotes.getState().setCloudUser(user.uid);
 
-    // Pull + merge BEFORE any push so this device cannot resurrect deleted notes.
+    const remoteWorkspaces = (await adapter.pullWorkspaces?.()) ?? [];
+    if (remoteWorkspaces.length > 0) {
+      useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
+    }
+
     const remote = (await adapter.pullNotes?.()) ?? [];
     if (remote.length > 0) {
       useNotes.getState().mergeRemoteNotes(remote);
     }
 
     await useNotes.getState().pushAllToCloud();
+
+    stopWorkspaceSync = adapter.subscribeWorkspaces?.((remoteWorkspaces) => {
+      useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
+    }) ?? null;
 
     stopSync = adapter.subscribe((remoteNotes) => {
       useNotes.getState().mergeRemoteNotes(remoteNotes);
@@ -89,6 +100,8 @@ async function startCloudSync(user: User) {
 function stopCloudSync() {
   stopSync?.();
   stopSync = null;
+  stopWorkspaceSync?.();
+  stopWorkspaceSync = null;
   setSyncAdapter(localOnlyAdapter());
   useNotes.getState().setCloudUser(null);
 }

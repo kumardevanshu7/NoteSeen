@@ -28,8 +28,19 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type NoteKind = "note" | "prompt" | "promptCard";
 export type SecretCategory = "api" | "password" | "other";
 
+export const DEFAULT_WORKSPACE_ID = "default";
+
+export interface Workspace {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface Note {
   id: string;
+  /** Workspace this note belongs to. */
+  workspaceId: string;
   /** Regular notepad entry or a reusable prompt. */
   kind: NoteKind;
   title: string;
@@ -111,6 +122,20 @@ export interface SecretEntry {
   updatedAt: number;
 }
 
+export function normalizeWorkspace(raw: Partial<Workspace> & { id: string }): Workspace {
+  const name = (raw.name ?? "Workspace").trim().slice(0, 80);
+  return {
+    id: raw.id,
+    name: name || "Workspace",
+    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
+  };
+}
+
+export function defaultWorkspace(now = Date.now()): Workspace {
+  return normalizeWorkspace({ id: DEFAULT_WORKSPACE_ID, name: "General", createdAt: now, updatedAt: now });
+}
+
 export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
   const legacy = raw.typeface as string | undefined;
   const aliases: Record<string, Typeface> = {
@@ -145,6 +170,10 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
   return {
     id: raw.id,
     kind,
+    workspaceId:
+      typeof raw.workspaceId === "string" && raw.workspaceId.trim()
+        ? raw.workspaceId.trim()
+        : DEFAULT_WORKSPACE_ID,
     title: raw.title ?? "",
     subtitle: typeof raw.subtitle === "string" ? raw.subtitle : "",
     tags: Array.isArray(raw.tags) ? raw.tags.filter(Boolean) : [],

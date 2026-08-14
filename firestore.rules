@@ -117,7 +117,7 @@ service cloud.firestore {
     function validNote(noteId) {
       let d = request.resource.data;
       return d.keys().hasOnly([
-          'id', 'kind', 'title', 'subtitle', 'tags', 'html', 'text', 'coverUrl',
+          'id', 'kind', 'workspaceId', 'title', 'subtitle', 'tags', 'html', 'text', 'coverUrl',
           'theme', 'typeface', 'size', 'spacing',
           'pinned', 'createdAt', 'updatedAt', 'openedAt', 'deletedAt', 'fileName'
         ])
@@ -131,6 +131,7 @@ service cloud.firestore {
         && d.id.size() > 0
         && d.id.size() <= 128
         && d.kind in ['note', 'prompt', 'promptCard']
+        && (!d.keys().hasAny(['workspaceId']) || stringLen(d.workspaceId, 1, 128))
         && stringLen(d.title, 0, 500)
         && stringLen(d.html, 0, 500000)
         && stringLen(d.text, 0, 500000)
@@ -194,6 +195,21 @@ service cloud.firestore {
       return request.resource.data.createdAt == resource.data.createdAt;
     }
 
+    function validWorkspace(workspaceId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['id', 'name', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['id', 'name', 'createdAt', 'updatedAt'])
+        && d.id == workspaceId
+        && stringLen(d.id, 1, 128)
+        && stringLen(d.name, 1, 80)
+        && d.createdAt is number
+        && d.updatedAt is number;
+    }
+
+    function workspaceCreatedAtImmutable() {
+      return request.resource.data.createdAt == resource.data.createdAt;
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
       allow create, update: if validUserWrite(uid);
@@ -211,6 +227,13 @@ service cloud.firestore {
         allow create: if isOwner(uid) && validSecret(secretId);
         allow update: if isOwner(uid) && validSecret(secretId) && secretCreatedAtImmutable();
         allow delete: if isOwner(uid);
+      }
+
+      match /workspaces/{workspaceId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && validWorkspace(workspaceId);
+        allow update: if isOwner(uid) && validWorkspace(workspaceId) && workspaceCreatedAtImmutable();
+        allow delete: if isOwner(uid) && workspaceId != 'default';
       }
     }
 

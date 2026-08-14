@@ -11,12 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNotes } from "@/store/notes";
-import { noteLabel, promptCards, searchNotes } from "@/lib/selectors";
+import { noteLabel, notesForWorkspace, promptCards, searchNotes } from "@/lib/selectors";
 import type { Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function PromptCardsView() {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const trashNote = useNotes((state) => state.trashNote);
 
@@ -25,7 +26,10 @@ export function PromptCardsView() {
   const [viewing, setViewing] = useState<Note | null>(null);
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
 
-  const allCards = useMemo(() => promptCards(notes), [notes]);
+  const allCards = useMemo(
+    () => promptCards(notesForWorkspace(notes, activeWorkspaceId)),
+    [notes, activeWorkspaceId],
+  );
   const viewingLive = viewing ? (notes[viewing.id] ?? null) : null;
 
   const allLabels = useMemo(() => {

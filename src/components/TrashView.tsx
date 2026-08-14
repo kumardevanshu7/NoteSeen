@@ -2,16 +2,20 @@ import { useMemo } from "react";
 import { RotateCcw, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNotes } from "@/store/notes";
-import { noteLabel, trashedNotes } from "@/lib/selectors";
+import { noteLabel, notesForWorkspace, trashedNotes } from "@/lib/selectors";
 import { excerpt, formatRelative } from "@/lib/utils";
 
 export function TrashView() {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const restoreNote = useNotes((state) => state.restoreNote);
   const purgeNote = useNotes((state) => state.purgeNote);
   const emptyTrash = useNotes((state) => state.emptyTrash);
 
-  const trashed = useMemo(() => trashedNotes(notes), [notes]);
+  const trashed = useMemo(
+    () => trashedNotes(notesForWorkspace(notes, activeWorkspaceId)),
+    [notes, activeWorkspaceId],
+  );
 
   return (
     <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-5 py-8 sm:px-10">

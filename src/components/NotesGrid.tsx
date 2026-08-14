@@ -24,7 +24,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { NewItemDialog } from "@/components/NewItemDialog";
 import { useNotes } from "@/store/notes";
 import { NOTE_THEMES } from "@/lib/note-themes";
-import { liveNotes, noteLabel, searchNotes } from "@/lib/selectors";
+import { liveNotes, noteLabel, notesForWorkspace, searchNotes } from "@/lib/selectors";
 import type { Note, NoteKind } from "@/lib/types";
 import { cn, excerpt, formatRelative } from "@/lib/utils";
 
@@ -84,6 +84,7 @@ function useColumnCeiling(): number {
 
 export function NotesGrid() {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const setActive = useNotes((state) => state.setActive);
   const createItem = useNotes((state) => state.createItem);
@@ -107,9 +108,14 @@ export function NotesGrid() {
     }
   }, [prefs]);
 
+  const scopedNotes = useMemo(
+    () => notesForWorkspace(notes, activeWorkspaceId),
+    [notes, activeWorkspaceId],
+  );
+
   const allLive = useMemo(
-    () => liveNotes(notes).filter((note) => note.kind !== "promptCard"),
-    [notes],
+    () => liveNotes(scopedNotes).filter((note) => note.kind !== "promptCard"),
+    [scopedNotes],
   );
 
   const counts = useMemo(

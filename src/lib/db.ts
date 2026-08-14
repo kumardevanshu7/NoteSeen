@@ -1,15 +1,19 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { NsFileHandle } from "./fs";
-import type { Note } from "./types";
+import type { Note, Workspace } from "./types";
 
 const DB_NAME = "noteseen";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 interface NoteSeenDB extends DBSchema {
   notes: {
     key: string;
     value: Note;
     indexes: { "by-updatedAt": number };
+  };
+  workspaces: {
+    key: string;
+    value: Workspace;
   };
   /**
    * File System Access handles are structured-cloneable, so a note opened from
@@ -30,15 +34,35 @@ let dbPromise: Promise<IDBPDatabase<NoteSeenDB>> | null = null;
 function db() {
   if (!dbPromise) {
     dbPromise = openDB<NoteSeenDB>(DB_NAME, DB_VERSION, {
-      upgrade(database) {
-        const notes = database.createObjectStore("notes", { keyPath: "id" });
-        notes.createIndex("by-updatedAt", "updatedAt");
-        database.createObjectStore("handles");
-        database.createObjectStore("meta");
+      upgrade(database, oldVersion) {
+        if (oldVersion < 1) {
+          const notes = database.createObjectStore("notes", { keyPath: "id" });
+          notes.createIndex("by-updatedAt", "updatedAt");
+          database.createObjectStore("handles");
+          database.createObjectStore("meta");
+        }
+        if (oldVersion < 2 && !database.objectStoreNames.contains("workspaces")) {
+          database.createObjectStore("workspaces", { keyPath: "id" });
+        }
       },
     });
   }
   return dbPromise;
+}
+
+export async function loadWorkspaces(): Promise<Workspace[]> {
+  return (await db()).getAll("workspaces");
+}
+
+export async function saveWorkspaces(workspaces: Workspace[]): Promise<void> {
+  if (workspaces.length === 0) return;
+  const database = await db();
+  const tx = database.transaction("workspaces", "readwrite");
+  await Promise.all([...workspaces.map((ws) => tx.store.put(ws)), tx.done]);
+}
+
+export async function removeWorkspace(id: string): Promise<void> {
+  await (await db()).delete("workspaces", id);
 }
 
 export async function loadNotes(): Promise<Note[]> {

@@ -26,7 +26,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useNotes } from "@/store/notes";
 import { downloadMarkdown } from "@/lib/note-file";
-import { liveNotes, noteLabel } from "@/lib/selectors";
+import { liveNotes, noteLabel, notesForWorkspace } from "@/lib/selectors";
 import { excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
 
 interface CommandPaletteProps {
@@ -39,6 +39,7 @@ interface CommandPaletteProps {
 export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const activeId = useNotes((state) => state.activeId);
   const setActive = useNotes((state) => state.setActive);
   const setView = useNotes((state) => state.setView);
@@ -46,8 +47,11 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
   const { toggle, isDark } = useAppearance();
 
   const list = useMemo(
-    () => liveNotes(notes).filter((note) => note.kind !== "promptCard").slice(0, 60),
-    [notes],
+    () =>
+      liveNotes(notesForWorkspace(notes, activeWorkspaceId))
+        .filter((note) => note.kind !== "promptCard")
+        .slice(0, 60),
+    [notes, activeWorkspaceId],
   );
   const activeNote = activeId ? notes[activeId] : null;
   const mod = modKeyLabel();

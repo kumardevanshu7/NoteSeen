@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { collectLabels, normalizeLabelName } from "@/lib/selectors";
+import { collectLabels, normalizeLabelName, notesForWorkspace } from "@/lib/selectors";
 import { useNotes } from "@/store/notes";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,7 @@ export function NoteLabelsField({
   placeholder = "Type a label, Enter to add",
 }: NoteLabelsFieldProps) {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const [draft, setDraft] = useState("");
 
   const selected = useMemo(() => uniqueLabels(tags), [tags]);
@@ -36,7 +37,10 @@ export function NoteLabelsField({
     [selected],
   );
 
-  const catalog = useMemo(() => collectLabels(notes), [notes]);
+  const catalog = useMemo(
+    () => collectLabels(notesForWorkspace(notes, activeWorkspaceId)),
+    [notes, activeWorkspaceId],
+  );
 
   const suggestions = useMemo(() => {
     const needle = draft.trim().toLowerCase();

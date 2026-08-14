@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 export function NoteTabs() {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const openTabs = useNotes((state) => state.openTabs);
   const activeId = useNotes((state) => state.activeId);
   const view = useNotes((state) => state.view);
@@ -15,7 +16,10 @@ export function NoteTabs() {
     .map((id) => notes[id])
     .filter(
       (note): note is NonNullable<typeof note> =>
-        Boolean(note) && !note.deletedAt && note.kind !== "promptCard",
+        Boolean(note) &&
+        !note.deletedAt &&
+        note.kind !== "promptCard" &&
+        note.workspaceId === activeWorkspaceId,
     );
 
   if (tabs.length === 0) return null;

@@ -1,4 +1,5 @@
-import type { Note, NoteTheme } from "./types";
+import type { Note, NoteTheme, Workspace } from "./types";
+import { DEFAULT_WORKSPACE_ID } from "./types";
 
 function byRecency(a: Note, b: Note): number {
   return b.updatedAt - a.updatedAt;
@@ -7,6 +8,29 @@ function byRecency(a: Note, b: Note): number {
 function pinnedFirst(a: Note, b: Note): number {
   if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
   return byRecency(a, b);
+}
+
+export function notesForWorkspace(
+  notes: Record<string, Note>,
+  workspaceId: string,
+): Record<string, Note> {
+  const scoped: Record<string, Note> = {};
+  for (const [id, note] of Object.entries(notes)) {
+    if (note.workspaceId === workspaceId) scoped[id] = note;
+  }
+  return scoped;
+}
+
+export function workspaceList(workspaces: Record<string, Workspace>): Workspace[] {
+  return Object.values(workspaces).sort((a, b) => {
+    if (a.id === DEFAULT_WORKSPACE_ID) return -1;
+    if (b.id === DEFAULT_WORKSPACE_ID) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+export function noteCountInWorkspace(notes: Record<string, Note>, workspaceId: string): number {
+  return liveNotes(notesForWorkspace(notes, workspaceId)).length;
 }
 
 export function liveNotes(notes: Record<string, Note>): Note[] {

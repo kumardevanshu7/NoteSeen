@@ -8,8 +8,8 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
-import type { Note } from "@/lib/types";
-import { normalizeNote } from "@/lib/types";
+import type { Note, Workspace } from "@/lib/types";
+import { normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { type SyncAdapter } from "./adapter";
 
 /** Fast enough to feel instant; still batches rapid keystrokes. */
@@ -25,10 +25,19 @@ function noteDoc(uid: string, noteId: string) {
   return doc(getFirebaseDb(), "users", uid, "notes", noteId);
 }
 
+function workspacesCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "workspaces");
+}
+
+function workspaceDoc(uid: string, workspaceId: string) {
+  return doc(getFirebaseDb(), "users", uid, "workspaces", workspaceId);
+}
+
 function toDoc(note: Note): NoteDoc {
   return {
     id: note.id,
     kind: note.kind,
+    workspaceId: note.workspaceId,
     title: note.title,
     subtitle: note.subtitle,
     tags: note.tags,
@@ -61,11 +70,35 @@ function fromDoc(data: NoteDoc, fallbackId: string): Note {
  */
 export function createFirestoreAdapter(): SyncAdapter {
   let unsubscribe: Unsubscribe | null = null;
+  let unsubscribeWorkspaces: Unsubscribe | null = null;
   let pushTimer: ReturnType<typeof setTimeout> | null = null;
+  let workspacePushTimer: ReturnType<typeof setTimeout> | null = null;
   const pending = new Map<string, Note>();
+  const pendingWorkspaces = new Map<string, Workspace>();
   let connectedUid: string | null = null;
   /** Remote ids seen on the last full snapshot — used to detect hard deletes. */
   let knownRemoteIds = new Set<string>();
+
+  async function flushPendingWorkspaces() {
+    if (workspacePushTimer) {
+      clearTimeout(workspacePushTimer);
+      workspacePushTimer = null;
+    }
+    const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
+    if (!uid || pendingWorkspaces.size === 0) return;
+
+    const entries = [...pendingWorkspaces.entries()];
+    pendingWorkspaces.clear();
+
+    for (let i = 0; i < entries.length; i += 450) {
+      const slice = entries.slice(i, i + 450);
+      const chunk = writeBatch(getFirebaseDb());
+      for (const [id, workspace] of slice) {
+        chunk.set(workspaceDoc(uid, id), workspace, { merge: true });
+      }
+      await chunk.commit();
+    }
+  }
 
   async function flushPending() {
     if (pushTimer) {
@@ -104,6 +137,23 @@ export function createFirestoreAdapter(): SyncAdapter {
     }, CLOUD_PUSH_DEBOUNCE_MS);
   }
 
+  function scheduleWorkspacePush(workspaces: Workspace[]) {
+    for (const ws of workspaces) pendingWorkspaces.set(ws.id, ws);
+    if (workspacePushTimer) clearTimeout(workspacePushTimer);
+    workspacePushTimer = setTimeout(() => {
+      void flushPendingWorkspaces().catch((error) => {
+        console.error("NoteSeen: Firestore workspace push failed", error);
+      });
+    }, CLOUD_PUSH_DEBOUNCE_MS);
+  }
+
+  async function readAllWorkspaces(uid: string): Promise<Workspace[]> {
+    const snapshot = await getDocs(workspacesCol(uid));
+    return snapshot.docs.map((entry) =>
+      normalizeWorkspace({ ...(entry.data() as Workspace), id: entry.id }),
+    );
+  }
+
   async function readAllNotes(uid: string): Promise<Note[]> {
     const snapshot = await getDocs(notesCol(uid));
     const notes = snapshot.docs.map((entry) => fromDoc(entry.data() as NoteDoc, entry.id));
@@ -134,6 +184,29 @@ export function createFirestoreAdapter(): SyncAdapter {
       );
     },
 
+    async pullWorkspaces() {
+      const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
+      if (!uid) return [];
+      return readAllWorkspaces(uid);
+    },
+
+    async pushWorkspaces(workspaces) {
+      if (!getFirebaseAuth().currentUser) return;
+      scheduleWorkspacePush(workspaces);
+    },
+
+    async removeWorkspaces(ids) {
+      const uid = getFirebaseAuth().currentUser?.uid;
+      if (!uid || ids.length === 0) return;
+      for (const id of ids) pendingWorkspaces.delete(id);
+      for (let i = 0; i < ids.length; i += 450) {
+        const slice = ids.slice(i, i + 450);
+        const batch = writeBatch(getFirebaseDb());
+        for (const id of slice) batch.delete(workspaceDoc(uid, id));
+        await batch.commit();
+      }
+    },
+
     async pullNotes() {
       const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
       if (!uid) return [];
@@ -162,7 +235,35 @@ export function createFirestoreAdapter(): SyncAdapter {
     },
 
     async flushCloud() {
-      await flushPending();
+      await Promise.all([flushPending(), flushPendingWorkspaces()]);
+    },
+
+    subscribeWorkspaces(onRemoteWorkspaces) {
+      const uid = getFirebaseAuth().currentUser?.uid;
+      if (!uid) return () => {};
+
+      if (unsubscribeWorkspaces) {
+        unsubscribeWorkspaces();
+        unsubscribeWorkspaces = null;
+      }
+
+      unsubscribeWorkspaces = onSnapshot(
+        workspacesCol(uid),
+        (snapshot) => {
+          const workspaces = snapshot.docs.map((entry) =>
+            normalizeWorkspace({ ...(entry.data() as Workspace), id: entry.id }),
+          );
+          onRemoteWorkspaces(workspaces);
+        },
+        (error) => {
+          console.error("NoteSeen: Firestore workspace listener error", error);
+        },
+      );
+
+      return () => {
+        unsubscribeWorkspaces?.();
+        unsubscribeWorkspaces = null;
+      };
     },
 
     subscribe(onRemoteNotes) {
@@ -208,9 +309,15 @@ export function createFirestoreAdapter(): SyncAdapter {
       return () => {
         unsubscribe?.();
         unsubscribe = null;
+        unsubscribeWorkspaces?.();
+        unsubscribeWorkspaces = null;
         if (pushTimer) {
           clearTimeout(pushTimer);
           pushTimer = null;
+        }
+        if (workspacePushTimer) {
+          clearTimeout(workspacePushTimer);
+          workspacePushTimer = null;
         }
         connectedUid = null;
         knownRemoteIds = new Set();

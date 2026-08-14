@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNotes } from "@/store/notes";
 import { requireVault } from "@/store/vault";
-import { collectLabels, normalizeLabelName } from "@/lib/selectors";
+import { collectLabels, normalizeLabelName, notesForWorkspace } from "@/lib/selectors";
 
 export function LabelsView() {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const setView = useNotes((state) => state.setView);
   const setQuery = useNotes((state) => state.setQuery);
   const renameLabel = useNotes((state) => state.renameLabel);
   const removeLabel = useNotes((state) => state.removeLabel);
 
-  const labels = useMemo(() => collectLabels(notes), [notes]);
+  const labels = useMemo(
+    () => collectLabels(notesForWorkspace(notes, activeWorkspaceId)),
+    [notes, activeWorkspaceId],
+  );
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 

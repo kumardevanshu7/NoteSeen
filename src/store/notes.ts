@@ -6,10 +6,13 @@ import {
   getMeta,
   loadFileHandles,
   loadNotes,
+  loadWorkspaces,
   putFileHandle,
   removeNote,
   removeNotes,
+  removeWorkspace,
   saveNotes,
+  saveWorkspaces,
   setMeta,
 } from "@/lib/db";
 import { isAbortError, supportsFileSystemAccess, type NsFileHandle } from "@/lib/fs";
@@ -20,9 +23,9 @@ import {
   writeNoteToHandle,
   type ImportedNote,
 } from "@/lib/note-file";
-import { mergeRemote, syncAdapter } from "@/lib/sync/adapter";
-import type { Note, NoteKind, SaveStatus, View } from "@/lib/types";
-import { normalizeNote } from "@/lib/types";
+import { mergeRemote, mergeRemoteWorkspace, syncAdapter } from "@/lib/sync/adapter";
+import type { Note, NoteKind, SaveStatus, View, Workspace } from "@/lib/types";
+import { DEFAULT_WORKSPACE_ID, defaultWorkspace, normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { htmlToPlainText } from "@/lib/utils";
 import { requireVault } from "@/store/vault";
 
@@ -31,6 +34,7 @@ const FILE_DEBOUNCE_MS = 1200;
 const SNAPSHOT_KEY = "noteseen.snapshot";
 const ACTIVE_KEY = "activeNoteId";
 const TABS_KEY = "openTabs";
+const WORKSPACE_KEY = "activeWorkspaceId";
 const MAX_OPEN_TABS = 12;
 
 function withOpenTab(tabs: string[], id: string | null): string[] {
@@ -140,6 +144,8 @@ function clearSnapshot(): void {
 interface NotesState {
   ready: boolean;
   notes: Record<string, Note>;
+  workspaces: Record<string, Workspace>;
+  activeWorkspaceId: string;
   handles: Record<string, NsFileHandle>;
   activeId: string | null;
   /** Recently opened notes, Chrome-tab style — most recent first. */
@@ -152,6 +158,10 @@ interface NotesState {
   cloudUserId: string | null;
 
   init: () => Promise<void>;
+  createWorkspace: (name: string) => string;
+  renameWorkspace: (id: string, name: string) => void;
+  deleteWorkspace: (id: string) => Promise<boolean>;
+  setActiveWorkspace: (id: string) => void;
   createNote: (seed?: Partial<Note>) => string;
   createItem: (kind: NoteKind) => string;
   openForEdit: (id: string) => Promise<boolean>;
@@ -180,10 +190,12 @@ interface NotesState {
 
   setCloudUser: (uid: string | null) => void;
   mergeRemoteNotes: (remoteNotes: Note[]) => void;
+  mergeRemoteWorkspaces: (remoteWorkspaces: Workspace[]) => void;
   pushAllToCloud: () => Promise<void>;
 }
 
 const dirtyNotes = new Set<string>();
+const dirtyWorkspaces = new Set<string>();
 const dirtyFiles = new Set<string>();
 let idbTimer: ReturnType<typeof setTimeout> | null = null;
 let fileTimer: ReturnType<typeof setTimeout> | null = null;
@@ -199,6 +211,11 @@ export const useNotes = create<NotesState>((set, get) => {
       idbTimer = null;
       void get().flush({ toDisk: false });
     }, IDB_DEBOUNCE_MS);
+  }
+
+  function scheduleWorkspaceIdb(id: string) {
+    dirtyWorkspaces.add(id);
+    scheduleIdb();
   }
 
   function scheduleFile(id: string) {
@@ -268,15 +285,32 @@ export const useNotes = create<NotesState>((set, get) => {
   }
 
   async function loadEverything() {
-    const [stored, handles, activeId, storedTabs] = await Promise.all([
-      loadNotes(),
-      loadFileHandles(),
-      getMeta<string>(ACTIVE_KEY),
-      getMeta<string[]>(TABS_KEY),
-    ]);
+    const [stored, storedWorkspaces, handles, activeId, storedTabs, storedWorkspaceId] =
+      await Promise.all([
+        loadNotes(),
+        loadWorkspaces(),
+        loadFileHandles(),
+        getMeta<string>(ACTIVE_KEY),
+        getMeta<string[]>(TABS_KEY),
+        getMeta<string>(WORKSPACE_KEY),
+      ]);
 
     const notes: Record<string, Note> = {};
     for (const note of stored) notes[note.id] = normalizeNote(note);
+
+    const workspaces: Record<string, Workspace> = {};
+    for (const ws of storedWorkspaces) workspaces[ws.id] = normalizeWorkspace(ws);
+    if (!workspaces[DEFAULT_WORKSPACE_ID]) {
+      workspaces[DEFAULT_WORKSPACE_ID] = defaultWorkspace();
+      dirtyWorkspaces.add(DEFAULT_WORKSPACE_ID);
+    }
+
+    for (const [id, note] of Object.entries(notes)) {
+      if (note.workspaceId !== DEFAULT_WORKSPACE_ID && !workspaces[note.workspaceId]) {
+        notes[id] = { ...note, workspaceId: DEFAULT_WORKSPACE_ID };
+        dirtyNotes.add(id);
+      }
+    }
 
     const snapshot = readSnapshot();
     if (snapshot && notes[snapshot.id] && snapshot.updatedAt > notes[snapshot.id].updatedAt) {
@@ -298,18 +332,36 @@ export const useNotes = create<NotesState>((set, get) => {
       dirtyNotes.add(welcome.id);
     }
 
+    const activeWorkspaceId =
+      storedWorkspaceId && workspaces[storedWorkspaceId]
+        ? storedWorkspaceId
+        : DEFAULT_WORKSPACE_ID;
+
     const live = Object.values(notes)
-      .filter((note) => !note.deletedAt)
+      .filter((note) => !note.deletedAt && note.workspaceId === activeWorkspaceId)
       .sort((a, b) => b.updatedAt - a.updatedAt);
     const resolvedActive =
       activeId && notes[activeId] && !notes[activeId].deletedAt ? activeId : (live[0]?.id ?? null);
-    const liveIds = new Set(live.map((note) => note.id));
+    const liveIds = new Set(
+      Object.values(notes)
+        .filter((note) => !note.deletedAt)
+        .map((note) => note.id),
+    );
     const openTabs = withOpenTab(
       (Array.isArray(storedTabs) ? storedTabs : []).filter((id) => liveIds.has(id)),
       resolvedActive,
     );
 
-    set({ notes, handles, activeId: resolvedActive, openTabs, ready: true, view: "suggestions" });
+    set({
+      notes,
+      workspaces,
+      activeWorkspaceId,
+      handles,
+      activeId: resolvedActive,
+      openTabs,
+      ready: true,
+      view: "suggestions",
+    });
     void setMeta(TABS_KEY, openTabs);
     if (dirtyNotes.size > 0) void get().flush({ toDisk: false });
   }
@@ -317,6 +369,8 @@ export const useNotes = create<NotesState>((set, get) => {
   return {
     ready: false,
     notes: {},
+    workspaces: { [DEFAULT_WORKSPACE_ID]: defaultWorkspace() },
+    activeWorkspaceId: DEFAULT_WORKSPACE_ID,
     handles: {},
     activeId: null,
     openTabs: [],
@@ -331,8 +385,92 @@ export const useNotes = create<NotesState>((set, get) => {
       return initPromise;
     },
 
+    createWorkspace(name) {
+      const trimmed = name.trim().slice(0, 80);
+      if (!trimmed) return DEFAULT_WORKSPACE_ID;
+      const now = Date.now();
+      const workspace = normalizeWorkspace({ id: nanoid(12), name: trimmed, createdAt: now, updatedAt: now });
+      set((state) => ({
+        workspaces: { ...state.workspaces, [workspace.id]: workspace },
+        activeWorkspaceId: workspace.id,
+        query: "",
+        view: "suggestions",
+      }));
+      scheduleWorkspaceIdb(workspace.id);
+      void setMeta(WORKSPACE_KEY, workspace.id);
+      return workspace.id;
+    },
+
+    renameWorkspace(id, name) {
+      const trimmed = name.trim().slice(0, 80);
+      const current = get().workspaces[id];
+      if (!current || !trimmed || trimmed === current.name) return;
+      const next = { ...current, name: trimmed, updatedAt: Date.now() };
+      set((state) => ({ workspaces: { ...state.workspaces, [id]: next } }));
+      scheduleWorkspaceIdb(id);
+    },
+
+    async deleteWorkspace(id) {
+      if (id === DEFAULT_WORKSPACE_ID) return false;
+      const ok = await requireVault("delete");
+      if (!ok) return false;
+
+      const { notes, workspaces, activeWorkspaceId } = get();
+      if (!workspaces[id]) return false;
+
+      const stamp = Date.now();
+      const nextNotes = { ...notes };
+      for (const [noteId, note] of Object.entries(nextNotes)) {
+        if (note.workspaceId !== id) continue;
+        nextNotes[noteId] = { ...note, workspaceId: DEFAULT_WORKSPACE_ID, updatedAt: stamp };
+        dirtyNotes.add(noteId);
+      }
+
+      const nextWorkspaces = { ...workspaces };
+      delete nextWorkspaces[id];
+
+      set({
+        notes: nextNotes,
+        workspaces: nextWorkspaces,
+        activeWorkspaceId: activeWorkspaceId === id ? DEFAULT_WORKSPACE_ID : activeWorkspaceId,
+      });
+
+      scheduleIdb();
+      dirtyWorkspaces.delete(id);
+      await removeWorkspace(id);
+      if (get().cloudUserId) {
+        void syncAdapter().removeWorkspaces?.([id]);
+        void get().flush({ toDisk: false });
+      }
+      if (activeWorkspaceId === id) {
+        get().setActiveWorkspace(DEFAULT_WORKSPACE_ID);
+      }
+      toast.success("Workspace removed — notes moved to General");
+      return true;
+    },
+
+    setActiveWorkspace(id) {
+      const { workspaces, notes, openTabs, activeId } = get();
+      if (!workspaces[id]) return;
+
+      const inWorkspace = openTabs.filter((tabId) => notes[tabId]?.workspaceId === id);
+      const nextActive =
+        activeId && notes[activeId]?.workspaceId === id
+          ? activeId
+          : (inWorkspace[inWorkspace.length - 1] ?? null);
+
+      set({
+        activeWorkspaceId: id,
+        query: "",
+        activeId: nextActive,
+        view: nextActive ? "editor" : "suggestions",
+      });
+      void setMeta(WORKSPACE_KEY, id);
+    },
+
     createNote(seed) {
-      const note = emptyNote(seed);
+      const workspaceId = seed?.workspaceId ?? get().activeWorkspaceId ?? DEFAULT_WORKSPACE_ID;
+      const note = emptyNote({ ...seed, workspaceId });
       const isCard = note.kind === "promptCard";
       set((state) => ({
         notes: { ...state.notes, [note.id]: note },
@@ -453,6 +591,7 @@ export const useNotes = create<NotesState>((set, get) => {
         kind: note.kind,
         title: note.title ? `${note.title} (copy)` : "",
         subtitle: note.subtitle,
+        workspaceId: note.workspaceId,
         tags: [...note.tags],
         html: note.html,
         text: note.text,
@@ -572,8 +711,9 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     async emptyTrash() {
+      const workspaceId = get().activeWorkspaceId;
       const ids = Object.values(get().notes)
-        .filter((note) => note.deletedAt)
+        .filter((note) => note.deletedAt && note.workspaceId === workspaceId)
         .map((note) => note.id);
       if (ids.length === 0) return;
 
@@ -599,13 +739,14 @@ export const useNotes = create<NotesState>((set, get) => {
       const source = from.trim().toLowerCase();
       const nextName = to.trim().replace(/\s+/g, " ").slice(0, 40);
       if (!source || !nextName) return 0;
+      const workspaceId = get().activeWorkspaceId;
 
       const stamp = Date.now();
       let touched = 0;
       set((state) => {
         const notes = { ...state.notes };
         for (const [id, note] of Object.entries(notes)) {
-          if (note.deletedAt) continue;
+          if (note.deletedAt || note.workspaceId !== workspaceId) continue;
           if (!note.tags.some((tag) => tag.toLowerCase() === source)) continue;
           const tags = note.tags
             .map((tag) => (tag.toLowerCase() === source ? nextName : tag))
@@ -628,13 +769,14 @@ export const useNotes = create<NotesState>((set, get) => {
     removeLabel(label) {
       const target = label.trim().toLowerCase();
       if (!target) return 0;
+      const workspaceId = get().activeWorkspaceId;
 
       const stamp = Date.now();
       let touched = 0;
       set((state) => {
         const notes = { ...state.notes };
         for (const [id, note] of Object.entries(notes)) {
-          if (note.deletedAt) continue;
+          if (note.deletedAt || note.workspaceId !== workspaceId) continue;
           if (!note.tags.some((tag) => tag.toLowerCase() === target)) continue;
           const tags = note.tags.filter((tag) => tag.toLowerCase() !== target);
           notes[id] = { ...note, tags, updatedAt: stamp };
@@ -662,6 +804,23 @@ export const useNotes = create<NotesState>((set, get) => {
 
       const noteIds = [...dirtyNotes];
       dirtyNotes.clear();
+      const workspaceIds = [...dirtyWorkspaces];
+      dirtyWorkspaces.clear();
+
+      if (workspaceIds.length > 0) {
+        const { workspaces } = get();
+        const workspacePayload = workspaceIds.map((id) => workspaces[id]).filter(Boolean);
+        try {
+          await saveWorkspaces(workspacePayload);
+          if (get().cloudUserId && workspacePayload.length > 0) {
+            void syncAdapter().pushWorkspaces?.(workspacePayload);
+          }
+        } catch (error) {
+          for (const id of workspaceIds) dirtyWorkspaces.add(id);
+          console.error("NoteSeen: failed to persist workspaces", error);
+        }
+      }
+
       if (noteIds.length > 0) {
         const { notes } = get();
         const payload = noteIds.map((id) => notes[id]).filter(Boolean);
@@ -842,11 +1001,51 @@ export const useNotes = create<NotesState>((set, get) => {
       }
     },
 
+    mergeRemoteWorkspaces(remoteWorkspaces) {
+      const local = get().workspaces;
+      const next = { ...local };
+      const toSave: Workspace[] = [];
+      let changed = false;
+
+      for (const remoteRaw of remoteWorkspaces) {
+        const remote = normalizeWorkspace(remoteRaw);
+        const existing = local[remote.id];
+        if (!existing) {
+          next[remote.id] = remote;
+          toSave.push(remote);
+          changed = true;
+          continue;
+        }
+        const merged = mergeRemoteWorkspace(existing, remote);
+        if (merged === existing) continue;
+        next[remote.id] = merged;
+        toSave.push(merged);
+        changed = true;
+      }
+
+      if (!next[DEFAULT_WORKSPACE_ID]) {
+        next[DEFAULT_WORKSPACE_ID] = defaultWorkspace();
+        toSave.push(next[DEFAULT_WORKSPACE_ID]);
+        changed = true;
+      }
+
+      if (!changed) return;
+      set({ workspaces: next });
+      if (toSave.length > 0) void saveWorkspaces(toSave);
+
+      const active = get().activeWorkspaceId;
+      if (!next[active]) {
+        set({ activeWorkspaceId: DEFAULT_WORKSPACE_ID });
+        void setMeta(WORKSPACE_KEY, DEFAULT_WORKSPACE_ID);
+      }
+    },
+
     async pushAllToCloud() {
       if (!get().cloudUserId) return;
       const all = Object.values(get().notes);
-      if (all.length === 0) return;
-      await syncAdapter().pushNotes(all);
+      const allWorkspaces = Object.values(get().workspaces);
+      if (all.length > 0) await syncAdapter().pushNotes(all);
+      if (allWorkspaces.length > 0) await syncAdapter().pushWorkspaces?.(allWorkspaces);
       await syncAdapter().flushCloud?.();
     },
   };

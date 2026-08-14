@@ -7,6 +7,7 @@ import { NOTE_THEMES } from "@/lib/note-themes";
 import {
   inactiveNotes,
   noteLabel,
+  notesForWorkspace,
   quietDays,
   searchNotes,
   suggestionTheme,
@@ -15,11 +16,15 @@ import { excerpt } from "@/lib/utils";
 
 export function SuggestionsView() {
   const notes = useNotes((state) => state.notes);
+  const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const setActive = useNotes((state) => state.setActive);
   const setView = useNotes((state) => state.setView);
 
-  const quiet = useMemo(() => inactiveNotes(notes), [notes]);
+  const quiet = useMemo(
+    () => inactiveNotes(notesForWorkspace(notes, activeWorkspaceId)),
+    [notes, activeWorkspaceId],
+  );
   const visible = useMemo(() => searchNotes(quiet, query), [quiet, query]);
 
   return (
