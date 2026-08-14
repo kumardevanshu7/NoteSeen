@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useNotes } from "@/store/notes";
 import { useSecrets } from "@/store/secrets";
+import { requireVault } from "@/store/vault";
 import type { SecretCategory, SecretEntry } from "@/lib/types";
 import { cn, formatRelative } from "@/lib/utils";
 
@@ -222,13 +223,24 @@ export function SecretVaultView() {
     }
   };
 
-  const openEditor = (entry: SecretEntry | null) => {
+  const openEditor = async (entry: SecretEntry | null): Promise<boolean> => {
+    if (entry) {
+      const ok = await requireVault("edit");
+      if (!ok) return false;
+    }
     setEditing(entry);
     setEditorOpen(true);
+    return true;
   };
 
   const openDetail = (entry: SecretEntry) => {
     setViewing(entry);
+  };
+
+  const deleteSecret = async (id: string): Promise<boolean> => {
+    const ok = await requireVault("delete");
+    if (!ok) return false;
+    return removeEntry(id);
   };
 
   // Keep the open detail card in sync after edits/deletes.
@@ -460,8 +472,8 @@ export function SecretVaultView() {
                 entry={entry}
                 variant="list"
                 onOpen={() => openDetail(entry)}
-                onEdit={() => openEditor(entry)}
-                onDelete={() => void removeEntry(entry.id)}
+                onEdit={() => void openEditor(entry)}
+                onDelete={() => void deleteSecret(entry.id)}
                 onReveal={() => revealValue(entry.id)}
               />
             ))}
@@ -474,8 +486,8 @@ export function SecretVaultView() {
                 entry={entry}
                 variant="details"
                 onOpen={() => openDetail(entry)}
-                onEdit={() => openEditor(entry)}
-                onDelete={() => void removeEntry(entry.id)}
+                onEdit={() => void openEditor(entry)}
+                onDelete={() => void deleteSecret(entry.id)}
                 onReveal={() => revealValue(entry.id)}
               />
             ))}
@@ -491,8 +503,8 @@ export function SecretVaultView() {
                 entry={entry}
                 variant="grid"
                 onOpen={() => openDetail(entry)}
-                onEdit={() => openEditor(entry)}
-                onDelete={() => void removeEntry(entry.id)}
+                onEdit={() => void openEditor(entry)}
+                onDelete={() => void deleteSecret(entry.id)}
                 onReveal={() => revealValue(entry.id)}
               />
             ))}
@@ -508,12 +520,15 @@ export function SecretVaultView() {
         }}
         onEdit={() => {
           if (!viewingLive) return;
-          setViewing(null);
-          openEditor(viewingLive);
+          void openEditor(viewingLive).then((ok) => {
+            if (ok) setViewing(null);
+          });
         }}
         onDelete={() => {
           if (!viewingLive) return;
-          void removeEntry(viewingLive.id).then(() => setViewing(null));
+          void deleteSecret(viewingLive.id).then((ok) => {
+            if (ok) setViewing(null);
+          });
         }}
         onReveal={() => (viewingLive ? revealValue(viewingLive.id) : Promise.resolve(null))}
       />

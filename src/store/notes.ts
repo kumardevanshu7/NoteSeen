@@ -27,6 +27,7 @@ import { mergeRemote, mergeRemoteWorkspace, syncAdapter } from "@/lib/sync/adapt
 import type { Note, NoteKind, SaveStatus, View, Workspace, WorkspaceColor } from "@/lib/types";
 import { DEFAULT_WORKSPACE_ID, defaultWorkspace, normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { htmlToPlainText } from "@/lib/utils";
+import { listOrphanedPromptCardImages } from "@/lib/note-images";
 import { requireVault } from "@/store/vault";
 import { useSecrets } from "@/store/secrets";
 
@@ -194,6 +195,7 @@ interface NotesState {
   mergeRemoteNotes: (remoteNotes: Note[]) => void;
   mergeRemoteWorkspaces: (remoteWorkspaces: Workspace[]) => void;
   pushAllToCloud: () => Promise<void>;
+  recoverOrphanedPromptCards: () => Promise<number>;
 }
 
 const dirtyNotes = new Set<string>();
@@ -299,6 +301,15 @@ export const useNotes = create<NotesState>((set, get) => {
 
     const notes: Record<string, Note> = {};
     for (const note of stored) notes[note.id] = normalizeNote(note);
+
+    // Re-normalize fixes prompt cards that lost kind/coverUrl during partial sync.
+    for (const [id, note] of Object.entries(notes)) {
+      const fixed = normalizeNote(note);
+      if (fixed.kind !== note.kind || fixed.coverUrl !== note.coverUrl) {
+        notes[id] = fixed;
+        dirtyNotes.add(id);
+      }
+    }
 
     const workspaces: Record<string, Workspace> = {};
     for (const ws of storedWorkspaces) workspaces[ws.id] = normalizeWorkspace(ws);
@@ -1093,6 +1104,31 @@ export const useNotes = create<NotesState>((set, get) => {
       if (all.length > 0) await syncAdapter().pushNotes(all);
       if (allWorkspaces.length > 0) await syncAdapter().pushWorkspaces?.(allWorkspaces);
       await syncAdapter().flushCloud?.();
+    },
+
+    async recoverOrphanedPromptCards() {
+      const state = get();
+      const existing = new Set(Object.keys(state.notes));
+      const orphans = await listOrphanedPromptCardImages(existing);
+      if (orphans.length === 0) return 0;
+
+      const next = { ...state.notes };
+      for (const { noteId, coverUrl } of orphans) {
+        next[noteId] = emptyNote({
+          id: noteId,
+          kind: "promptCard",
+          title: "Recovered card",
+          coverUrl,
+          text: "",
+          html: "<p></p>",
+        });
+        dirtyNotes.add(noteId);
+      }
+
+      set({ notes: next });
+      scheduleIdb();
+      void get().pushAllToCloud();
+      return orphans.length;
     },
   };
 });

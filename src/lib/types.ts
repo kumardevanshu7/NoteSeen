@@ -195,10 +195,15 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     (legacy ? aliases[legacy] : undefined) ||
     "inter";
 
-  const kind: NoteKind =
-    raw.kind === "promptCard" ? "promptCard" : raw.kind === "prompt" ? "prompt" : "note";
   const cover =
     typeof raw.coverUrl === "string" && raw.coverUrl.trim() ? raw.coverUrl.trim() : null;
+  // coverUrl only exists on prompt cards — infer kind so metadata survives partial sync.
+  const kind: NoteKind =
+    raw.kind === "promptCard" || cover
+      ? "promptCard"
+      : raw.kind === "prompt"
+        ? "prompt"
+        : "note";
 
   return {
     id: raw.id,

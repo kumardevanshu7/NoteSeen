@@ -30,6 +30,7 @@ import {
   liveNotes,
   noteLabel,
   notesForWorkspace,
+  promptCards,
   searchNotes,
   trashedNotes,
 } from "@/lib/selectors";
@@ -93,6 +94,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
     [live, recent, query],
   );
   const allLabels = useMemo(() => collectLabels(scopedNotes), [scopedNotes]);
+  const cardCount = useMemo(() => promptCards(notes).length, [notes]);
   const secretCount = useSecrets((state) =>
     state.entries.filter((entry) => entry.workspaceId === activeWorkspaceId).length,
   );
@@ -137,6 +139,9 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                 <span className="flex-1 truncate">{item.label}</span>
                 {item.id === "all" ? (
                   <span className="ns-mono text-muted">{live.length}</span>
+                ) : null}
+                {item.id === "cards" && cardCount > 0 ? (
+                  <span className="ns-mono text-muted">{cardCount}</span>
                 ) : null}
                 {item.id === "labels" && allLabels.length > 0 ? (
                   <span className="ns-mono text-muted">{allLabels.length}</span>

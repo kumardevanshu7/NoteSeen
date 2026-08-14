@@ -82,6 +82,15 @@ async function startCloudSync(user: User) {
 
     await useNotes.getState().pushAllToCloud();
 
+    const recovered = await useNotes.getState().recoverOrphanedPromptCards();
+    if (recovered > 0) {
+      toast.success(
+        recovered === 1
+          ? "Restored 1 prompt card from your image library"
+          : `Restored ${recovered} prompt cards from your image library`,
+      );
+    }
+
     stopWorkspaceSync = adapter.subscribeWorkspaces?.((remoteWorkspaces) => {
       useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
     }) ?? null;

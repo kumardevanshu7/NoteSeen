@@ -12,12 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import { MoveToWorkspaceMenu } from "@/components/MoveToWorkspaceMenu";
 import { useNotes } from "@/store/notes";
-import { noteLabel, notesForWorkspace, promptCards, searchNotes } from "@/lib/selectors";
+import { noteLabel, promptCards, searchNotes, trashedNotes } from "@/lib/selectors";
 import type { Note } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function PromptCardsView() {
   const notes = useNotes((state) => state.notes);
+  const workspaces = useNotes((state) => state.workspaces);
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const trashNote = useNotes((state) => state.trashNote);
@@ -27,9 +28,10 @@ export function PromptCardsView() {
   const [viewing, setViewing] = useState<Note | null>(null);
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
 
-  const allCards = useMemo(
-    () => promptCards(notesForWorkspace(notes, activeWorkspaceId)),
-    [notes, activeWorkspaceId],
+  const allCards = useMemo(() => promptCards(notes), [notes]);
+  const trashedCards = useMemo(
+    () => trashedNotes(notes).filter((note) => note.kind === "promptCard"),
+    [notes],
   );
   const viewingLive = viewing ? (notes[viewing.id] ?? null) : null;
 
@@ -108,6 +110,12 @@ export function PromptCardsView() {
             <p className="ns-caption mt-1 max-w-sm text-body-muted">
               Upload any-ratio images with a short detail and the prompt itself. They show up here as a gallery.
             </p>
+            {trashedCards.length > 0 ? (
+              <p className="ns-caption mt-3 max-w-sm text-body-muted">
+                {trashedCards.length} prompt {trashedCards.length === 1 ? "card is" : "cards are"} in Trash — open Trash
+                in the sidebar to restore them.
+              </p>
+            ) : null}
             {!query && !labelFilter ? (
               <Button variant="primary" size="sm" className="mt-6" onClick={() => setComposerOpen(true)}>
                 <Plus className="size-3.5" />
@@ -139,6 +147,11 @@ export function PromptCardsView() {
                     <span className="block text-[14px] font-medium text-ink">{noteLabel(card)}</span>
                     {card.subtitle.trim() ? (
                       <span className="ns-caption mt-1 block text-body-muted">{card.subtitle.trim()}</span>
+                    ) : null}
+                    {card.workspaceId !== activeWorkspaceId ? (
+                      <span className="ns-caption mt-1 block text-muted">
+                        {workspaces[card.workspaceId]?.name ?? "Workspace"}
+                      </span>
                     ) : null}
                     {card.tags.length > 0 ? (
                       <span className="mt-2 flex flex-wrap gap-1">

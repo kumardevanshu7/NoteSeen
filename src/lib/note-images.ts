@@ -34,6 +34,45 @@ function assertImageFile(file: File): void {
   }
 }
 
+const IMAGE_EXT = /\.(jpe?g|png|gif|webp)$/i;
+
+/** Prompt-card images live at `{uid}/{noteId}/{file}` — recover when metadata was lost locally. */
+export async function listOrphanedPromptCardImages(
+  existingNoteIds: ReadonlySet<string>,
+): Promise<{ noteId: string; coverUrl: string }[]> {
+  const uid = useAuth.getState().user?.uid;
+  if (!uid || !isImageStorageConfigured()) return [];
+
+  const supabase = getSupabase();
+  const { data: folders, error } = await supabase.storage.from(NOTE_IMAGE_BUCKET).list(uid, {
+    limit: 1000,
+    sortBy: { column: "created_at", order: "desc" },
+  });
+  if (error || !folders?.length) return [];
+
+  const orphans: { noteId: string; coverUrl: string }[] = [];
+
+  for (const entry of folders) {
+    const noteId = entry.name;
+    if (!noteId || existingNoteIds.has(noteId)) continue;
+
+    const { data: files } = await supabase.storage.from(NOTE_IMAGE_BUCKET).list(`${uid}/${noteId}`, {
+      limit: 20,
+      sortBy: { column: "created_at", order: "desc" },
+    });
+    if (!files?.length) continue;
+
+    const image = files.find((file) => IMAGE_EXT.test(file.name)) ?? files[0];
+    if (!image?.name || image.name.startsWith(".")) continue;
+
+    const path = `${uid}/${noteId}/${image.name}`;
+    const { data } = supabase.storage.from(NOTE_IMAGE_BUCKET).getPublicUrl(path);
+    if (data.publicUrl) orphans.push({ noteId, coverUrl: data.publicUrl });
+  }
+
+  return orphans;
+}
+
 export async function uploadPublicImage(file: File, noteId: string): Promise<string> {
   if (!isImageStorageConfigured()) {
     throw new Error("Image hosting is not configured.");
