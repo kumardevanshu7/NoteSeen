@@ -24,6 +24,7 @@ import { ToolRail } from "./ToolRail";
 import { TopBar } from "./TopBar";
 import { TrashView } from "./TrashView";
 import { VaultGateDialog } from "./VaultGateDialog";
+import { UnlockTimerDialog } from "./UnlockTimerDialog";
 import { EditorErrorBoundary } from "./EditorErrorBoundary";
 import { ImageEditDialog } from "./ImageEditDialog";
 import { hideBootSplash } from "@/lib/boot";
@@ -69,6 +70,7 @@ export function AppShell() {
   const [styleOpen, setStyleOpen] = useState(readStyleOpen);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [unlockTimerOpen, setUnlockTimerOpen] = useState(false);
 
   const note = activeId ? (notes[activeId] ?? null) : null;
 
@@ -295,6 +297,7 @@ export function AppShell() {
         onOpenNav={() => setNavOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenFiles={() => void openFromDisk()}
+        onOpenUnlockTimer={() => setUnlockTimerOpen(true)}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -405,6 +408,7 @@ export function AppShell() {
         onOpenChange={setPaletteOpen}
         onOpenFiles={() => void openFromDisk()}
         onCreate={() => setChooserOpen(true)}
+        onOpenUnlockTimer={() => setUnlockTimerOpen(true)}
       />
       <NewItemDialog
         open={chooserOpen}
@@ -412,6 +416,10 @@ export function AppShell() {
         onChoose={(kind: NoteKind) => createItem(kind)}
       />
       <VaultGateDialog />
+      <UnlockTimerDialog
+        open={unlockTimerOpen}
+        onOpenChange={setUnlockTimerOpen}
+      />
       <ImageEditDialog />
     </div>
   );

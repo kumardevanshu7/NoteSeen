@@ -7,6 +7,7 @@ import { hashVaultAnswer, verifyVaultAnswer } from "@/lib/vault-crypto";
 import type { VaultConfig } from "@/lib/types";
 
 const VAULT_KEY = "vault.config";
+const VAULT_EDIT_UNLOCK_KEY = "noteseen.edit_unlock_until";
 
 export type VaultReason = "edit" | "delete" | "setup";
 
@@ -20,13 +21,39 @@ interface VaultState {
   pendingReason: VaultReason | null;
   pendingResolve: ResolveFn | null;
 
+  /** Timestamp in ms until which note editing is unlocked without repeated password prompts. */
+  editUnlockExpiresAt: number | null;
+
   initVault: () => Promise<void>;
   /** Pull vault from Firestore for the signed-in Google account (same Q on every device). */
   syncVaultFromCloud: () => Promise<void>;
   requireVault: (reason: "edit" | "delete") => Promise<boolean>;
   setupVault: (question: string, answer: string) => Promise<void>;
-  unlockWithAnswer: (answer: string) => Promise<boolean>;
+  unlockWithAnswer: (answer: string, timerMinutes?: number) => Promise<boolean>;
+  verifyAndStartTimer: (answer: string, minutes: number) => Promise<boolean>;
+  startEditUnlockTimer: (minutes: number) => void;
+  extendEditUnlockTimer: (minutes: number) => void;
+  lockEditNow: () => void;
+  isEditUnlocked: () => boolean;
+  getRemainingEditUnlockSeconds: () => number;
   cancelGate: () => void;
+}
+
+let tickerTimer: ReturnType<typeof setInterval> | null = null;
+
+function readStoredUnlockExpiresAt(): number | null {
+  try {
+    const raw = localStorage.getItem(VAULT_EDIT_UNLOCK_KEY);
+    if (!raw) return null;
+    const stamp = Number.parseInt(raw, 10);
+    if (Number.isFinite(stamp) && stamp > Date.now()) {
+      return stamp;
+    }
+    localStorage.removeItem(VAULT_EDIT_UNLOCK_KEY);
+  } catch {
+    // Ignore storage issues
+  }
+  return null;
 }
 
 /**
@@ -93,12 +120,41 @@ export const useVault = create<VaultState>((set, get) => ({
   cloudChecking: false,
   pendingReason: null,
   pendingResolve: null,
+  editUnlockExpiresAt: readStoredUnlockExpiresAt(),
 
   async initVault() {
     const local = (await getMeta<VaultConfig>(VAULT_KEY)) ?? null;
     // Never clobber a config the cloud sync already installed for this session.
     if (local && !get().config) set({ config: local });
-    set({ ready: true });
+
+    const storedExpiresAt = readStoredUnlockExpiresAt();
+    set({ ready: true, editUnlockExpiresAt: storedExpiresAt });
+
+    // Set up ticker to track timer expiry and trigger re-renders
+    if (!tickerTimer && typeof window !== "undefined") {
+      tickerTimer = setInterval(() => {
+        const { editUnlockExpiresAt } = get();
+        if (editUnlockExpiresAt !== null) {
+          if (Date.now() >= editUnlockExpiresAt) {
+            try {
+              localStorage.removeItem(VAULT_EDIT_UNLOCK_KEY);
+            } catch {
+              // ignore
+            }
+            set({ editUnlockExpiresAt: null });
+            toast.info("Edit unlock timer expired — notes locked");
+          }
+        }
+      }, 1000);
+
+      window.addEventListener("storage", (event) => {
+        if (event.key === VAULT_EDIT_UNLOCK_KEY) {
+          const next = readStoredUnlockExpiresAt();
+          set({ editUnlockExpiresAt: next });
+        }
+      });
+    }
+
     await get().syncVaultFromCloud();
   },
 
@@ -132,6 +188,11 @@ export const useVault = create<VaultState>((set, get) => ({
   },
 
   async requireVault(reason) {
+    // Only bypass if editing notes/prompts and edit timer is currently active
+    if (reason === "edit" && get().isEditUnlocked()) {
+      return true;
+    }
+
     const existing = get().pendingResolve;
     if (existing) existing(false);
 
@@ -177,11 +238,15 @@ export const useVault = create<VaultState>((set, get) => ({
     resolve?.(true);
   },
 
-  async unlockWithAnswer(answer) {
+  async unlockWithAnswer(answer, timerMinutes) {
     const config = get().config;
     if (!config) return false;
     const ok = await verifyVaultAnswer(answer, config.answerHash);
     if (!ok) return false;
+
+    if (timerMinutes && timerMinutes > 0) {
+      get().startEditUnlockTimer(timerMinutes);
+    }
 
     const resolve = get().pendingResolve;
     set({
@@ -190,6 +255,61 @@ export const useVault = create<VaultState>((set, get) => ({
     });
     resolve?.(true);
     return true;
+  },
+
+  async verifyAndStartTimer(answer, minutes) {
+    const config = get().config;
+    if (!config) return false;
+    const ok = await verifyVaultAnswer(answer, config.answerHash);
+    if (!ok) return false;
+    get().startEditUnlockTimer(minutes);
+    return true;
+  },
+
+  startEditUnlockTimer(minutes) {
+    const durationMs = Math.max(1, minutes) * 60 * 1000;
+    const expiresAt = Date.now() + durationMs;
+    try {
+      localStorage.setItem(VAULT_EDIT_UNLOCK_KEY, String(expiresAt));
+    } catch {
+      // ignore
+    }
+    set({ editUnlockExpiresAt: expiresAt });
+  },
+
+  extendEditUnlockTimer(minutes) {
+    const { editUnlockExpiresAt } = get();
+    const durationMs = Math.max(1, minutes) * 60 * 1000;
+    const base = editUnlockExpiresAt && editUnlockExpiresAt > Date.now() ? editUnlockExpiresAt : Date.now();
+    const nextExpires = base + durationMs;
+    try {
+      localStorage.setItem(VAULT_EDIT_UNLOCK_KEY, String(nextExpires));
+    } catch {
+      // ignore
+    }
+    set({ editUnlockExpiresAt: nextExpires });
+  },
+
+  lockEditNow() {
+    try {
+      localStorage.removeItem(VAULT_EDIT_UNLOCK_KEY);
+    } catch {
+      // ignore
+    }
+    set({ editUnlockExpiresAt: null });
+    toast.message("Notes locked for editing");
+  },
+
+  isEditUnlocked() {
+    const { editUnlockExpiresAt } = get();
+    return editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
+  },
+
+  getRemainingEditUnlockSeconds() {
+    const { editUnlockExpiresAt } = get();
+    if (!editUnlockExpiresAt) return 0;
+    const diff = Math.floor((editUnlockExpiresAt - Date.now()) / 1000);
+    return Math.max(0, diff);
   },
 
   cancelGate() {

@@ -20,7 +20,7 @@ import { imageFilesFromData, queueNoteImages } from "@/lib/note-images";
 import { clipboardHasImageFile, sanitizePastedHtml } from "@/lib/paste-html";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
-import { requireVault } from "@/store/vault";
+import { requireVault, useVault } from "@/store/vault";
 import type { Note } from "@/lib/types";
 import { countWords, formatClock, readingMinutes } from "@/lib/utils";
 import { SelectionMenu } from "./SelectionMenu";
@@ -36,6 +36,8 @@ export function NoteEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const setEditor = useEditorStore((state) => state.setEditor);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
+  const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
+  const isTimerUnlocked = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
 
   /**
    * Whether the note was empty when it was opened. Deriving this from the
@@ -46,7 +48,7 @@ export function NoteEditor({ note }: { note: Note }) {
   if (openedEmpty.current.id !== note.id) {
     openedEmpty.current = { id: note.id, empty: isEmptyNote(note) };
   }
-  const canEdit = openedEmpty.current.empty || sessionUnlocked;
+  const canEdit = openedEmpty.current.empty || sessionUnlocked || isTimerUnlocked;
 
   useEffect(() => {
     setSessionUnlocked(false);

@@ -9,11 +9,13 @@ import { plainTextToHtmlFriendly } from "@/lib/prompt-utils";
 import type { Note } from "@/lib/types";
 import { formatClock } from "@/lib/utils";
 import { useNotes } from "@/store/notes";
-import { requireVault } from "@/store/vault";
+import { requireVault, useVault } from "@/store/vault";
 
 export function PromptEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
+  const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
+  const isTimerUnlocked = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
 
   /** Empty at open means it is brand new, so the first write stays unlocked. */
   const openedEmpty = useRef({
@@ -26,7 +28,7 @@ export function PromptEditor({ note }: { note: Note }) {
       empty: !note.title.trim() && !note.text.trim(),
     };
   }
-  const canEdit = openedEmpty.current.empty || sessionUnlocked;
+  const canEdit = openedEmpty.current.empty || sessionUnlocked || isTimerUnlocked;
 
   const [title, setTitle] = useState(note.title);
   const [tags, setTags] = useState(note.tags);

@@ -20,6 +20,7 @@ import {
   Save,
   Search,
   Sun,
+  Timer,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -42,6 +43,7 @@ import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { useEditorStore } from "@/store/editor";
 import { useNotes } from "@/store/notes";
+import { useVault } from "@/store/vault";
 import { downloadHtml, exportPdf } from "@/lib/export-note";
 import { copyMarkdown, downloadMarkdown } from "@/lib/note-file";
 import { noteLabel } from "@/lib/selectors";
@@ -50,15 +52,17 @@ import { modKeyLabel } from "@/lib/utils";
 import { Wordmark } from "./Logo";
 import { AuthButton } from "./AuthButton";
 import { copyNoteToClipboard } from "./CopyButton";
+import { UnlockTimerBadge } from "./UnlockTimerBadge";
 
 interface TopBarProps {
   note: Note | null;
   onOpenNav: () => void;
   onOpenPalette: () => void;
   onOpenFiles: () => void;
+  onOpenUnlockTimer?: () => void;
 }
 
-export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarProps) {
+export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles, onOpenUnlockTimer }: TopBarProps) {
   const editor = useEditorStore((state) => state.editor);
   useEditorTick(editor);
   const createItem = useNotes((state) => state.createItem);
@@ -67,6 +71,8 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
   const togglePin = useNotes((state) => state.togglePin);
   const trashNote = useNotes((state) => state.trashNote);
   const setView = useNotes((state) => state.setView);
+  const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
+  const isTimerActive = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
   const { appearance, setAppearance, toggle, isDark } = useAppearance();
   const { canInstall, installed, install } = useInstallPrompt();
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -145,6 +151,10 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
         <Plus className="size-3.5" />
         <span className="hidden sm:inline">New</span>
       </Button>
+
+      {onOpenUnlockTimer ? (
+        <UnlockTimerBadge onClick={onOpenUnlockTimer} />
+      ) : null}
 
       <AuthButton />
 
@@ -252,6 +262,12 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles }: TopBarPr
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel>App</DropdownMenuLabel>
+          {onOpenUnlockTimer ? (
+            <DropdownMenuItem onSelect={onOpenUnlockTimer}>
+              <Timer />
+              {isTimerActive ? "Edit unlock timer (active)" : "Long-time unlock timer…"}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={onOpenFiles}>
             <FolderOpen />
             Open a file from disk

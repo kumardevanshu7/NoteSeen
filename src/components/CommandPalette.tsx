@@ -6,10 +6,12 @@ import {
   Images,
   KeyRound,
   Lightbulb,
+  Lock,
   Moon,
   Plus,
   Save,
   Sun,
+  Timer,
   Trash2,
   Users,
 } from "lucide-react";
@@ -25,6 +27,7 @@ import {
 import { Kbd } from "@/components/ui/kbd";
 import { useAppearance } from "@/hooks/use-appearance";
 import { useNotes } from "@/store/notes";
+import { useVault } from "@/store/vault";
 import { downloadMarkdown } from "@/lib/note-file";
 import { liveNotes, noteLabel, notesForWorkspace } from "@/lib/selectors";
 import { excerpt, formatRelative, modKeyLabel } from "@/lib/utils";
@@ -34,9 +37,10 @@ interface CommandPaletteProps {
   onOpenChange: (open: boolean) => void;
   onOpenFiles: () => void;
   onCreate?: () => void;
+  onOpenUnlockTimer?: () => void;
 }
 
-export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: CommandPaletteProps) {
+export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOpenUnlockTimer }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const notes = useNotes((state) => state.notes);
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
@@ -44,6 +48,9 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
   const setActive = useNotes((state) => state.setActive);
   const setView = useNotes((state) => state.setView);
   const saveToFile = useNotes((state) => state.saveToFile);
+  const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
+  const lockEditNow = useVault((state) => state.lockEditNow);
+  const isTimerActive = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
   const { toggle, isDark } = useAppearance();
 
   const list = useMemo(
@@ -140,6 +147,26 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate }: Co
                 {isDark ? <Sun /> : <Moon />}
                 {isDark ? "Switch to light" : "Switch to dark"}
               </CommandItem>
+              {onOpenUnlockTimer ? (
+                <CommandItem
+                  value="unlock timer edit long time duration lock notes"
+                  onSelect={() => run(onOpenUnlockTimer)}
+                >
+                  <Timer />
+                  <span className="flex-1">
+                    {isTimerActive ? "Manage edit unlock timer" : "Long-time unlock timer…"}
+                  </span>
+                </CommandItem>
+              ) : null}
+              {isTimerActive ? (
+                <CommandItem
+                  value="lock notes now end timer security"
+                  onSelect={() => run(() => lockEditNow())}
+                >
+                  <Lock />
+                  <span className="flex-1">Lock notes now</span>
+                </CommandItem>
+              ) : null}
             </CommandGroup>
 
             <CommandGroup heading="Go to">
