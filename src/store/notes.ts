@@ -171,6 +171,8 @@ interface NotesState {
   patchNote: (id: string, patch: Partial<Note>, options?: { touch?: boolean }) => void;
   setActive: (id: string | null) => void;
   closeTab: (id: string) => void;
+  closeOtherTabs: (id: string) => void;
+  closeTabsToRight: (id: string) => void;
   setView: (view: View) => void;
   setQuery: (query: string) => void;
   togglePin: (id: string) => void;
@@ -625,6 +627,38 @@ export const useNotes = create<NotesState>((set, get) => {
       });
       void setMeta(TABS_KEY, nextTabs);
       if (nextActive !== activeId) void setMeta(ACTIVE_KEY, nextActive);
+    },
+
+    closeOtherTabs(id) {
+      const { openTabs, notes, activeWorkspaceId } = get();
+      if (!openTabs.includes(id)) return;
+      // Keep only `id` in the current workspace, preserving other workspace tabs
+      const nextTabs = openTabs.filter((tabId) => tabId === id || notes[tabId]?.workspaceId !== activeWorkspaceId);
+      set({
+        openTabs: nextTabs,
+        activeId: id,
+        view: "editor",
+      });
+      void setMeta(TABS_KEY, nextTabs);
+      void setMeta(ACTIVE_KEY, id);
+    },
+
+    closeTabsToRight(id) {
+      const { openTabs, notes, activeWorkspaceId } = get();
+      const workspaceTabs = openTabs.filter((tabId) => notes[tabId]?.workspaceId === activeWorkspaceId);
+      const targetIndex = workspaceTabs.indexOf(id);
+      if (targetIndex === -1) return;
+      const toClose = new Set(workspaceTabs.slice(targetIndex + 1));
+      if (toClose.size === 0) return;
+      const nextTabs = openTabs.filter((tabId) => !toClose.has(tabId));
+      const nextActive = toClose.has(get().activeId ?? "") ? id : get().activeId;
+      set({
+        openTabs: nextTabs,
+        activeId: nextActive,
+        view: nextActive ? get().view : "all",
+      });
+      void setMeta(TABS_KEY, nextTabs);
+      if (nextActive !== get().activeId) void setMeta(ACTIVE_KEY, nextActive);
     },
 
     setView(view) {
