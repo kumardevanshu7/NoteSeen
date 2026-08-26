@@ -80,8 +80,15 @@ export function NoteEditor({ note }: { note: Note }) {
     }
     const edit = pending.current;
     pending.current = null;
-    if (edit) patchNote(edit.id, { html: edit.html });
-  }, [patchNote]);
+    if (edit) {
+      patchNote(edit.id, { html: edit.html });
+    } else if (editorRef.current && noteIdRef.current) {
+      const currentHtml = editorRef.current.getHTML();
+      if (currentHtml && currentHtml !== note.html) {
+        patchNote(noteIdRef.current, { html: currentHtml });
+      }
+    }
+  }, [patchNote, note.html]);
 
   const extensions = useMemo(
     () => [

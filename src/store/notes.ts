@@ -616,6 +616,7 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     closeTab(id) {
+      void get().flush({ toDisk: true });
       const { openTabs, activeId, view } = get();
       if (!openTabs.includes(id)) return;
       const nextTabs = openTabs.filter((tab) => tab !== id);
@@ -630,6 +631,7 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     closeOtherTabs(id) {
+      void get().flush({ toDisk: true });
       const { openTabs, notes, activeWorkspaceId } = get();
       if (!openTabs.includes(id)) return;
       // Keep only `id` in the current workspace, preserving other workspace tabs
@@ -644,6 +646,7 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     closeTabsToRight(id) {
+      void get().flush({ toDisk: true });
       const { openTabs, notes, activeWorkspaceId } = get();
       const workspaceTabs = openTabs.filter((tabId) => notes[tabId]?.workspaceId === activeWorkspaceId);
       const targetIndex = workspaceTabs.indexOf(id);
@@ -662,6 +665,7 @@ export const useNotes = create<NotesState>((set, get) => {
     },
 
     setView(view) {
+      void get().flush({ toDisk: true });
       set({ view });
     },
 
