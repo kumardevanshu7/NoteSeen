@@ -62,7 +62,7 @@ export function NoteTabs() {
 
   return (
     <div
-      className="ns-no-print ns-scroll ns-note-tabs flex h-10 shrink-0 items-end gap-1 overflow-x-auto border-b px-2"
+      className="ns-no-print ns-note-tabs flex h-10 shrink-0 items-end gap-1.5 overflow-x-auto border-b border-hairline px-3 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       onWheel={(event) => {
         if (event.deltaY === 0 || event.shiftKey) return;
         event.currentTarget.scrollLeft += event.deltaY;

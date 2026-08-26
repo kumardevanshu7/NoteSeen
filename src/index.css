@@ -957,12 +957,13 @@
 
 .ns-note-tabs {
   background: var(--tab-strip);
-  border-bottom-color: var(--tab-edge);
+  border-bottom: 1px solid var(--tab-edge);
 }
 
 .ns-note-tab {
   background: var(--tab-idle);
-  border-color: var(--tab-edge);
+  border: 1px solid var(--tab-edge);
+  border-bottom: none;
   color: var(--slate);
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--ink) 6%, transparent);
 }
@@ -977,6 +978,7 @@
   color: var(--ink);
   border-color: var(--tab-edge);
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--ink) 12%, transparent);
+  z-index: 1;
 }
 
 .ns-note-tab.is-active::after {
@@ -985,7 +987,7 @@
   right: 0;
   bottom: -1px;
   left: 0;
-  height: 1px;
+  height: 2px;
   background: var(--tab-active);
 }
 
