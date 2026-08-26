@@ -147,7 +147,25 @@ export const ResizableImage = Node.create({
       const label = document.createElement("span");
       label.className = "ns-img-size";
 
-      tools.append(slider, label);
+      const presetsWrap = document.createElement("div");
+      presetsWrap.className = "ns-img-presets";
+
+      const PRESETS = [25, 50, 75, 100];
+      for (const p of PRESETS) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ns-img-preset-btn";
+        btn.textContent = `${p}%`;
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          pct = p;
+          commit(p, deg);
+        });
+        presetsWrap.append(btn);
+      }
+
+      tools.append(slider, label, presetsWrap);
       box.append(img, frame);
       wrap.append(box, tools);
 
@@ -230,6 +248,7 @@ export const ResizableImage = Node.create({
         event.preventDefault();
         event.stopPropagation();
         selectSelf();
+        wrap.classList.add("is-selected", "is-transforming");
         const rect = box.getBoundingClientRect();
         drag = {
           kind,
@@ -262,13 +281,14 @@ export const ResizableImage = Node.create({
 
       const onBoxDown = (event: MouseEvent) => {
         const target = event.target as HTMLElement;
-        if (target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider")) return;
+        if (target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider, .ns-img-preset-btn")) return;
         selectSelf();
+        wrap.classList.add("is-selected", "is-transforming");
       };
       const onDblClick = (event: MouseEvent) => {
         event.preventDefault();
         event.stopPropagation();
-        wrap.classList.add("is-transforming");
+        wrap.classList.add("is-selected", "is-transforming");
         selectSelf();
       };
       box.addEventListener("mousedown", onBoxDown);
@@ -279,7 +299,7 @@ export const ResizableImage = Node.create({
         ignoreMutation: () => true,
         stopEvent(event) {
           const target = event.target as HTMLElement;
-          return Boolean(target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider"));
+          return Boolean(target.closest(".ns-img-box-handle, .ns-img-rotate, .ns-img-slider, .ns-img-preset-btn"));
         },
         update(updated) {
           if (updated.type.name !== "image") return false;
@@ -292,7 +312,7 @@ export const ResizableImage = Node.create({
           return true;
         },
         selectNode() {
-          wrap.classList.add("is-selected");
+          wrap.classList.add("is-selected", "is-transforming");
         },
         deselectNode() {
           wrap.classList.remove("is-selected", "is-transforming");
