@@ -569,148 +569,70 @@
   margin-right: 0;
 }
 
-.ns-editor .ns-img-wrap.is-transforming {
-  padding-top: 30px;
-}
-
-.ns-editor .ns-img-grip {
-  display: none;
-  position: absolute;
-  top: -28px;
-  left: 50%;
-  translate: -50% 0;
-  z-index: 10;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 10px;
-  border-radius: 9999px;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: grab;
-  user-select: none;
-}
-
-.ns-editor .ns-img-grip:active {
-  cursor: grabbing;
-}
-
-.ns-editor .ns-img-wrap.is-selected .ns-img-grip,
-.ns-editor .ns-img-wrap.is-transforming .ns-img-grip {
-  display: flex;
-}
-
 .ns-editor .ns-img-box {
   position: relative;
   display: block;
   width: 100%;
   overflow: visible;
+  border-radius: var(--radius-sm);
+  transition: outline 0.15s ease;
+}
+
+.ns-editor .ns-img-wrap.is-selected .ns-img-box {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
 .ns-editor .ns-img-wrap img {
   width: 100%;
   height: auto;
+  border-radius: var(--radius-sm);
   pointer-events: none;
-}
-
-.ns-editor .ns-img-frame {
-  display: none;
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  border: 1.5px solid #3b82f6;
-  pointer-events: none;
-}
-
-.ns-editor .ns-img-wrap.is-selected .ns-img-frame,
-.ns-editor .ns-img-wrap.is-transforming .ns-img-frame {
   display: block;
 }
 
-.ns-editor .ns-img-box-handle,
-.ns-editor .ns-img-rotate {
-  pointer-events: auto;
+/* Notion-style vertical pill edge drag handles */
+.ns-editor .ns-img-edge-handle {
+  display: none;
   position: absolute;
-  z-index: 5;
-  padding: 0;
-  border: 2px solid #3b82f6;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.45);
-}
-
-.ns-editor .ns-img-box-handle {
-  width: 14px;
-  height: 14px;
-  border-radius: 2px;
-}
-
-.ns-editor .ns-img-box-handle.is-n {
-  top: -7px;
-  left: 50%;
-  cursor: ns-resize;
-  translate: -50% 0;
-}
-.ns-editor .ns-img-box-handle.is-s {
-  bottom: -7px;
-  left: 50%;
-  cursor: ns-resize;
-  translate: -50% 0;
-}
-.ns-editor .ns-img-box-handle.is-e {
   top: 50%;
-  right: -7px;
-  cursor: ew-resize;
   translate: 0 -50%;
-}
-.ns-editor .ns-img-box-handle.is-w {
-  top: 50%;
-  left: -7px;
-  cursor: ew-resize;
-  translate: 0 -50%;
-}
-.ns-editor .ns-img-box-handle.is-ne {
-  top: -7px;
-  right: -7px;
-  cursor: nesw-resize;
-}
-.ns-editor .ns-img-box-handle.is-nw {
-  top: -7px;
-  left: -7px;
-  cursor: nwse-resize;
-}
-.ns-editor .ns-img-box-handle.is-se {
-  right: -7px;
-  bottom: -7px;
-  cursor: nwse-resize;
-}
-.ns-editor .ns-img-box-handle.is-sw {
-  bottom: -7px;
-  left: -7px;
-  cursor: nesw-resize;
-}
-
-.ns-editor .ns-img-rotate {
-  top: -26px;
-  left: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  cursor: grab;
-  translate: -50% 0;
-}
-
-.ns-editor .ns-img-rotate::before {
-  content: "";
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  width: 1.5px;
-  height: 12px;
+  width: 8px;
+  height: 48px;
+  border-radius: 9999px;
   background: #3b82f6;
-  translate: -50% 0;
+  box-shadow: 0 0 0 2px #ffffff, 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: col-resize;
+  z-index: 25;
+  transition: width 0.12s ease, height 0.12s ease, background 0.12s ease;
+  pointer-events: auto;
+}
+
+.ns-editor .ns-img-edge-handle.is-left {
+  left: -4px;
+}
+
+.ns-editor .ns-img-edge-handle.is-right {
+  right: -4px;
+}
+
+.ns-editor .ns-img-wrap.is-selected .ns-img-edge-handle,
+.ns-editor .ns-img-wrap.is-resizing .ns-img-edge-handle {
+  display: block;
+}
+
+.ns-editor .ns-img-edge-handle:hover,
+.ns-editor .ns-img-wrap.is-resizing .ns-img-edge-handle {
+  width: 10px;
+  height: 56px;
+  background: #1d4ed8;
+}
+
+/* Global resizing mode */
+body.ns-is-resizing,
+body.ns-is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .ns-editor .ns-img-tools {

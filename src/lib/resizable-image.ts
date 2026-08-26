@@ -3,8 +3,6 @@ import type { NodeViewRendererProps } from "@tiptap/core";
 
 const MIN_PCT = 15;
 const MAX_PCT = 100;
-const HANDLES = ["n", "s", "e", "w", "ne", "nw", "se", "sw"] as const;
-type HandleDir = (typeof HANDLES)[number];
 type ImageAlign = "left" | "center" | "right";
 
 declare module "@tiptap/core" {
@@ -121,40 +119,20 @@ export const ResizableImage = Node.create({
       if (node.attrs.title) img.title = node.attrs.title;
       img.draggable = false;
 
-      // Drag Grip handle for moving the image within the note editor
-      const grip = document.createElement("div");
-      grip.className = "ns-img-grip";
-      grip.draggable = true;
-      grip.setAttribute("title", "Drag to move image anywhere in note");
-      grip.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="9" cy="5" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="9" cy="19" r="1.2"/><circle cx="15" cy="5" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="15" cy="19" r="1.2"/></svg><span>Drag to move</span>`;
+      // Notion-style Edge Drag Handles (Left & Right pill bars)
+      const leftHandle = document.createElement("div");
+      leftHandle.className = "ns-img-edge-handle is-left";
+      leftHandle.setAttribute("title", "Drag to resize");
 
-      const frame = document.createElement("div");
-      frame.className = "ns-img-frame";
+      const rightHandle = document.createElement("div");
+      rightHandle.className = "ns-img-edge-handle is-right";
+      rightHandle.setAttribute("title", "Drag to resize");
 
-      const handleEls = new Map<HandleDir, HTMLButtonElement>();
-      for (const dir of HANDLES) {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = `ns-img-box-handle is-${dir}`;
-        el.dataset.dir = dir;
-        el.tabIndex = -1;
-        el.setAttribute("aria-label", `Resize ${dir}`);
-        handleEls.set(dir, el);
-        frame.append(el);
-      }
-
-      const rotator = document.createElement("button");
-      rotator.type = "button";
-      rotator.className = "ns-img-rotate";
-      rotator.tabIndex = -1;
-      rotator.setAttribute("aria-label", "Rotate");
-      frame.append(rotator);
-
-      // Notion-style floating toolbar
+      // Notion-style Floating Toolbar
       const tools = document.createElement("div");
       tools.className = "ns-img-tools";
 
-      // Alignment Group
+      // Alignment Controls
       const alignGroup = document.createElement("div");
       alignGroup.className = "ns-img-align-group";
 
@@ -162,17 +140,17 @@ export const ResizableImage = Node.create({
         {
           id: "left",
           label: "Align left",
-          icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/></svg>`,
+          icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="15" y1="12" x2="3" y2="12"/><line x1="17" y1="18" x2="3" y2="18"/></svg>`,
         },
         {
           id: "center",
           label: "Align center",
-          icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="19" y1="12" x2="5" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/></svg>`,
+          icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="19" y1="12" x2="5" y2="12"/><line x1="21" y1="18" x2="3" y2="18"/></svg>`,
         },
         {
           id: "right",
           label: "Align right",
-          icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="9" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/></svg>`,
+          icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="12" x2="9" y2="12"/><line x1="21" y1="18" x2="7" y2="18"/></svg>`,
         },
       ];
 
@@ -199,7 +177,7 @@ export const ResizableImage = Node.create({
         alignGroup.append(btn);
       }
 
-      // Preset buttons: 25%, 50%, 75%, 100%
+      // Quick Size Presets: 25%, 50%, 75%, 100%
       const presetsWrap = document.createElement("div");
       presetsWrap.className = "ns-img-presets";
 
@@ -214,8 +192,7 @@ export const ResizableImage = Node.create({
           e.preventDefault();
           e.stopPropagation();
           pct = p;
-          commit(p, deg);
-          updatePresetHighlights();
+          commit(p);
         });
         presetButtons.set(p, btn);
         presetsWrap.append(btn);
@@ -227,15 +204,7 @@ export const ResizableImage = Node.create({
         }
       };
 
-      // Range slider
-      const slider = document.createElement("input");
-      slider.type = "range";
-      slider.min = String(MIN_PCT);
-      slider.max = String(MAX_PCT);
-      slider.step = "1";
-      slider.className = "ns-img-slider";
-      slider.setAttribute("aria-label", "Image size");
-
+      // Live percentage badge
       const label = document.createElement("span");
       label.className = "ns-img-size";
 
@@ -256,130 +225,105 @@ export const ResizableImage = Node.create({
         }
       });
 
-      tools.append(alignGroup, presetsWrap, slider, label, delBtn);
-      box.append(img, grip, frame);
+      tools.append(alignGroup, presetsWrap, label, delBtn);
+      box.append(img, leftHandle, rightHandle);
       wrap.append(box, tools);
 
-      const apply = (nextPct: number, nextDeg: number) => {
+      const apply = (nextPct: number) => {
         const p = clampPct(nextPct);
-        const d = rotateToDeg(nextDeg);
         wrap.style.width = `${p}%`;
-        img.style.transform = d ? `rotate(${d}deg)` : "";
-        slider.value = String(p);
-        label.textContent = d ? `${p}% · ${d}°` : `${p}%`;
+        label.textContent = `${p}%`;
         updatePresetHighlights();
-        return { pct: p, deg: d };
+        return p;
       };
 
-      const commit = (nextPct: number, nextDeg: number) => {
-        const value = apply(nextPct, nextDeg);
+      const commit = (nextPct: number) => {
+        const p = apply(nextPct);
         if (!editor.isEditable) return;
         editor.commands.updateAttributes("image", {
-          width: `${value.pct}%`,
-          rotate: value.deg,
+          width: `${p}%`,
           align,
         });
       };
 
       let pct = widthToPct(node.attrs.width);
-      let deg = rotateToDeg(node.attrs.rotate);
-      apply(pct, deg);
+      apply(pct);
 
-      const onSlide = () => {
-        pct = apply(Number(slider.value), deg).pct;
-      };
-      const onSlideEnd = () => commit(Number(slider.value), deg);
-      slider.addEventListener("input", onSlide);
-      slider.addEventListener("change", onSlideEnd);
-
-      let drag: {
-        kind: "resize" | "rotate";
-        dir?: HandleDir;
+      // Direct Mouse Drag Resizing Logic
+      let dragSession: {
+        side: "left" | "right";
         startX: number;
-        startY: number;
-        startPct: number;
-        startDeg: number;
-        cx: number;
-        cy: number;
+        startWidthPx: number;
+        parentWidthPx: number;
       } | null = null;
 
-      const onPointerMove = (event: PointerEvent) => {
-        if (!drag) return;
-        if (drag.kind === "rotate") {
-          const angle = (Math.atan2(event.clientY - drag.cy, event.clientX - drag.cx) * 180) / Math.PI;
-          const start = (Math.atan2(drag.startY - drag.cy, drag.startX - drag.cx) * 180) / Math.PI;
-          deg = apply(pct, drag.startDeg + (angle - start)).deg;
-          return;
-        }
-
-        const parent = wrap.parentElement;
-        if (!parent) return;
-        const parentW = parent.getBoundingClientRect().width;
-        if (parentW <= 0) return;
-
-        const dir = drag.dir ?? "e";
-        const dx = event.clientX - drag.startX;
-        const xSign = dir.includes("e") ? 1 : dir.includes("w") ? -1 : 0;
-
-        let deltaPct = 0;
-        if (xSign !== 0) {
-          deltaPct = ((dx * xSign) / parentW) * 100;
-        } else {
-          const dy = event.clientY - drag.startY;
-          const ySign = dir.includes("s") ? 1 : dir.includes("n") ? -1 : 0;
-          deltaPct = ((dy * ySign) / Math.max(box.getBoundingClientRect().height, 1)) * 100;
-        }
-
-        pct = apply(drag.startPct + deltaPct, deg).pct;
+      const onPointerMove = (e: PointerEvent) => {
+        if (!dragSession) return;
+        const dx = e.clientX - dragSession.startX;
+        const multiplier = align === "center" ? 2 : 1;
+        const effectiveDelta = dragSession.side === "right" ? dx * multiplier : -dx * multiplier;
+        const newWidthPx = dragSession.startWidthPx + effectiveDelta;
+        const newPct = clampPct(Math.round((newWidthPx / dragSession.parentWidthPx) * 100));
+        pct = newPct;
+        wrap.style.width = `${pct}%`;
+        label.textContent = `${pct}%`;
+        updatePresetHighlights();
       };
 
-      const onPointerUp = () => {
-        if (!drag) return;
-        drag = null;
-        document.body.classList.remove("select-none");
+      const onPointerUp = (e: PointerEvent) => {
+        if (!dragSession) return;
+        const side = dragSession.side;
+        dragSession = null;
+        document.body.classList.remove("ns-is-resizing");
+        wrap.classList.remove("is-resizing");
         window.removeEventListener("pointermove", onPointerMove);
         window.removeEventListener("pointerup", onPointerUp);
-        commit(pct, deg);
+        try {
+          const handle = side === "right" ? rightHandle : leftHandle;
+          handle.releasePointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
+        commit(pct);
       };
 
-      const startDrag = (event: PointerEvent, kind: "resize" | "rotate", dir?: HandleDir) => {
+      const startEdgeDrag = (e: PointerEvent, side: "left" | "right") => {
         if (!editor.isEditable) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const targetEl = event.currentTarget as HTMLElement | null;
+        e.preventDefault();
+        e.stopPropagation();
+        selectSelf();
+        wrap.classList.add("is-selected", "is-resizing");
+        document.body.classList.add("ns-is-resizing");
+
+        const targetEl = e.currentTarget as HTMLElement | null;
         if (targetEl && typeof targetEl.setPointerCapture === "function") {
           try {
-            targetEl.setPointerCapture(event.pointerId);
+            targetEl.setPointerCapture(e.pointerId);
           } catch {
             // ignore
           }
         }
-        document.body.classList.add("select-none");
-        selectSelf();
-        wrap.classList.add("is-selected", "is-transforming");
-        const rect = box.getBoundingClientRect();
-        drag = {
-          kind,
-          dir,
-          startX: event.clientX,
-          startY: event.clientY,
-          startPct: pct,
-          startDeg: deg,
-          cx: rect.left + rect.width / 2,
-          cy: rect.top + rect.height / 2,
+
+        const parent = wrap.parentElement;
+        const parentWidthPx = parent ? parent.getBoundingClientRect().width : 600;
+        const startWidthPx = box.getBoundingClientRect().width;
+
+        dragSession = {
+          side,
+          startX: e.clientX,
+          startWidthPx,
+          parentWidthPx: Math.max(parentWidthPx, 100),
         };
+
         window.addEventListener("pointermove", onPointerMove);
         window.addEventListener("pointerup", onPointerUp);
       };
 
-      const handleListeners: Array<[HTMLButtonElement, (event: PointerEvent) => void]> = [];
-      for (const [dir, el] of handleEls) {
-        const onDown = (event: PointerEvent) => startDrag(event, "resize", dir);
-        el.addEventListener("pointerdown", onDown);
-        handleListeners.push([el, onDown]);
-      }
-      const onRotateDown = (event: PointerEvent) => startDrag(event, "rotate");
-      rotator.addEventListener("pointerdown", onRotateDown);
+      const onRightDown = (e: PointerEvent) => startEdgeDrag(e, "right");
+      const onLeftDown = (e: PointerEvent) => startEdgeDrag(e, "left");
+
+      rightHandle.addEventListener("pointerdown", onRightDown);
+      leftHandle.addEventListener("pointerdown", onLeftDown);
 
       const selectSelf = () => {
         if (typeof getPos !== "function") return;
@@ -389,42 +333,22 @@ export const ResizableImage = Node.create({
 
       const onBoxDown = (event: MouseEvent) => {
         const target = event.target as HTMLElement;
-        if (
-          target.closest(
-            ".ns-img-box-handle, .ns-img-rotate, .ns-img-slider, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-del-btn, .ns-img-grip",
-          )
-        ) {
+        if (target.closest(".ns-img-edge-handle, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-del-btn")) {
           return;
         }
         selectSelf();
-        wrap.classList.add("is-selected", "is-transforming");
-      };
-
-      const onDblClick = (event: MouseEvent) => {
-        event.preventDefault();
-        event.stopPropagation();
-        wrap.classList.add("is-selected", "is-transforming");
-        selectSelf();
+        wrap.classList.add("is-selected");
       };
 
       box.addEventListener("mousedown", onBoxDown);
-      box.addEventListener("dblclick", onDblClick);
-
-      grip.addEventListener("dragstart", () => {
-        selectSelf();
-      });
 
       return {
         dom: wrap,
         ignoreMutation: () => true,
         stopEvent(event) {
-          // Allow native drag & drop events on the image to pass to ProseMirror
-          if (event.type.startsWith("drag")) return false;
           const target = event.target as HTMLElement;
           return Boolean(
-            target.closest(
-              ".ns-img-box-handle, .ns-img-rotate, .ns-img-slider, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-del-btn",
-            ),
+            target.closest(".ns-img-edge-handle, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-del-btn"),
           );
         },
         update(updated) {
@@ -433,30 +357,24 @@ export const ResizableImage = Node.create({
           img.alt = updated.attrs.alt ?? "";
           img.title = updated.attrs.title ?? "";
           pct = widthToPct(updated.attrs.width);
-          deg = rotateToDeg(updated.attrs.rotate);
           align = (updated.attrs.align as ImageAlign) || "center";
           wrap.dataset.align = align;
           for (const [k, b] of alignButtons) {
             b.classList.toggle("is-active", k === align);
           }
-          apply(pct, deg);
+          apply(pct);
           return true;
         },
         selectNode() {
-          wrap.classList.add("is-selected", "is-transforming");
+          wrap.classList.add("is-selected");
         },
         deselectNode() {
-          wrap.classList.remove("is-selected", "is-transforming");
+          wrap.classList.remove("is-selected", "is-resizing");
         },
         destroy() {
-          slider.removeEventListener("input", onSlide);
-          slider.removeEventListener("change", onSlideEnd);
-          rotator.removeEventListener("pointerdown", onRotateDown);
+          rightHandle.removeEventListener("pointerdown", onRightDown);
+          leftHandle.removeEventListener("pointerdown", onLeftDown);
           box.removeEventListener("mousedown", onBoxDown);
-          box.removeEventListener("dblclick", onDblClick);
-          for (const [el, onDown] of handleListeners) {
-            el.removeEventListener("pointerdown", onDown);
-          }
           window.removeEventListener("pointermove", onPointerMove);
           window.removeEventListener("pointerup", onPointerUp);
         },
