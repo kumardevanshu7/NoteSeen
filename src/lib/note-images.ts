@@ -126,6 +126,116 @@ export function queueNoteImages(files: File[], noteId: string): void {
   useImageEdit.getState().queue(images, noteId);
 }
 
+/**
+ * Optimizes an image/screenshot file into a lightweight base64 data URL.
+ * Automatically scales down large dimensions and compresses to WebP/JPEG/PNG.
+ */
+export async function imageFileToOptimizedDataUrl(
+  file: File,
+  maxDimension = 1920,
+  quality = 0.85,
+): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rawResult = reader.result as string;
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(rawResult);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try WebP first for great compression; fallback to JPEG/PNG
+        try {
+          const webpData = canvas.toDataURL("image/webp", quality);
+          if (webpData.startsWith("data:image/webp")) {
+            resolve(webpData);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+
+        const isPng = file.type === "image/png";
+        const fallback = isPng
+          ? canvas.toDataURL("image/png")
+          : canvas.toDataURL("image/jpeg", quality);
+        resolve(fallback);
+      };
+      img.onerror = () => resolve(rawResult);
+      img.src = rawResult;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Inserts pasted/dropped images directly into the editor at cursor position.
+ * Handles both cloud-hosted and local/offline base64 data URL fallbacks.
+ */
+export async function insertPastedImages(
+  editor: Editor,
+  files: File[],
+  noteId: string,
+): Promise<void> {
+  const images = files.filter((file) => file.type.startsWith("image/"));
+  if (images.length === 0) return;
+
+  const uid = useAuth.getState().user?.uid;
+  const isCloud = isImageStorageConfigured() && uid;
+
+  let ok = 0;
+  for (const file of images) {
+    try {
+      let src = "";
+      if (isCloud) {
+        try {
+          src = await uploadPublicImage(file, noteId);
+        } catch (uploadError) {
+          console.warn("Cloud upload failed, falling back to data URL", uploadError);
+          src = await imageFileToOptimizedDataUrl(file);
+        }
+      } else {
+        src = await imageFileToOptimizedDataUrl(file);
+      }
+
+      if (src) {
+        const alt = file.name ? file.name.replace(/\.[^.]+$/, "") : "image";
+        editor.chain().focus().setImage({ src, alt, width: "100%" }).run();
+        ok += 1;
+      }
+    } catch (error) {
+      console.error("NoteSeen: image insert failed", error);
+      toast.error("Could not paste image", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
+  }
+
+  if (ok > 0) {
+    toast.success(ok === 1 ? "Image pasted" : `${ok} images pasted`);
+  }
+}
+
 export async function insertImagesIntoEditor(
   editor: Editor,
   files: File[],
@@ -139,7 +249,12 @@ export async function insertImagesIntoEditor(
   try {
     for (const file of images) {
       try {
-        const src = await uploadPublicImage(file, noteId);
+        let src = "";
+        try {
+          src = await uploadPublicImage(file, noteId);
+        } catch {
+          src = await imageFileToOptimizedDataUrl(file);
+        }
         const alt = file.name.replace(/\.[^.]+$/, "") || "image";
         editor.chain().focus().setImage({ src, alt, width: "100%" }).run();
         ok += 1;
@@ -155,3 +270,4 @@ export async function insertImagesIntoEditor(
     toast.success(ok === 1 ? "Image added" : `${ok} images added`);
   }
 }
+

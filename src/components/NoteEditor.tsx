@@ -10,15 +10,17 @@ import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
-import { Lock } from "lucide-react";
+import { Lock, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
-import { imageFilesFromData, queueNoteImages } from "@/lib/note-images";
+import { imageFilesFromData, insertPastedImages } from "@/lib/note-images";
 import { clipboardHasImageFile, sanitizePastedHtml } from "@/lib/paste-html";
 import { useEditorStore } from "@/store/editor";
+import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
 import { requireVault, useVault } from "@/store/vault";
 import type { Note } from "@/lib/types";
@@ -26,7 +28,7 @@ import { countWords, formatClock, readingMinutes } from "@/lib/utils";
 import { SelectionMenu } from "./SelectionMenu";
 
 const CONTENT_DEBOUNCE_MS = 320;
-const MAX_NOTE_HTML = 500_000;
+const MAX_NOTE_HTML = 15_000_000;
 
 function isEmptyNote(note: Note): boolean {
   return !note.title.trim() && !note.text.trim();
@@ -35,6 +37,8 @@ function isEmptyNote(note: Note): boolean {
 export function NoteEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const setEditor = useEditorStore((state) => state.setEditor);
+  const isFullscreen = useFullscreen((state) => state.isFullscreen);
+  const toggleFullscreen = useFullscreen((state) => state.toggleFullscreen);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
   const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
   const isTimerUnlocked = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
@@ -141,7 +145,7 @@ export function NoteEditor({ note }: { note: Note }) {
             toast("Unlock the note to add images");
             return true;
           }
-          queueNoteImages(images, noteIdRef.current);
+          void insertPastedImages(ed, images, noteIdRef.current);
           return true;
         }
 
@@ -187,7 +191,7 @@ export function NoteEditor({ note }: { note: Note }) {
           toast("Unlock the note to add images");
           return true;
         }
-        queueNoteImages(images, noteIdRef.current);
+        void insertPastedImages(ed, images, noteIdRef.current);
         return true;
       },
     },
@@ -257,7 +261,28 @@ export function NoteEditor({ note }: { note: Note }) {
     <EditorErrorBoundary>
       <div className="ns-editor flex min-h-0 flex-1 flex-col">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <CopyButton note={note} label="Copy note" />
+          <div className="flex items-center gap-1.5">
+            <CopyButton note={note} label="Copy note" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={toggleFullscreen}
+                  aria-label={isFullscreen ? "Exit full screen" : "Full screen window"}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="size-3.5" />
+                  ) : (
+                    <Maximize2 className="size-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isFullscreen ? "Exit full screen · Esc" : "Full screen window · F11"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
           {!canEdit ? (
             <Button variant="outline" size="sm" onClick={() => void unlockForEdit()}>
               <Lock className="size-3.5" />

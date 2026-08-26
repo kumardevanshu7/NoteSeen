@@ -7,6 +7,8 @@ import {
   KeyRound,
   Lightbulb,
   Lock,
+  Maximize2,
+  Minimize2,
   Moon,
   Plus,
   Save,
@@ -26,6 +28,7 @@ import {
 } from "@/components/ui/command";
 import { Kbd } from "@/components/ui/kbd";
 import { useAppearance } from "@/hooks/use-appearance";
+import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
 import { useVault } from "@/store/vault";
 import { downloadMarkdown } from "@/lib/note-file";
@@ -51,6 +54,8 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOp
   const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
   const lockEditNow = useVault((state) => state.lockEditNow);
   const isTimerActive = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
+  const isFullscreen = useFullscreen((state) => state.isFullscreen);
+  const toggleFullscreen = useFullscreen((state) => state.toggleFullscreen);
   const { toggle, isDark } = useAppearance();
 
   const list = useMemo(
@@ -146,6 +151,13 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOp
               <CommandItem value="appearance theme dark light" onSelect={() => run(toggle)}>
                 {isDark ? <Sun /> : <Moon />}
                 {isDark ? "Switch to light" : "Switch to dark"}
+              </CommandItem>
+              <CommandItem value="full screen window zen focus mode maximize" onSelect={() => run(toggleFullscreen)}>
+                {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+                <span className="flex-1">{isFullscreen ? "Exit full screen" : "Full screen window"}</span>
+                <span className="flex items-center gap-1">
+                  <Kbd>F11</Kbd>
+                </span>
               </CommandItem>
               {onOpenUnlockTimer ? (
                 <CommandItem

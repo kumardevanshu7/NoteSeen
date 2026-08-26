@@ -8,7 +8,9 @@ import {
   FileType2,
   FolderOpen,
   Link2Off,
+  Maximize2,
   Menu,
+  Minimize2,
   MonitorSmartphone,
   Moon,
   PanelRightOpen,
@@ -42,6 +44,7 @@ import { useAppearance } from "@/hooks/use-appearance";
 import { useEditorTick } from "@/hooks/use-editor-tick";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { useEditorStore } from "@/store/editor";
+import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
 import { useVault } from "@/store/vault";
 import { downloadHtml, exportPdf } from "@/lib/export-note";
@@ -71,6 +74,8 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles, onOpenUnlo
   const togglePin = useNotes((state) => state.togglePin);
   const trashNote = useNotes((state) => state.trashNote);
   const setView = useNotes((state) => state.setView);
+  const isFullscreen = useFullscreen((state) => state.isFullscreen);
+  const toggleFullscreen = useFullscreen((state) => state.toggleFullscreen);
   const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
   const isTimerActive = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
   const { appearance, setAppearance, toggle, isDark } = useAppearance();
@@ -145,6 +150,22 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles, onOpenUnlo
           </Button>
         </TooltipTrigger>
         <TooltipContent>Find a note · {mod} K</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen window"}
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isFullscreen ? "Exit full screen · Esc" : "Full screen window · F11"}
+        </TooltipContent>
       </Tooltip>
 
       <Button variant="primary" size="sm" className="gap-1.5 pl-3" onClick={() => setChooserOpen(true)}>
@@ -262,6 +283,11 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles, onOpenUnlo
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel>App</DropdownMenuLabel>
+          <DropdownMenuItem onSelect={toggleFullscreen}>
+            {isFullscreen ? <Minimize2 /> : <Maximize2 />}
+            {isFullscreen ? "Exit full screen" : "Full screen window"}
+            <DropdownMenuShortcut>F11</DropdownMenuShortcut>
+          </DropdownMenuItem>
           {onOpenUnlockTimer ? (
             <DropdownMenuItem onSelect={onOpenUnlockTimer}>
               <Timer />

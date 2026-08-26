@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { Lock, Save } from "lucide-react";
+import { Lock, Maximize2, Minimize2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { CopyButton } from "@/components/CopyButton";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
 import { plainTextToHtmlFriendly } from "@/lib/prompt-utils";
 import type { Note } from "@/lib/types";
 import { formatClock } from "@/lib/utils";
+import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
 import { requireVault, useVault } from "@/store/vault";
 
 export function PromptEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
+  const isFullscreen = useFullscreen((state) => state.isFullscreen);
+  const toggleFullscreen = useFullscreen((state) => state.toggleFullscreen);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
   const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
   const isTimerUnlocked = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
@@ -75,6 +79,21 @@ export function PromptEditor({ note }: { note: Note }) {
             note={{ ...note, title, text: body, tags }}
             label="Copy prompt"
           />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={toggleFullscreen}
+                aria-label={isFullscreen ? "Exit full screen" : "Full screen window"}
+              >
+                {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isFullscreen ? "Exit full screen · Esc" : "Full screen window · F11"}
+            </TooltipContent>
+          </Tooltip>
           {canEdit ? (
             <Button variant="primary" size="sm" onClick={() => void save()} disabled={saving}>
               <Save className="size-3.5" />

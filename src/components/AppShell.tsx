@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { FilePlus2, FolderOpen, Palette } from "lucide-react";
+import { FilePlus2, FolderOpen, Minimize2, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { isAbortError, consumeLaunchFiles, supportsFileSystemAccess, type NsFileHandle } from "@/lib/fs";
 import { pickNoteFiles } from "@/lib/note-file";
 import { isEditableTarget } from "@/lib/utils";
+import { useFullscreen } from "@/store/fullscreen";
 import { registerLifecycleFlush, useNotes } from "@/store/notes";
 import { useVault } from "@/store/vault";
 import { CommandPalette } from "./CommandPalette";
@@ -66,6 +67,8 @@ export function AppShell() {
   const importFiles = useNotes((state) => state.importFiles);
   const initVault = useVault((state) => state.initVault);
 
+  const isFullscreen = useFullscreen((state) => state.isFullscreen);
+  const toggleFullscreen = useFullscreen((state) => state.toggleFullscreen);
   const [navOpen, setNavOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(readStyleOpen);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -192,6 +195,19 @@ export function AppShell() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const mod = event.metaKey || event.ctrlKey;
+
+      if (event.key === "F11" || (mod && event.shiftKey && event.key.toLowerCase() === "f")) {
+        event.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+
+      if (event.key === "Escape" && isFullscreen) {
+        event.preventDefault();
+        useFullscreen.getState().setFullscreen(false);
+        return;
+      }
+
       if (!mod) return;
       const key = event.key.toLowerCase();
 
@@ -223,7 +239,7 @@ export function AppShell() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeId, openFromDisk, saveToFile]);
+  }, [activeId, isFullscreen, openFromDisk, saveToFile, toggleFullscreen]);
 
   useEffect(() => {
     const onDragOver = (event: DragEvent) => {
@@ -292,20 +308,37 @@ export function AppShell() {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
-      <TopBar
-        note={note}
-        onOpenNav={() => setNavOpen(true)}
-        onOpenPalette={() => setPaletteOpen(true)}
-        onOpenFiles={() => void openFromDisk()}
-        onOpenUnlockTimer={() => setUnlockTimerOpen(true)}
-      />
+      {!isFullscreen ? (
+        <TopBar
+          note={note}
+          onOpenNav={() => setNavOpen(true)}
+          onOpenPalette={() => setPaletteOpen(true)}
+          onOpenFiles={() => void openFromDisk()}
+          onOpenUnlockTimer={() => setUnlockTimerOpen(true)}
+        />
+      ) : (
+        <div className="ns-no-print fixed top-3 right-4 z-50 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleFullscreen}
+            className="gap-1.5 rounded-full border-hairline bg-surface/90 backdrop-blur-md px-3 py-1 text-xs text-ink shadow-lg hover:bg-surface"
+          >
+            <Minimize2 className="size-3.5" />
+            <span>Exit full screen</span>
+            <span className="font-mono text-[10px] text-muted">Esc</span>
+          </Button>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="ns-no-print hidden h-full min-h-0 lg:block">
-          <SideRail />
-        </div>
+        {!isFullscreen ? (
+          <div className="ns-no-print hidden h-full min-h-0 lg:block">
+            <SideRail />
+          </div>
+        ) : null}
 
-        {navOpen ? (
+        {navOpen && !isFullscreen ? (
           <div className="ns-no-print fixed inset-0 z-40 flex lg:hidden">
             <div
               className="ns-fade absolute inset-0 bg-black/25"
@@ -319,7 +352,7 @@ export function AppShell() {
         ) : null}
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <NoteTabs />
+          {!isFullscreen ? <NoteTabs /> : null}
           {view === "suggestions" ? <SuggestionsView /> : null}
           {view === "all" ? <NotesGrid /> : null}
           {view === "cards" ? <PromptCardsView /> : null}
@@ -331,8 +364,10 @@ export function AppShell() {
             note ? (
               <>
                 <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
-                    <article
-                    className="ns-paper mx-auto w-full max-w-[46rem] px-5 py-7 sm:px-12 sm:py-12"
+                  <article
+                    className={`ns-paper mx-auto w-full px-5 py-7 sm:px-12 sm:py-12 transition-all ${
+                      isFullscreen ? "max-w-4xl" : "max-w-[46rem]"
+                    }`}
                     data-theme={note.theme}
                     data-typeface={note.typeface}
                     data-size={note.size}
@@ -347,12 +382,14 @@ export function AppShell() {
                     </EditorErrorBoundary>
                   </article>
                 </div>
-                <footer className="ns-no-print flex h-10 shrink-0 items-center justify-between border-t border-hairline px-5">
-                  <SaveIndicator fileName={note.fileName} />
-                  <span className="ns-mono text-muted">
-                    {note.kind === "prompt" ? "prompt" : ".noteseen"}
-                  </span>
-                </footer>
+                {!isFullscreen ? (
+                  <footer className="ns-no-print flex h-10 shrink-0 items-center justify-between border-t border-hairline px-5">
+                    <SaveIndicator fileName={note.fileName} />
+                    <span className="ns-mono text-muted">
+                      {note.kind === "prompt" ? "prompt" : ".noteseen"}
+                    </span>
+                  </footer>
+                ) : null}
               </>
             ) : (
               <EmptyEditor onCreate={() => setChooserOpen(true)} onOpen={() => void openFromDisk()} />
@@ -360,7 +397,7 @@ export function AppShell() {
           ) : null}
         </main>
 
-        {view === "editor" && note && note.kind === "note" ? (
+        {!isFullscreen && view === "editor" && note && note.kind === "note" ? (
           <>
             {styleOpen ? (
               <div className="ns-no-print hidden h-full min-h-0 xl:block">

@@ -67,7 +67,7 @@ export const ResizableImage = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: "img[src]:not([src^='data:'])" }];
+    return [{ tag: "img[src]" }];
   },
 
   renderHTML({ HTMLAttributes }) {
