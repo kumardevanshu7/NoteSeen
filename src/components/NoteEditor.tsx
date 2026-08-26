@@ -247,13 +247,24 @@ export function NoteEditor({ note }: { note: Note }) {
     };
   }, [commit]);
 
-  // Long titles wrap instead of scrolling out of view on narrow phones.
-  useEffect(() => {
+  // Auto-resize title textarea and guarantee it never collapses to 0 height
+  const adjustTitleHeight = useCallback(() => {
     const el = titleRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [note.title, note.id, note.typeface, note.size]);
+    const nextHeight = Math.max(el.scrollHeight, 40);
+    el.style.height = `${nextHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    adjustTitleHeight();
+  }, [note.title, note.id, note.typeface, note.size, isFullscreen, adjustTitleHeight]);
+
+  useEffect(() => {
+    const handleResize = () => adjustTitleHeight();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [adjustTitleHeight]);
 
   const words = countWords(note.text);
 

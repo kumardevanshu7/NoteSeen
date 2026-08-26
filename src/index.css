@@ -417,6 +417,8 @@
 
 .ns-title {
   color: var(--ink);
+  min-height: 2.4rem;
+  display: block;
 }
 
 .ns-title::placeholder {
