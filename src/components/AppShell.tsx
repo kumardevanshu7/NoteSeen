@@ -363,10 +363,18 @@ export function AppShell() {
           {view === "editor" ? (
             note ? (
               <>
-                <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
+                <div
+                  className={`ns-scroll min-h-0 flex-1 overflow-y-auto transition-all ${
+                    isFullscreen
+                      ? "p-2 sm:p-5 md:p-8 flex flex-col items-center"
+                      : "px-3 py-4 sm:px-8 sm:py-6"
+                  }`}
+                >
                   <article
-                    className={`ns-paper mx-auto w-full px-5 py-7 sm:px-12 sm:py-12 transition-all ${
-                      isFullscreen ? "max-w-4xl" : "max-w-[46rem]"
+                    className={`ns-paper mx-auto w-full transition-all duration-200 ${
+                      isFullscreen
+                        ? "max-w-5xl xl:max-w-6xl 2xl:max-w-7xl min-h-[calc(100vh-3.5rem)] px-6 py-8 sm:px-14 sm:py-12 md:px-20 md:py-16 shadow-2xl"
+                        : "max-w-[46rem] px-5 py-7 sm:px-12 sm:py-12"
                     }`}
                     data-theme={note.theme}
                     data-typeface={note.typeface}

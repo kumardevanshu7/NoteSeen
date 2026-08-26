@@ -381,6 +381,8 @@
   background: var(--accent-wash);
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
 }
 
 .ns-paper[data-theme="plain"] {
@@ -423,9 +425,10 @@
 
 .ns-editor .tiptap {
   outline: none;
-  min-height: 40vh;
+  min-height: 45vh;
+  height: 100%;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--ink);
 }
 
