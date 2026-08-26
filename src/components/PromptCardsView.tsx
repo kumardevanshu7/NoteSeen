@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Images, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { FileText, Images, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
@@ -25,6 +25,7 @@ export function PromptCardsView() {
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const trashNote = useNotes((state) => state.trashNote);
+  const convertPromptCardToNote = useNotes((state) => state.convertPromptCardToNote);
   const recoverOrphanedPromptCards = useNotes((state) => state.recoverOrphanedPromptCards);
   const cloudUserId = useNotes((state) => state.cloudUserId);
   const user = useAuth((state) => state.user);
@@ -314,6 +315,18 @@ export function PromptCardsView() {
                 <Button type="button" variant="outline" size="sm" onClick={() => openEdit(viewingLive)}>
                   <Pencil className="size-3.5" />
                   Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    convertPromptCardToNote(viewingLive.id);
+                    setViewing(null);
+                  }}
+                >
+                  <FileText className="size-3.5" />
+                  Convert to Note
                 </Button>
                 <MoveToWorkspaceMenu
                   noteId={viewingLive.id}

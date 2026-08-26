@@ -61,7 +61,7 @@ export async function listPromptCardImagesFromStorage(
 
   for (const entry of folders) {
     const noteId = entry.name;
-    if (!noteId || isImageFileName(noteId)) continue;
+    if (!noteId || isImageFileName(noteId) || noteId === "note-assets" || noteId === "notes") continue;
 
     const { data: files, error: fileError } = await supabase.storage
       .from(NOTE_IMAGE_BUCKET)
@@ -96,7 +96,11 @@ export async function listOrphanedPromptCardImages(
   return all.filter(({ noteId }) => !existingNoteIds.has(noteId));
 }
 
-export async function uploadPublicImage(file: File, noteId: string): Promise<string> {
+export async function uploadPublicImage(
+  file: File,
+  noteId: string,
+  folder?: string,
+): Promise<string> {
   if (!isImageStorageConfigured()) {
     throw new Error("Image hosting is not configured.");
   }
@@ -106,7 +110,9 @@ export async function uploadPublicImage(file: File, noteId: string): Promise<str
   if (!uid) throw new Error("Sign in to upload images.");
 
   const ext = EXT[file.type] ?? "jpg";
-  const path = `${uid}/${noteId}/${nanoid(10)}.${ext}`;
+  const path = folder
+    ? `${uid}/${folder}/${noteId}/${nanoid(10)}.${ext}`
+    : `${uid}/${noteId}/${nanoid(10)}.${ext}`;
   const supabase = getSupabase();
   const { error } = await supabase.storage.from(NOTE_IMAGE_BUCKET).upload(path, file, {
     cacheControl: "31536000",
@@ -209,7 +215,7 @@ export async function insertPastedImages(
       let src = "";
       if (isCloud) {
         try {
-          src = await uploadPublicImage(file, noteId);
+          src = await uploadPublicImage(file, noteId, "note-assets");
         } catch (uploadError) {
           console.warn("Cloud upload failed, falling back to data URL", uploadError);
           src = await imageFileToOptimizedDataUrl(file);
@@ -251,7 +257,7 @@ export async function insertImagesIntoEditor(
       try {
         let src = "";
         try {
-          src = await uploadPublicImage(file, noteId);
+          src = await uploadPublicImage(file, noteId, "note-assets");
         } catch {
           src = await imageFileToOptimizedDataUrl(file);
         }

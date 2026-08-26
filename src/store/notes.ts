@@ -176,6 +176,7 @@ interface NotesState {
   setView: (view: View) => void;
   setQuery: (query: string) => void;
   togglePin: (id: string) => void;
+  convertPromptCardToNote: (id: string) => void;
   duplicateNote: (id: string) => string | null;
   trashNote: (id: string) => Promise<boolean>;
   trashNotes: (ids: string[]) => Promise<boolean>;
@@ -304,11 +305,20 @@ export const useNotes = create<NotesState>((set, get) => {
     const notes: Record<string, Note> = {};
     for (const note of stored) notes[note.id] = normalizeNote(note);
 
-    // Re-normalize fixes prompt cards that lost kind/coverUrl during partial sync.
+    // Auto-heal blog notes that were mistakenly converted to promptCard (e.g. pasted images)
     for (const [id, note] of Object.entries(notes)) {
-      const fixed = normalizeNote(note);
-      if (fixed.kind !== note.kind || fixed.coverUrl !== note.coverUrl) {
-        notes[id] = fixed;
+      if (
+        note.kind === "promptCard" &&
+        (note.tags.some((t) => t.toLowerCase() === "blogs") ||
+          note.title.toLowerCase().startsWith("blog") ||
+          (note.html && (note.html.includes("<p>") || note.html.includes("<img")) && !note.subtitle))
+      ) {
+        notes[id] = {
+          ...note,
+          kind: "note",
+          coverUrl: null,
+          updatedAt: Date.now(),
+        };
         dirtyNotes.add(id);
       }
     }
@@ -696,6 +706,15 @@ export const useNotes = create<NotesState>((set, get) => {
         size: note.size,
         spacing: note.spacing,
       });
+    },
+
+    convertPromptCardToNote(id) {
+      const note = get().notes[id];
+      if (!note) return;
+      get().patchNote(id, { kind: "note", coverUrl: null });
+      get().setActive(id);
+      set({ view: "editor" });
+      toast.success("Converted to Note");
     },
 
     async trashNote(id) {
@@ -1156,6 +1175,9 @@ export const useNotes = create<NotesState>((set, get) => {
 
       for (const { noteId, coverUrl } of images) {
         const existing = next[noteId];
+        // NEVER convert or overwrite an existing regular Note or Prompt!
+        if (existing && existing.kind !== "promptCard") continue;
+
         const healthy =
           existing &&
           existing.kind === "promptCard" &&
