@@ -958,6 +958,30 @@
 .ns-note-tabs {
   background: var(--tab-strip);
   border-bottom: 1px solid var(--tab-edge);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--tab-edge) 80%, var(--ink)) transparent;
+}
+
+.ns-note-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.ns-note-tabs::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ns-note-tabs::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--tab-edge) 70%, var(--ink));
+  border-radius: 9999px;
+  transition: background 0.15s ease;
+}
+
+.ns-note-tabs::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--slate) 80%, var(--ink));
+}
+
+.ns-note-tabs::-webkit-scrollbar-thumb:active {
+  background: var(--ink);
 }
 
 .ns-note-tab {

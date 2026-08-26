@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import {
   ArrowRightToLine,
   Copy,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/context-menu";
 
 export function NoteTabs() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const notes = useNotes((state) => state.notes);
   const workspaces = useNotes((state) => state.workspaces);
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
@@ -58,11 +60,20 @@ export function NoteTabs() {
         note.workspaceId === activeWorkspaceId,
     );
 
+  useEffect(() => {
+    if (!activeId) return;
+    const activeEl = containerRef.current?.querySelector<HTMLElement>(`[data-tab-id="${activeId}"]`);
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
+  }, [activeId]);
+
   if (tabs.length === 0) return null;
 
   return (
     <div
-      className="ns-no-print ns-note-tabs flex h-10 shrink-0 items-end gap-1.5 overflow-x-auto border-b border-hairline px-3 pt-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      ref={containerRef}
+      className="ns-no-print ns-note-tabs flex h-11 shrink-0 items-end gap-1.5 overflow-x-auto border-b border-hairline px-3.5 pb-[2px] pt-1.5"
       onWheel={(event) => {
         if (event.deltaY === 0 || event.shiftKey) return;
         event.currentTarget.scrollLeft += event.deltaY;
@@ -76,6 +87,7 @@ export function NoteTabs() {
           <ContextMenu key={note.id}>
             <ContextMenuTrigger asChild>
               <div
+                data-tab-id={note.id}
                 role="tab"
                 aria-selected={active}
                 tabIndex={0}
