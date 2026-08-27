@@ -70,6 +70,13 @@ const KEEP_TAGS = new Set([
   "A",
   "MARK",
   "HR",
+  "TABLE",
+  "THEAD",
+  "TBODY",
+  "TFOOT",
+  "TR",
+  "TH",
+  "TD",
 ]);
 
 function unwrapElement(el: Element) {
@@ -109,28 +116,6 @@ function walk(node: Node) {
 
   if (DROP_TAGS.has(tag)) {
     el.remove();
-    return;
-  }
-
-  if (tag === "TABLE" || tag === "THEAD" || tag === "TBODY" || tag === "TFOOT") {
-    const lines: string[] = [];
-    el.querySelectorAll("tr").forEach((row) => {
-      const cells = [...row.querySelectorAll("th,td")].map((c) => c.textContent?.trim() ?? "");
-      if (cells.some(Boolean)) lines.push(cells.join(" — "));
-    });
-    const frag = el.ownerDocument.createDocumentFragment();
-    for (const line of lines) {
-      const p = el.ownerDocument.createElement("p");
-      p.textContent = line;
-      frag.appendChild(p);
-    }
-    el.replaceWith(frag);
-    return;
-  }
-
-  if (tag === "TR" || tag === "TD" || tag === "TH") {
-    for (const child of [...el.childNodes]) walk(child);
-    unwrapElement(el);
     return;
   }
 

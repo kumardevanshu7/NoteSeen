@@ -445,6 +445,56 @@
   margin-top: 0.85em;
 }
 
+/* ── Table styling ────────────────────────────────────────────────────── */
+.ns-editor .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  table-layout: auto;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+}
+
+.ns-editor .tiptap table td,
+.ns-editor .tiptap table th {
+  border: 1px solid var(--hairline);
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  position: relative;
+  min-width: 60px;
+  text-align: left;
+}
+
+.ns-editor .tiptap table th {
+  background: color-mix(in oklab, var(--accent-ink) 8%, transparent);
+  font-weight: 600;
+  font-size: 0.875em;
+  letter-spacing: 0.01em;
+}
+
+.ns-editor .tiptap table td {
+  background: transparent;
+}
+
+.ns-editor .tiptap table tr:nth-child(even) td {
+  background: color-mix(in oklab, var(--ink) 3%, transparent);
+}
+
+.ns-editor .tiptap table p {
+  margin: 0;
+}
+
+/* Selected cell highlight */
+.ns-editor .tiptap table .selectedCell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--focus-blue) 15%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
 .ns-editor .tiptap h1,
 .ns-editor .tiptap h2,
 .ns-editor .tiptap h3 {
