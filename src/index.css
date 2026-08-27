@@ -381,10 +381,7 @@
   background: var(--accent-wash);
   border: 1px solid var(--accent-line);
   border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 100%;
+  min-height: calc(100vh - 7rem);
   box-sizing: border-box;
 }
 
@@ -392,7 +389,8 @@
   border: none;
   border-radius: 0;
   box-shadow: none;
-  min-height: 100%;
+  background: var(--accent-wash);
+  min-height: 100vh;
 }
 
 .ns-paper[data-theme="plain"] {
@@ -435,17 +433,9 @@
   color: var(--muted);
 }
 
-.ns-editor {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 100%;
-}
-
 .ns-editor .tiptap {
   outline: none;
-  min-height: 100%;
-  flex: 1 1 auto;
+  min-height: 50vh;
   font-size: 16px;
   line-height: 1.65;
   color: var(--ink);

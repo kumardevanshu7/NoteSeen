@@ -277,7 +277,7 @@ export function NoteEditor({ note }: { note: Note }) {
 
   return (
     <EditorErrorBoundary>
-      <div className="ns-editor flex min-h-0 flex-1 flex-col">
+      <div className="ns-editor">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <CopyButton note={note} label="Copy note" />
@@ -356,14 +356,14 @@ export function NoteEditor({ note }: { note: Note }) {
         </div>
 
         <div
-          className="mt-7 flex-1 min-h-[50vh] cursor-text flex flex-col"
+          className="mt-7 min-h-[50vh] cursor-text"
           onClick={() => {
             if (editor && !editor.isFocused && canEdit) {
               editor.commands.focus("end");
             }
           }}
         >
-          <EditorContent editor={editor} className="flex-1 flex flex-col min-h-full" />
+          <EditorContent editor={editor} />
         </div>
 
         {editor && canEdit ? <SelectionMenu editor={editor} /> : null}
