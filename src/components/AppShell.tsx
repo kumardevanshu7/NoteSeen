@@ -364,18 +364,19 @@ export function AppShell() {
             note ? (
               <>
                 <div
-                  className={`ns-scroll min-h-0 flex-1 overflow-y-auto transition-all ${
+                  className={`ns-scroll min-h-0 flex-1 overflow-y-auto transition-all flex flex-col items-center ${
                     isFullscreen
-                      ? "p-0 bg-canvas flex flex-col items-center"
+                      ? "p-0 bg-canvas"
                       : "px-3 py-4 sm:px-8 sm:py-6"
                   }`}
                 >
                   <article
-                    className={`ns-paper mx-auto w-full transition-all duration-200 ${
+                    className={`ns-paper w-full transition-all duration-200 flex-1 flex flex-col ${
                       isFullscreen
-                        ? "max-w-5xl xl:max-w-6xl 2xl:max-w-7xl min-h-full px-6 py-10 sm:px-16 sm:py-14 md:px-24 md:py-16 rounded-none border-none bg-transparent shadow-none"
-                        : "max-w-[46rem] px-5 py-7 sm:px-12 sm:py-12"
+                        ? "max-w-5xl xl:max-w-6xl 2xl:max-w-7xl min-h-full px-6 py-10 sm:px-16 sm:py-14 md:px-24 md:py-16 rounded-none border-none shadow-none"
+                        : "max-w-[48rem] min-h-[calc(100vh-8rem)] px-5 py-7 sm:px-12 sm:py-12"
                     }`}
+                    data-fullscreen={isFullscreen ? "true" : undefined}
                     data-theme={note.theme}
                     data-typeface={note.typeface}
                     data-size={note.size}

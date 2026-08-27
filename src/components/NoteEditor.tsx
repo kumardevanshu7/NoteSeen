@@ -356,14 +356,14 @@ export function NoteEditor({ note }: { note: Note }) {
         </div>
 
         <div
-          className="mt-7 flex-1 min-h-[50vh] cursor-text"
+          className="mt-7 flex-1 min-h-[50vh] cursor-text flex flex-col"
           onClick={() => {
             if (editor && !editor.isFocused && canEdit) {
               editor.commands.focus("end");
             }
           }}
         >
-          <EditorContent editor={editor} className="min-h-full" />
+          <EditorContent editor={editor} className="flex-1 flex flex-col min-h-full" />
         </div>
 
         {editor && canEdit ? <SelectionMenu editor={editor} /> : null}
