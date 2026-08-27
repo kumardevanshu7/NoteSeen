@@ -446,31 +446,38 @@
 }
 
 /* ── Table styling ────────────────────────────────────────────────────── */
+.ns-editor .tiptap .tableWrapper {
+  overflow-x: auto;
+  margin: 1.25em 0;
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline);
+}
+
 .ns-editor .tiptap table {
   border-collapse: collapse;
   width: 100%;
-  margin: 1em 0;
+  margin: 0;
   table-layout: auto;
-  overflow: hidden;
-  border-radius: 6px;
-  border: 1px solid var(--hairline);
+  font-size: 0.9375em;
+  line-height: 1.5;
 }
 
 .ns-editor .tiptap table td,
 .ns-editor .tiptap table th {
   border: 1px solid var(--hairline);
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.85rem;
   vertical-align: top;
   position: relative;
-  min-width: 60px;
+  min-width: 80px;
   text-align: left;
 }
 
 .ns-editor .tiptap table th {
   background: color-mix(in oklab, var(--accent-ink) 8%, transparent);
   font-weight: 600;
-  font-size: 0.875em;
   letter-spacing: 0.01em;
+  color: var(--ink);
 }
 
 .ns-editor .tiptap table td {
@@ -483,6 +490,21 @@
 
 .ns-editor .tiptap table p {
   margin: 0;
+}
+
+.ns-editor .tiptap table th[align="center"],
+.ns-editor .tiptap table td[align="center"] {
+  text-align: center;
+}
+
+.ns-editor .tiptap table th[align="right"],
+.ns-editor .tiptap table td[align="right"] {
+  text-align: right;
+}
+
+.ns-editor .tiptap table th[align="left"],
+.ns-editor .tiptap table td[align="left"] {
+  text-align: left;
 }
 
 /* Selected cell highlight */

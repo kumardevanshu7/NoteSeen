@@ -1,3 +1,10 @@
+import { marked } from "marked";
+
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
+
 /**
  * Clean clipboard HTML (ChatGPT, Docs, Notion, browsers) into TipTap-safe markup.
  * Strips images/scripts/heavy styles that freeze or black out the editor.
@@ -93,6 +100,15 @@ function cleanAttributes(el: Element) {
   const tag = el.tagName;
   const allowed = new Set<string>();
   if (tag === "A") allowed.add("href");
+  if (tag === "TH" || tag === "TD") {
+    allowed.add("colspan");
+    allowed.add("rowspan");
+    allowed.add("colwidth");
+    allowed.add("align");
+  }
+  if (tag === "TABLE") {
+    allowed.add("border");
+  }
 
   for (const attr of [...el.attributes]) {
     if (!allowed.has(attr.name.toLowerCase())) el.removeAttribute(attr.name);
@@ -191,4 +207,54 @@ export function sanitizePastedHtml(rawHtml: string, plainFallback = ""): string 
 export function clipboardHasImageFile(data: DataTransfer | null | undefined): boolean {
   if (!data) return false;
   return Array.from(data.files ?? []).some((file) => file.type.startsWith("image/"));
+}
+
+/**
+ * Detect whether text is formatted as Markdown
+ * (e.g. copied from ChatGPT, Claude, Gemini, GitHub, code blocks, etc.)
+ */
+export function hasMarkdownTable(text: string): boolean {
+  return /\|[^\n\r]+\|[\r\n]+\s*\|[\s:\-|]+\|/.test(text);
+}
+
+/**
+ * Detect whether text is formatted as Markdown
+ * (e.g. copied from ChatGPT, Claude, Gemini, GitHub, code blocks, etc.)
+ */
+export function isMarkdownContent(text: string): boolean {
+  if (!text || text.length < 3) return false;
+
+  // Markdown tables: | col1 | col2 |\n| --- | --- |
+  if (hasMarkdownTable(text)) return true;
+
+  // Markdown headings: ### Title or # Title
+  if (/(?:^|\n)#{1,6}\s+\S+/.test(text)) return true;
+
+  // Markdown horizontal rule: --- or *** on its own line
+  if (/(?:^|\n)(?:-{3,}|\*{3,}|_{3,})\s*(?:\n|$)/.test(text)) return true;
+
+  // Markdown code fence: ```lang ... ```
+  if (/```[\s\S]*?```/.test(text)) return true;
+
+  // Markdown blockquote: > Quote
+  if (/(?:^|\n)>\s+\S+/.test(text)) return true;
+
+  // Multiple markdown list items: - item \n - item or 1. item \n 2. item
+  if (/(?:^|\n)\s*(?:[-*+]|\d+\.)\s+\S+[\r\n]+\s*(?:[-*+]|\d+\.)\s+\S+/.test(text)) return true;
+
+  return false;
+}
+
+/**
+ * Parses markdown text into sanitized, TipTap-safe HTML.
+ */
+export function parseMarkdownToHtml(markdown: string): string {
+  try {
+    const raw = marked.parse(markdown);
+    const html = typeof raw === "string" ? raw : "";
+    return sanitizePastedHtml(html);
+  } catch (err) {
+    console.error("NoteSeen: markdown parse failed", err);
+    return "";
+  }
 }

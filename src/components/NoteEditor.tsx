@@ -22,7 +22,13 @@ import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
 import { imageFilesFromData, insertPastedImages } from "@/lib/note-images";
-import { clipboardHasImageFile, sanitizePastedHtml } from "@/lib/paste-html";
+import {
+  clipboardHasImageFile,
+  hasMarkdownTable,
+  isMarkdownContent,
+  parseMarkdownToHtml,
+  sanitizePastedHtml,
+} from "@/lib/paste-html";
 import { useEditorStore } from "@/store/editor";
 import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
@@ -170,17 +176,29 @@ export function NoteEditor({ note }: { note: Note }) {
           return true;
         }
 
-        if (!html.trim()) return false;
+        const hasTable = hasMarkdownTable(text);
+        const hasHtmlTable = /<table\b/i.test(html);
+        const hasRichHtmlStructure = /<(?:table|h[1-6]|ul|ol|blockquote|hr)\b/i.test(html);
+        const isMarkdown = isMarkdownContent(text);
 
-        event.preventDefault();
-        const clean = sanitizePastedHtml(html, text);
-        if (!clean.trim()) {
-          toast("Nothing usable in that paste", {
-            description: "Try Ctrl+Shift+V for plain text.",
-          });
-          return true;
+        let clean = "";
+
+        // If text has a markdown table but HTML doesn't have a real <table>,
+        // or if text has markdown structures (headings, lists, hr) and HTML lacks rich tags,
+        // parse the markdown into proper TipTap HTML so tables and headings render formatted!
+        if (hasTable && !hasHtmlTable) {
+          clean = parseMarkdownToHtml(text);
+        } else if (isMarkdown && !hasRichHtmlStructure) {
+          clean = parseMarkdownToHtml(text);
+        } else if (html.trim()) {
+          clean = sanitizePastedHtml(html, text);
+        } else if (isMarkdown) {
+          clean = parseMarkdownToHtml(text);
         }
 
+        if (!clean.trim()) return false;
+
+        event.preventDefault();
         const ed = editorRef.current;
         if (!ed) return true;
 
