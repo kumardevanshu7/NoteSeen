@@ -1096,6 +1096,8 @@ body.ns-is-resizing * {
   border-bottom: none;
   color: var(--slate);
   box-shadow: inset 0 1px 0 color-mix(in oklab, var(--ink) 6%, transparent);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .ns-note-tab:hover {
@@ -1119,6 +1121,32 @@ body.ns-is-resizing * {
   left: 0;
   height: 2px;
   background: var(--tab-active);
+}
+
+.ns-note-tab.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+  border-style: dashed;
+}
+
+.ns-note-tab-indicator {
+  position: absolute;
+  top: 2px;
+  bottom: 0;
+  width: 3px;
+  background: var(--focus-blue);
+  border-radius: 9999px;
+  z-index: 30;
+  box-shadow: 0 0 8px var(--focus-blue);
+  pointer-events: none;
+}
+
+.ns-note-tab-indicator.is-left {
+  left: -2px;
+}
+
+.ns-note-tab-indicator.is-right {
+  right: -2px;
 }
 
 .ns-masonry {

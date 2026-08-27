@@ -173,6 +173,7 @@ interface NotesState {
   closeTab: (id: string) => void;
   closeOtherTabs: (id: string) => void;
   closeTabsToRight: (id: string) => void;
+  reorderTab: (sourceId: string, targetId: string, position?: "before" | "after") => void;
   setView: (view: View) => void;
   setQuery: (query: string) => void;
   togglePin: (id: string) => void;
@@ -672,6 +673,25 @@ export const useNotes = create<NotesState>((set, get) => {
       });
       void setMeta(TABS_KEY, nextTabs);
       if (nextActive !== get().activeId) void setMeta(ACTIVE_KEY, nextActive);
+    },
+
+    reorderTab(sourceId, targetId, position = "before") {
+      if (sourceId === targetId) return;
+      const { openTabs } = get();
+      const fromIndex = openTabs.indexOf(sourceId);
+      const toIndex = openTabs.indexOf(targetId);
+      if (fromIndex === -1 || toIndex === -1) return;
+
+      const nextTabs = [...openTabs];
+      nextTabs.splice(fromIndex, 1);
+
+      const targetNewIndex = nextTabs.indexOf(targetId);
+      const insertIndex = position === "after" ? targetNewIndex + 1 : targetNewIndex;
+
+      nextTabs.splice(insertIndex, 0, sourceId);
+
+      set({ openTabs: nextTabs });
+      void setMeta(TABS_KEY, nextTabs);
     },
 
     setView(view) {
