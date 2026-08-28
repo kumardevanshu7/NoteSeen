@@ -10,8 +10,8 @@ export interface SyncAdapter {
   /** One-shot pull before live subscribe (avoids push-over-remote race). */
   pullNotes?(): Promise<Note[]>;
   pullWorkspaces?(): Promise<Workspace[]>;
-  pushNotes(notes: Note[]): Promise<void>;
-  pushWorkspaces?(workspaces: Workspace[]): Promise<void>;
+  pushNotes(notes: Note[], immediate?: boolean): Promise<void>;
+  pushWorkspaces?(workspaces: Workspace[], immediate?: boolean): Promise<void>;
   removeNotes(ids: string[]): Promise<void>;
   removeWorkspaces?(ids: string[]): Promise<void>;
   subscribe(onRemoteNotes: (notes: Note[]) => void): () => void;

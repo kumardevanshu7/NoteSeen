@@ -947,7 +947,7 @@ export const useNotes = create<NotesState>((set, get) => {
         try {
           await saveWorkspaces(workspacePayload);
           if (get().cloudUserId && workspacePayload.length > 0) {
-            void syncAdapter().pushWorkspaces?.(workspacePayload);
+            void syncAdapter().pushWorkspaces?.(workspacePayload, toDisk);
           }
         } catch (error) {
           for (const id of workspaceIds) dirtyWorkspaces.add(id);
@@ -963,7 +963,8 @@ export const useNotes = create<NotesState>((set, get) => {
           clearSnapshot();
           set({ status: "saved", lastSavedAt: Date.now() });
           if (get().cloudUserId && payload.length > 0) {
-            void syncAdapter().pushNotes(payload);
+            void syncAdapter().pushNotes(payload, toDisk);
+            if (toDisk) void syncAdapter().flushCloud?.();
           }
         } catch (error) {
           for (const id of noteIds) dirtyNotes.add(id);
@@ -1242,7 +1243,10 @@ export const useNotes = create<NotesState>((set, get) => {
  * legitimate way to save.
  */
 export function registerLifecycleFlush(): () => void {
-  const flush = () => void useNotes.getState().flush({ toDisk: true });
+  const flush = () => {
+    void useNotes.getState().flush({ toDisk: true });
+    void syncAdapter().flushCloud?.();
+  };
 
   const onVisibility = () => {
     if (document.visibilityState === "hidden") flush();

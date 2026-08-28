@@ -13,7 +13,7 @@ import { normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { type SyncAdapter } from "./adapter";
 
 /** Fast enough to feel instant; still batches rapid keystrokes. */
-const CLOUD_PUSH_DEBOUNCE_MS = 450;
+const CLOUD_PUSH_DEBOUNCE_MS = 100;
 
 type NoteDoc = Omit<Note, "fileName"> & { fileName?: string | null };
 
@@ -137,9 +137,15 @@ export function createFirestoreAdapter(): SyncAdapter {
     }, CLOUD_PUSH_DEBOUNCE_MS);
   }
 
-  function scheduleWorkspacePush(workspaces: Workspace[]) {
+  function scheduleWorkspacePush(workspaces: Workspace[], immediate = false) {
     for (const ws of workspaces) pendingWorkspaces.set(ws.id, ws);
     if (workspacePushTimer) clearTimeout(workspacePushTimer);
+    if (immediate) {
+      void flushPendingWorkspaces().catch((error) => {
+        console.error("NoteSeen: Firestore workspace push failed", error);
+      });
+      return;
+    }
     workspacePushTimer = setTimeout(() => {
       void flushPendingWorkspaces().catch((error) => {
         console.error("NoteSeen: Firestore workspace push failed", error);
@@ -190,9 +196,9 @@ export function createFirestoreAdapter(): SyncAdapter {
       return readAllWorkspaces(uid);
     },
 
-    async pushWorkspaces(workspaces) {
+    async pushWorkspaces(workspaces, immediate = false) {
       if (!getFirebaseAuth().currentUser) return;
-      scheduleWorkspacePush(workspaces);
+      scheduleWorkspacePush(workspaces, immediate);
     },
 
     async removeWorkspaces(ids) {
@@ -213,9 +219,9 @@ export function createFirestoreAdapter(): SyncAdapter {
       return readAllNotes(uid);
     },
 
-    async pushNotes(notes) {
+    async pushNotes(notes, immediate = false) {
       if (!getFirebaseAuth().currentUser) return;
-      const urgent = notes.some((note) => note.deletedAt != null);
+      const urgent = immediate || notes.some((note) => note.deletedAt != null);
       schedulePush(notes, urgent);
     },
 

@@ -26,6 +26,7 @@ interface AuthState {
   signOut: () => Promise<void>;
   saveProfile: (input: Omit<UserProfile, "onboardedAt">) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
+  syncNow: (notify?: boolean) => Promise<boolean>;
 }
 
 let stopSync: (() => void) | null = null;
@@ -98,6 +99,9 @@ async function startCloudSync(user: User) {
     stopSync = adapter.subscribe((remoteNotes) => {
       useNotes.getState().mergeRemoteNotes(remoteNotes);
     });
+
+    stopFocusSync?.();
+    stopFocusSync = registerFocusSync();
   } catch (error) {
     console.error("NoteSeen: could not start cloud sync", error);
     toast.error("Could not connect to Firestore", {
@@ -106,7 +110,91 @@ async function startCloudSync(user: User) {
   }
 }
 
+let stopFocusSync: (() => void) | null = null;
+
+export async function syncNow(notify = false): Promise<boolean> {
+  const adapter = syncAdapter();
+  if (adapter.id === "local-only") return false;
+  const user = getFirebaseAuth().currentUser;
+  if (!user) return false;
+
+  useAuth.setState({ syncing: true });
+  try {
+    // 1. Commit and flush any local pending notes/workspaces to cloud immediately
+    await useNotes.getState().flush({ toDisk: true });
+    await adapter.flushCloud?.();
+
+    // 2. Pull latest remote updates
+    const [remoteWorkspaces, remoteNotes] = await Promise.all([
+      adapter.pullWorkspaces ? adapter.pullWorkspaces() : Promise.resolve([]),
+      adapter.pullNotes ? adapter.pullNotes() : Promise.resolve([]),
+    ]);
+
+    if (remoteWorkspaces.length > 0) {
+      useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
+    }
+    if (remoteNotes.length > 0) {
+      useNotes.getState().mergeRemoteNotes(remoteNotes);
+    }
+
+    if (notify) {
+      toast.success("Synced with cloud", { duration: 1500 });
+    }
+    return true;
+  } catch (error) {
+    console.error("NoteSeen: syncNow failed", error);
+    if (notify) {
+      toast.error("Sync failed", { description: "Check your internet connection." });
+    }
+    return false;
+  } finally {
+    useAuth.setState({ syncing: false });
+  }
+}
+
+export function registerFocusSync(): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  let lastPullTime = 0;
+  const pullIfActive = () => {
+    const now = Date.now();
+    // Throttle to max once every 2 seconds
+    if (now - lastPullTime < 2000) return;
+    lastPullTime = now;
+    void syncNow(false);
+  };
+
+  const onVisible = () => {
+    if (document.visibilityState === "visible") {
+      pullIfActive();
+    }
+  };
+
+  const onFocus = () => pullIfActive();
+  const onOnline = () => pullIfActive();
+
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("online", onOnline);
+
+  // Periodic heartbeat poll every 25 seconds while tab is active in foreground
+  const interval = setInterval(() => {
+    if (document.visibilityState === "visible") {
+      pullIfActive();
+    }
+  }, 25_000);
+
+  return () => {
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("online", onOnline);
+    clearInterval(interval);
+  };
+}
+
 function stopCloudSync() {
+  stopFocusSync?.();
+  stopFocusSync = null;
   stopSync?.();
   stopSync = null;
   stopWorkspaceSync?.();
@@ -229,5 +317,9 @@ export const useAuth = create<AuthState>((set, get) => ({
       console.error("NoteSeen: sign-out failed", error);
       toast.error("Could not sign out");
     }
+  },
+
+  async syncNow(notify = false) {
+    return syncNow(notify);
   },
 }));

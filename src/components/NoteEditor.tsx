@@ -33,6 +33,7 @@ import { useEditorStore } from "@/store/editor";
 import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
 import { requireVault, useVault } from "@/store/vault";
+import { syncAdapter } from "@/lib/sync/adapter";
 import type { Note } from "@/lib/types";
 import { countWords, formatClock, readingMinutes } from "@/lib/utils";
 import { SelectionMenu } from "./SelectionMenu";
@@ -78,6 +79,7 @@ export function NoteEditor({ note }: { note: Note }) {
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const editorRef = useRef<Editor | null>(null);
   const loadedIdRef = useRef<string | null>(null);
+  const lastHtmlRef = useRef(note.html);
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<{ id: string; html: string } | null>(null);
   noteIdRef.current = note.id;
@@ -91,10 +93,12 @@ export function NoteEditor({ note }: { note: Note }) {
     const edit = pending.current;
     pending.current = null;
     if (edit) {
+      lastHtmlRef.current = edit.html;
       patchNote(edit.id, { html: edit.html });
     } else if (editorRef.current && noteIdRef.current) {
       const currentHtml = editorRef.current.getHTML();
       if (currentHtml && currentHtml !== note.html) {
+        lastHtmlRef.current = currentHtml;
         patchNote(noteIdRef.current, { html: currentHtml });
       }
     }
@@ -234,6 +238,7 @@ export function NoteEditor({ note }: { note: Note }) {
         toast.error("Content too large", { description: "Paste in smaller chunks." });
         return;
       }
+      lastHtmlRef.current = html;
       pending.current = { id: noteIdRef.current, html };
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(commit, CONTENT_DEBOUNCE_MS);
@@ -255,28 +260,54 @@ export function NoteEditor({ note }: { note: Note }) {
 
   useEffect(() => {
     if (!editor) return;
-    if (loadedIdRef.current === note.id) return;
-    commit();
-    loadedIdRef.current = note.id;
-    try {
-      editor.commands.setContent(note.html || "<p></p>", false);
-    } catch (error) {
-      console.error("NoteSeen: setContent failed", error);
-      editor.commands.setContent("<p></p>", false);
+
+    // Case 1: Switched to a different note tab
+    if (loadedIdRef.current !== note.id) {
+      commit();
+      loadedIdRef.current = note.id;
+      lastHtmlRef.current = note.html;
+      try {
+        editor.commands.setContent(note.html || "<p></p>", false);
+      } catch (error) {
+        console.error("NoteSeen: setContent failed", error);
+        editor.commands.setContent("<p></p>", false);
+      }
+      if (!note.title && !note.text && canEdit) {
+        editor.commands.focus("end");
+      }
+      return;
     }
-    if (!note.title && !note.text && canEdit) {
-      editor.commands.focus("end");
+
+    // Case 2: Same note, but remote sync updated note.html from cloud!
+    if (note.html !== lastHtmlRef.current) {
+      const currentEditorHtml = editor.getHTML();
+      // If remote HTML differs from editor's current DOM
+      if (note.html !== currentEditorHtml) {
+        // If user on THIS device is not currently typing in the editor, update immediately!
+        if (!editor.isFocused) {
+          lastHtmlRef.current = note.html;
+          try {
+            editor.commands.setContent(note.html || "<p></p>", false);
+          } catch (error) {
+            console.error("NoteSeen: remote sync setContent failed", error);
+          }
+        }
+      }
     }
   }, [editor, note.id, note.html, note.title, note.text, commit, canEdit]);
 
   useEffect(() => {
-    const onHide = () => commit();
+    const onHide = () => {
+      commit();
+      void useNotes.getState().flush({ toDisk: true });
+      void syncAdapter().flushCloud?.();
+    };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", onHide);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", onHide);
-      commit();
+      onHide();
     };
   }, [commit]);
 

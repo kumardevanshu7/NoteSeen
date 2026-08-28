@@ -19,6 +19,7 @@ import {
   Plus,
   Printer,
   Redo2,
+  RefreshCw,
   Save,
   Search,
   Sun,
@@ -56,6 +57,7 @@ import { Wordmark } from "./Logo";
 import { AuthButton } from "./AuthButton";
 import { copyNoteToClipboard } from "./CopyButton";
 import { UnlockTimerBadge } from "./UnlockTimerBadge";
+import { syncNow, useAuth } from "@/store/auth";
 
 interface TopBarProps {
   note: Note | null;
@@ -81,6 +83,8 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles, onOpenUnlo
   const { appearance, setAppearance, toggle, isDark } = useAppearance();
   const { canInstall, installed, install } = useInstallPrompt();
   const [chooserOpen, setChooserOpen] = useState(false);
+  const user = useAuth((state) => state.user);
+  const syncing = useAuth((state) => state.syncing);
 
   const mod = modKeyLabel();
 
@@ -283,6 +287,12 @@ export function TopBar({ note, onOpenNav, onOpenPalette, onOpenFiles, onOpenUnlo
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel>App</DropdownMenuLabel>
+          {user ? (
+            <DropdownMenuItem onSelect={() => void syncNow(true)}>
+              <RefreshCw className={syncing ? "animate-spin" : ""} />
+              <span>{syncing ? "Syncing with cloud…" : "Sync with cloud now"}</span>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem onSelect={toggleFullscreen}>
             {isFullscreen ? <Minimize2 /> : <Maximize2 />}
             {isFullscreen ? "Exit full screen" : "Full screen window"}

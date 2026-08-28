@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,12 +10,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PROFESSIONS } from "@/lib/profile";
-import { useAuth } from "@/store/auth";
+import { syncNow, useAuth } from "@/store/auth";
 
 export function AuthButton() {
   const ready = useAuth((state) => state.ready);
   const user = useAuth((state) => state.user);
   const profile = useAuth((state) => state.profile);
+  const syncing = useAuth((state) => state.syncing);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
   const signOut = useAuth((state) => state.signOut);
 
@@ -88,6 +89,10 @@ export function AuthButton() {
           ) : null}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void syncNow(true)}>
+          <RefreshCw className={syncing ? "animate-spin" : ""} />
+          <span>{syncing ? "Syncing…" : "Sync now"}</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void signOut()}>
           <LogOut />
           Sign out
