@@ -367,14 +367,14 @@ export function AppShell() {
                   className={`ns-scroll min-h-0 flex-1 overflow-y-auto transition-all ${
                     isFullscreen
                       ? "p-0 bg-canvas"
-                      : "px-3 py-4 sm:px-8 sm:py-6"
+                      : "px-3 py-4 sm:px-6 sm:py-6 md:px-8"
                   }`}
                 >
                   <article
                     className={`ns-paper mx-auto w-full transition-all duration-200 ${
                       isFullscreen
                         ? "max-w-5xl xl:max-w-6xl 2xl:max-w-7xl px-6 py-10 sm:px-16 sm:py-14 md:px-24 md:py-16 rounded-none border-none shadow-none"
-                        : "max-w-[48rem] px-5 py-7 sm:px-12 sm:py-12"
+                        : "max-w-4xl lg:max-w-5xl xl:max-w-[64rem] 2xl:max-w-[72rem] px-5 py-7 sm:px-12 sm:py-10 md:px-16 md:py-12"
                     }`}
                     data-fullscreen={isFullscreen ? "true" : undefined}
                     data-theme={note.theme}

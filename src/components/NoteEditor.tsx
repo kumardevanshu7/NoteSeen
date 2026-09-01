@@ -36,7 +36,9 @@ import { requireVault, useVault } from "@/store/vault";
 import { syncAdapter } from "@/lib/sync/adapter";
 import type { Note } from "@/lib/types";
 import { countWords, formatClock, readingMinutes } from "@/lib/utils";
+import { createSlashCommandsExtension } from "@/lib/slash-commands";
 import { SelectionMenu } from "./SelectionMenu";
+import { SlashCommandMenu } from "./SlashCommandMenu";
 
 const CONTENT_DEBOUNCE_MS = 320;
 const MAX_NOTE_HTML = 15_000_000;
@@ -126,7 +128,8 @@ export function NoteEditor({ note }: { note: Note }) {
       TableRow,
       TableHeader,
       TableCell,
-      Placeholder.configure({ placeholder: "Start typing. It saves itself." }),
+      createSlashCommandsExtension(() => noteIdRef.current),
+      Placeholder.configure({ placeholder: "Type '/' for commands, or start typing…" }),
       CharacterCount,
     ],
     [],
@@ -424,6 +427,7 @@ export function NoteEditor({ note }: { note: Note }) {
         </div>
 
         {editor && canEdit ? <SelectionMenu editor={editor} /> : null}
+        {editor && canEdit ? <SlashCommandMenu /> : null}
       </div>
     </EditorErrorBoundary>
   );
