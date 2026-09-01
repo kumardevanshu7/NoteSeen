@@ -356,21 +356,21 @@ export function ArchiveView() {
             ))}
           </ul>
         ) : (
-          <ul className="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
+          <ul className="mt-6 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4 w-full min-w-0">
             {visible.map((note) => {
               const theme = NOTE_THEMES.find((option) => option.id === note.theme) ?? NOTE_THEMES[0];
               const isSel = Boolean(selected[note.id]);
 
               return (
-                <li key={note.id}>
+                <li key={note.id} className="min-w-0 w-full">
                   <div
                     className={cn(
-                      "group flex min-h-[14rem] flex-col justify-between overflow-hidden rounded-xl border p-4 sm:p-5 transition-all hover:-translate-y-0.5 shadow-xs",
+                      "group flex min-h-[14rem] w-full min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-4 sm:p-5 transition-all hover:-translate-y-0.5 shadow-xs",
                       isSel && "ring-2 ring-primary ring-offset-2 ring-offset-canvas",
                     )}
                     style={{ background: theme.wash, borderColor: theme.line }}
                   >
-                    <div>
+                    <div className="min-w-0 w-full">
                       <div className="mb-2.5 flex items-center justify-between gap-2">
                         <button
                           type="button"
@@ -394,12 +394,12 @@ export function ArchiveView() {
                       <button
                         type="button"
                         onClick={() => setActive(note.id)}
-                        className="w-full text-left focus:outline-none"
+                        className="w-full min-w-0 text-left focus:outline-none cursor-pointer"
                       >
-                        <span className="line-clamp-2 block text-[15px] sm:text-[16px] font-semibold text-ink leading-snug">
+                        <span className="line-clamp-2 block break-words [overflow-wrap:anywhere] text-[15px] sm:text-[16px] font-semibold text-ink leading-snug">
                           {noteLabel(note)}
                         </span>
-                        <span className="ns-caption mt-2 line-clamp-3 block text-xs sm:text-[13px] text-body-muted leading-relaxed">
+                        <span className="ns-caption mt-2 line-clamp-3 block break-words [overflow-wrap:anywhere] text-xs sm:text-[13px] text-body-muted leading-relaxed">
                           {excerpt(note.text, 140) || "Empty note"}
                         </span>
                       </button>

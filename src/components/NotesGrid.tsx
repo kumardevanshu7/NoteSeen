@@ -492,10 +492,10 @@ function NoteCard({
   const theme = NOTE_THEMES.find((option) => option.id === note.theme) ?? NOTE_THEMES[0];
 
   return (
-    <li>
+    <li className="min-w-0 w-full">
       <div
         className={cn(
-          "group flex flex-col overflow-hidden rounded-sm border transition-transform hover:-translate-y-0.5",
+          "group flex flex-col overflow-hidden rounded-sm border transition-transform hover:-translate-y-0.5 min-w-0 w-full",
           compact ? "h-44 p-3" : "h-56 p-4",
           selected && "ring-2 ring-primary ring-offset-2 ring-offset-canvas",
         )}
@@ -532,10 +532,10 @@ function NoteCard({
           </span>
         </div>
 
-        <button type="button" onClick={onOpen} className="min-h-0 flex-1 overflow-hidden text-left">
+        <button type="button" onClick={onOpen} className="min-h-0 w-full flex-1 overflow-hidden text-left">
           <span
             className={cn(
-              "line-clamp-2 block font-medium text-ink",
+              "line-clamp-2 block break-words [overflow-wrap:anywhere] font-medium text-ink",
               compact ? "text-[13.5px]" : "text-[15px]",
             )}
           >
@@ -543,7 +543,7 @@ function NoteCard({
           </span>
           <span
             className={cn(
-              "ns-caption mt-2 block text-body-muted",
+              "ns-caption mt-2 block break-words [overflow-wrap:anywhere] text-body-muted",
               compact ? "line-clamp-2" : note.tags.length > 0 ? "line-clamp-2" : "line-clamp-3",
             )}
           >

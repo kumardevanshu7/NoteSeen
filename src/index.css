@@ -591,6 +591,90 @@
   overflow-x: auto;
 }
 
+/* Custom Notion-style Code Block with Header & Copy Button */
+.ns-code-block-container {
+  position: relative;
+  margin: 1.4rem 0;
+  border-radius: var(--radius-md, 0.75rem);
+  border: 1px solid var(--hairline);
+  background: color-mix(in oklab, var(--stone) 82%, var(--surface));
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ns-code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.35rem 0.85rem;
+  background: color-mix(in oklab, var(--stone) 95%, var(--ink));
+  border-bottom: 1px solid var(--hairline);
+  user-select: none;
+}
+
+.ns-code-block-lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ns-code-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--body-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 150ms ease;
+  cursor: pointer;
+}
+
+.ns-code-copy-btn:hover {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--hairline);
+}
+
+.ns-code-copy-btn:active {
+  transform: scale(0.96);
+}
+
+.ns-code-copy-btn.is-copied {
+  color: #10b981;
+  background: color-mix(in oklab, #10b981 12%, transparent);
+  border-color: color-mix(in oklab, #10b981 25%, transparent);
+}
+
+.ns-editor .tiptap .ns-code-pre,
+.ns-code-pre {
+  margin: 0 !important;
+  padding: 14px 16px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.ns-editor .tiptap .ns-code-pre code,
+.ns-code-pre code {
+  background: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--ink);
+}
+
 .ns-editor .tiptap code {
   font-family: var(--font-mono);
   font-size: 0.88em;

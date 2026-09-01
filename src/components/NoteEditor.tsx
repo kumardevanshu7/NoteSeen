@@ -39,6 +39,7 @@ import type { Note } from "@/lib/types";
 import { countWords, formatClock, readingMinutes, cn } from "@/lib/utils";
 import { createSlashCommandsExtension } from "@/lib/slash-commands";
 import { CustomInputRules } from "@/lib/custom-input-rules";
+import { CodeBlockWithCopy } from "@/lib/code-block-extension";
 import { SelectionMenu } from "./SelectionMenu";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { TableControls } from "./TableControls";
@@ -125,9 +126,11 @@ export function NoteEditor({ note }: { note: Note }) {
   const extensions = useMemo(
     () => [
       StarterKit.configure({
+        codeBlock: false,
         heading: { levels: [1, 2, 3] },
         dropcursor: { color: "var(--focus-blue)", width: 2 },
       }),
+      CodeBlockWithCopy,
       Underline,
       Highlight,
       TextAlign.configure({ types: ["heading", "paragraph"] }),

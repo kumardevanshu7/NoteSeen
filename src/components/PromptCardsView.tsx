@@ -208,9 +208,9 @@ export function PromptCardsView() {
                     </div>
                   )}
                   <span className="block px-3 py-3">
-                    <span className="block text-[14px] font-medium text-ink">{noteLabel(card)}</span>
+                    <span className="block break-words [overflow-wrap:anywhere] text-[14px] font-medium text-ink">{noteLabel(card)}</span>
                     {card.subtitle.trim() ? (
-                      <span className="ns-caption mt-1 block text-body-muted">{card.subtitle.trim()}</span>
+                      <span className="ns-caption mt-1 block break-words [overflow-wrap:anywhere] text-body-muted">{card.subtitle.trim()}</span>
                     ) : null}
                     {card.workspaceId !== activeWorkspaceId ? (
                       <span className="ns-caption mt-1 block text-muted">

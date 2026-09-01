@@ -12,7 +12,7 @@ import {
   searchNotes,
   suggestionTheme,
 } from "@/lib/selectors";
-import { excerpt } from "@/lib/utils";
+import { excerpt, formatRelative } from "@/lib/utils";
 
 export function SuggestionsView() {
   const notes = useNotes((state) => state.notes);
@@ -28,18 +28,18 @@ export function SuggestionsView() {
   const visible = useMemo(() => searchNotes(quiet, query), [quiet, query]);
 
   return (
-    <div className="ns-scroll min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
-      <div className="mx-auto max-w-5xl">
+    <div className="ns-scroll min-h-0 w-full max-w-full flex-1 overflow-x-hidden overflow-y-auto px-3.5 py-5 sm:px-8 sm:py-8 lg:px-10">
+      <div className="mx-auto w-full min-w-0 max-w-5xl">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 border-b border-hairline/60 pb-5 sm:pb-6">
-          <div>
-            <p className="ns-mono text-[11px] font-semibold uppercase tracking-wider text-muted">Home</p>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink mt-1">Suggestions</h1>
-            <p className="ns-caption mt-1.5 max-w-xl text-xs sm:text-sm text-body-muted leading-relaxed">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 border-b border-hairline/60 pb-4 sm:pb-6">
+          <div className="min-w-0">
+            <p className="ns-mono text-[10.5px] font-semibold uppercase tracking-wider text-muted">Home</p>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink mt-0.5 sm:mt-1">Suggestions</h1>
+            <p className="ns-caption mt-1 max-w-xl text-xs sm:text-sm text-body-muted leading-relaxed">
               Notes and prompts untouched for a week or more. Each gets a distinct color accent so quiet items stand out.
             </p>
           </div>
-          <span className="ns-mono self-start sm:self-auto inline-flex items-center rounded-full border border-hairline/80 bg-stone/60 px-3 py-1 text-xs text-muted">
+          <span className="ns-mono shrink-0 self-start sm:self-auto inline-flex items-center rounded-full border border-hairline/80 bg-stone/60 px-3 py-1 text-xs text-muted">
             {visible.length} quiet {visible.length === 1 ? "item" : "items"}
           </span>
         </div>
@@ -70,18 +70,18 @@ export function SuggestionsView() {
             ) : null}
           </div>
         ) : (
-          <ul className="mt-6 sm:mt-8 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
+          <ul className="mt-5 sm:mt-8 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4 w-full min-w-0">
             {visible.map((note) => {
               const themeId = suggestionTheme(note);
               const theme = NOTE_THEMES.find((option) => option.id === themeId) ?? NOTE_THEMES[1];
               const days = quietDays(note);
               return (
-                <li key={note.id}>
+                <li key={note.id} className="min-w-0 w-full">
                   <div
-                    className="group flex min-h-[13.5rem] sm:min-h-[14rem] flex-col justify-between overflow-hidden rounded-xl border p-4 sm:p-5 transition-all hover:-translate-y-0.5 active:scale-[0.99] shadow-xs"
+                    className="group flex min-h-[12.5rem] sm:min-h-[14rem] w-full min-w-0 flex-col justify-between overflow-hidden rounded-xl border p-4 sm:p-5 transition-all hover:-translate-y-0.5 active:scale-[0.99] shadow-xs"
                     style={{ background: theme.wash, borderColor: theme.line }}
                   >
-                    <div>
+                    <div className="min-w-0 w-full">
                       <div className="mb-2.5 flex items-center justify-between gap-2">
                         <span className="ns-mono flex items-center gap-1.5 text-xs text-muted">
                           {note.kind === "prompt" ? (
@@ -105,12 +105,12 @@ export function SuggestionsView() {
                       <button
                         type="button"
                         onClick={() => setActive(note.id)}
-                        className="w-full text-left focus:outline-none"
+                        className="w-full min-w-0 text-left focus:outline-none cursor-pointer"
                       >
-                        <span className="line-clamp-2 block text-[15px] sm:text-[16px] font-semibold text-ink leading-snug">
+                        <span className="block break-words [overflow-wrap:anywhere] line-clamp-2 text-[15px] sm:text-[16px] font-semibold text-ink leading-snug">
                           {noteLabel(note)}
                         </span>
-                        <span className="ns-caption mt-2 line-clamp-3 block text-xs sm:text-[13px] text-body-muted leading-relaxed">
+                        <span className="ns-caption mt-2 block break-words [overflow-wrap:anywhere] line-clamp-3 text-xs sm:text-[13px] text-body-muted leading-relaxed">
                           {excerpt(note.text, 140) ||
                             (note.kind === "prompt" ? "Empty prompt" : "Empty note")}
                         </span>
@@ -118,11 +118,16 @@ export function SuggestionsView() {
                     </div>
 
                     <div className="mt-4 flex items-center justify-between gap-2 border-t border-hairline/40 pt-3">
-                      <CopyButton note={note} size="icon-sm" />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <CopyButton note={note} size="icon-sm" />
+                        <span className="ns-mono truncate text-[11px] text-muted">
+                          {formatRelative(note.updatedAt)}
+                        </span>
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 rounded-lg px-3 text-xs font-medium"
+                        className="h-8 shrink-0 rounded-lg px-3 text-xs font-medium"
                         onClick={() => setActive(note.id)}
                       >
                         Open
