@@ -308,9 +308,23 @@ export function createSlashCommandsExtension(getNoteId?: () => string) {
           items: ({ query }: { query: string }) => {
             return filterSlashCommands(query);
           },
+          command: ({
+            editor,
+            range,
+            props,
+          }: {
+            editor: Editor;
+            range: Range;
+            props: SlashCommandItem;
+          }) => {
+            props.command({ editor, range, noteId: getNoteId?.() });
+          },
           render: () => {
+            let suggestionCommand: ((item: SlashCommandItem) => void) | null = null;
+
             return {
               onStart: (props: SuggestionProps<SlashCommandItem>) => {
+                suggestionCommand = props.command;
                 const items = filterSlashCommands(props.query);
                 const rect = props.clientRect ? props.clientRect() : null;
                 updateSlashMenuState({
@@ -328,6 +342,7 @@ export function createSlashCommandsExtension(getNoteId?: () => string) {
               },
 
               onUpdate: (props: SuggestionProps<SlashCommandItem>) => {
+                suggestionCommand = props.command;
                 const items = filterSlashCommands(props.query);
                 const rect = props.clientRect ? props.clientRect() : null;
                 updateSlashMenuState({
@@ -367,11 +382,15 @@ export function createSlashCommandsExtension(getNoteId?: () => string) {
                 }
 
                 if (props.event.key === "Enter" || props.event.key === "Tab") {
-                  const { items, selectedIndex, command } = currentMenuState;
+                  const { items, selectedIndex } = currentMenuState;
                   if (items.length > 0 && selectedIndex >= 0 && selectedIndex < items.length) {
                     const item = items[selectedIndex];
-                    if (item && command) {
-                      command(item);
+                    if (item) {
+                      if (suggestionCommand) {
+                        suggestionCommand(item);
+                      } else if (currentMenuState.command) {
+                        currentMenuState.command(item);
+                      }
                       updateSlashMenuState({ isOpen: false });
                       return true;
                     }
@@ -382,6 +401,7 @@ export function createSlashCommandsExtension(getNoteId?: () => string) {
               },
 
               onExit: () => {
+                suggestionCommand = null;
                 updateSlashMenuState({ isOpen: false, rect: null, command: null });
               },
             };

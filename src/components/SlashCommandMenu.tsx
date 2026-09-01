@@ -152,6 +152,9 @@ export function SlashCommandMenu() {
                       }}
                       type="button"
                       onMouseEnter={() => updateSlashMenuState({ selectedIndex: globalIndex })}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                      }}
                       onClick={() => {
                         if (state.command) {
                           state.command(item);
