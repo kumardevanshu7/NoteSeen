@@ -14,13 +14,14 @@ import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
-import { Lock, Maximize2, Minimize2 } from "lucide-react";
+import { Archive, CheckCircle2, Lock, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
+import { ArchivePromptDialog } from "@/components/ArchivePromptDialog";
 import { imageFilesFromData, insertPastedImages } from "@/lib/note-images";
 import {
   clipboardHasImageFile,
@@ -35,7 +36,7 @@ import { useNotes } from "@/store/notes";
 import { requireVault, useVault } from "@/store/vault";
 import { syncAdapter } from "@/lib/sync/adapter";
 import type { Note } from "@/lib/types";
-import { countWords, formatClock, readingMinutes } from "@/lib/utils";
+import { countWords, formatClock, readingMinutes, cn } from "@/lib/utils";
 import { createSlashCommandsExtension } from "@/lib/slash-commands";
 import { CustomInputRules } from "@/lib/custom-input-rules";
 import { SelectionMenu } from "./SelectionMenu";
@@ -51,10 +52,14 @@ function isEmptyNote(note: Note): boolean {
 
 export function NoteEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
+  const archiveNotes = useNotes((state) => state.archiveNotes);
+  const unarchiveNotes = useNotes((state) => state.unarchiveNotes);
+  const toggleComplete = useNotes((state) => state.toggleComplete);
   const setEditor = useEditorStore((state) => state.setEditor);
   const isFullscreen = useFullscreen((state) => state.isFullscreen);
   const toggleFullscreen = useFullscreen((state) => state.toggleFullscreen);
   const [sessionUnlocked, setSessionUnlocked] = useState(false);
+  const [archivePromptOpen, setArchivePromptOpen] = useState(false);
   const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
   const isTimerUnlocked = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
 
@@ -76,6 +81,15 @@ export function NoteEditor({ note }: { note: Note }) {
   const unlockForEdit = async () => {
     const ok = await requireVault("edit");
     if (ok) setSessionUnlocked(true);
+  };
+
+  const handleToggleComplete = () => {
+    const next = toggleComplete(note.id);
+    if (next) {
+      setArchivePromptOpen(true);
+    } else {
+      toast.info("Marked note as incomplete");
+    }
   };
 
   const noteIdRef = useRef(note.id);
@@ -344,6 +358,20 @@ export function NoteEditor({ note }: { note: Note }) {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <CopyButton note={note} label="Copy note" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggleComplete}
+              className={cn(
+                "gap-1.5 text-xs font-medium transition-all",
+                note.completed
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20"
+                  : "text-muted hover:border-emerald-500/30 hover:text-emerald-600",
+              )}
+            >
+              <CheckCircle2 className={cn("size-3.5", note.completed ? "text-emerald-500" : "text-muted")} />
+              <span>{note.completed ? "100% Covered" : "100% Check"}</span>
+            </Button>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -371,6 +399,28 @@ export function NoteEditor({ note }: { note: Note }) {
             </Button>
           ) : null}
         </div>
+
+        {note.archived ? (
+          <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <div className="flex items-center gap-2">
+              <Archive className="size-4 shrink-0" />
+              <span>
+                This note is safely in your <strong>Archive Space</strong>.
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                unarchiveNotes([note.id]);
+                toast.success("Restored note to My Notes");
+              }}
+              className="h-7 text-xs"
+            >
+              Restore to Notes
+            </Button>
+          </div>
+        ) : null}
 
         <textarea
           ref={titleRef}
@@ -432,6 +482,27 @@ export function NoteEditor({ note }: { note: Note }) {
         {editor && canEdit ? <SelectionMenu editor={editor} /> : null}
         {editor && canEdit ? <SlashCommandMenu /> : null}
         {editor && canEdit ? <TableControls editor={editor} /> : null}
+
+        {archivePromptOpen ? (
+          <ArchivePromptDialog
+            open={archivePromptOpen}
+            onOpenChange={setArchivePromptOpen}
+            noteTitle={note.title || "Untitled note"}
+            onArchive={() => {
+              archiveNotes([note.id]);
+              toast.success("Moved to Archive Space", {
+                description: `"${note.title || "Untitled note"}" is now in your Archive Space.`,
+              });
+              setArchivePromptOpen(false);
+            }}
+            onKeep={() => {
+              toast.success("100% Checked", {
+                description: `"${note.title || "Untitled note"}" kept in My Notes.`,
+              });
+              setArchivePromptOpen(false);
+            }}
+          />
+        ) : null}
       </div>
     </EditorErrorBoundary>
   );

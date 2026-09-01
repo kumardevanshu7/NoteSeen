@@ -13,6 +13,7 @@ import { NoteEditor } from "./NoteEditor";
 import { NotesGrid } from "./NotesGrid";
 import { PromptCardsView } from "./PromptCardsView";
 import { SuggestionsView } from "./SuggestionsView";
+import { ArchiveView } from "./ArchiveView";
 import { LabelsView } from "./LabelsView";
 import { SecretVaultView } from "./SecretVaultView";
 import { NewItemDialog } from "./NewItemDialog";
@@ -355,6 +356,7 @@ export function AppShell() {
           {!isFullscreen ? <NoteTabs /> : null}
           {view === "suggestions" ? <SuggestionsView /> : null}
           {view === "all" ? <NotesGrid /> : null}
+          {view === "archive" ? <ArchiveView /> : null}
           {view === "cards" ? <PromptCardsView /> : null}
           {view === "labels" ? <LabelsView /> : null}
           {view === "secrets" ? <SecretVaultView /> : null}

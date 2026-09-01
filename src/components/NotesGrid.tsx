@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Archive,
   Check,
+  CheckCircle2,
   CheckSquare,
   Columns3,
   FileText,
@@ -12,6 +14,7 @@ import {
   Square,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +26,7 @@ import {
 import { CopyButton } from "@/components/CopyButton";
 import { MoveToWorkspaceMenu } from "@/components/MoveToWorkspaceMenu";
 import { NewItemDialog } from "@/components/NewItemDialog";
+import { ArchivePromptDialog } from "@/components/ArchivePromptDialog";
 import { useNotes } from "@/store/notes";
 import { NOTE_THEMES } from "@/lib/note-themes";
 import { liveNotes, noteLabel, notesForWorkspace, searchNotes } from "@/lib/selectors";
@@ -91,8 +95,11 @@ export function NotesGrid() {
   const createItem = useNotes((state) => state.createItem);
   const togglePin = useNotes((state) => state.togglePin);
   const trashNotes = useNotes((state) => state.trashNotes);
+  const archiveNotes = useNotes((state) => state.archiveNotes);
+  const toggleComplete = useNotes((state) => state.toggleComplete);
 
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [archivePromptNote, setArchivePromptNote] = useState<Note | null>(null);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [labelFilter, setLabelFilter] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<GridPrefs>(readPrefs);
@@ -174,6 +181,22 @@ export function NotesGrid() {
     createItem(kind);
   };
 
+  const handleToggleComplete = (note: Note) => {
+    const next = toggleComplete(note.id);
+    if (next) {
+      setArchivePromptNote(note);
+    } else {
+      toast.info("Marked note as incomplete");
+    }
+  };
+
+  const handleArchiveSingle = (note: Note) => {
+    archiveNotes([note.id]);
+    toast.success("Moved to Archive Space", {
+      description: `"${noteLabel(note)}" was archived.`,
+    });
+  };
+
   const heading =
     prefs.kind === "note" ? "My Notes" : prefs.kind === "prompt" ? "My Prompts" : "Everything";
 
@@ -197,19 +220,36 @@ export function NotesGrid() {
               </Button>
             ) : null}
             {selectedIds.length > 0 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-error"
-                onClick={() => {
-                  void trashNotes(selectedIds).then((ok) => {
-                    if (ok) setSelected({});
-                  });
-                }}
-              >
-                <Trash2 className="size-3.5" />
-                Delete ({selectedIds.length})
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-accent"
+                  onClick={() => {
+                    const count = archiveNotes(selectedIds);
+                    if (count > 0) {
+                      setSelected({});
+                      toast.success(`Moved ${count} notes to Archive Space`);
+                    }
+                  }}
+                >
+                  <Archive className="size-3.5" />
+                  Archive ({selectedIds.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-error"
+                  onClick={() => {
+                    void trashNotes(selectedIds).then((ok) => {
+                      if (ok) setSelected({});
+                    });
+                  }}
+                >
+                  <Trash2 className="size-3.5" />
+                  Delete ({selectedIds.length})
+                </Button>
+              </>
             ) : null}
             <Button variant="primary" size="sm" className="gap-1.5 pl-3" onClick={() => setChooserOpen(true)}>
               <Plus className="size-3.5" />
@@ -365,6 +405,8 @@ export function NotesGrid() {
                 onToggleSelect={() => toggleOne(note.id)}
                 onOpen={() => setActive(note.id)}
                 onTogglePin={() => togglePin(note.id)}
+                onToggleComplete={() => handleToggleComplete(note)}
+                onArchive={() => handleArchiveSingle(note)}
                 onTrash={() => void trashNotes([note.id])}
               />
             ))}
@@ -383,6 +425,8 @@ export function NotesGrid() {
                 onToggleSelect={() => toggleOne(note.id)}
                 onOpen={() => setActive(note.id)}
                 onTogglePin={() => togglePin(note.id)}
+                onToggleComplete={() => handleToggleComplete(note)}
+                onArchive={() => handleArchiveSingle(note)}
                 onTrash={() => void trashNotes([note.id])}
               />
             ))}
@@ -396,6 +440,29 @@ export function NotesGrid() {
       </div>
 
       <NewItemDialog open={chooserOpen} onOpenChange={setChooserOpen} onChoose={onChoose} />
+
+      {archivePromptNote ? (
+        <ArchivePromptDialog
+          open={Boolean(archivePromptNote)}
+          onOpenChange={(open) => {
+            if (!open) setArchivePromptNote(null);
+          }}
+          noteTitle={noteLabel(archivePromptNote)}
+          onArchive={() => {
+            archiveNotes([archivePromptNote.id]);
+            toast.success("Moved to Archive Space", {
+              description: `"${noteLabel(archivePromptNote)}" is now in your Archive Space.`,
+            });
+            setArchivePromptNote(null);
+          }}
+          onKeep={() => {
+            toast.success("100% Checked", {
+              description: `"${noteLabel(archivePromptNote)}" marked as covered.`,
+            });
+            setArchivePromptNote(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -406,10 +473,22 @@ interface ItemProps {
   onToggleSelect: () => void;
   onOpen: () => void;
   onTogglePin: () => void;
+  onToggleComplete: () => void;
+  onArchive: () => void;
   onTrash: () => void;
 }
 
-function NoteCard({ note, compact, selected, onToggleSelect, onOpen, onTogglePin, onTrash }: ItemProps & { compact: boolean }) {
+function NoteCard({
+  note,
+  compact,
+  selected,
+  onToggleSelect,
+  onOpen,
+  onTogglePin,
+  onToggleComplete,
+  onArchive,
+  onTrash,
+}: ItemProps & { compact: boolean }) {
   const theme = NOTE_THEMES.find((option) => option.id === note.theme) ?? NOTE_THEMES[0];
 
   return (
@@ -423,14 +502,30 @@ function NoteCard({ note, compact, selected, onToggleSelect, onOpen, onTogglePin
         style={{ background: theme.wash, borderColor: theme.line }}
       >
         <div className="mb-2 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            aria-label={selected ? "Deselect" : "Select"}
-            onClick={onToggleSelect}
-            className="flex size-7 items-center justify-center rounded-xs text-slate hover:bg-surface/70"
-          >
-            {selected ? <CheckSquare className="size-4 text-ink" /> : <Square className="size-4" />}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label={selected ? "Deselect" : "Select"}
+              onClick={onToggleSelect}
+              className="flex size-7 items-center justify-center rounded-xs text-slate hover:bg-surface/70"
+            >
+              {selected ? <CheckSquare className="size-4 text-ink" /> : <Square className="size-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={onToggleComplete}
+              title={note.completed ? "100% Covered (click to uncheck)" : "Mark 100% Covered"}
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-all",
+                note.completed
+                  ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+                  : "text-muted hover:bg-stone/80 hover:text-emerald-500",
+              )}
+            >
+              <CheckCircle2 className={cn("size-3.5", note.completed ? "text-emerald-500" : "text-muted")} />
+              <span>100%</span>
+            </button>
+          </div>
           <span className="ns-mono flex items-center gap-1 text-muted">
             {note.kind === "prompt" ? <Sparkles className="size-3" /> : <FileText className="size-3" />}
             {compact ? null : note.kind}
@@ -473,6 +568,15 @@ function NoteCard({ note, compact, selected, onToggleSelect, onOpen, onTogglePin
           <div className="flex items-center justify-between gap-2">
             <span className="ns-mono shrink-0 text-muted">{formatRelative(note.updatedAt)}</span>
             <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label="Archive"
+                title="Move to Archive Space"
+                onClick={onArchive}
+                className="flex size-7 items-center justify-center rounded-full text-muted hover:text-accent"
+              >
+                <Archive className="size-3.5" />
+              </button>
               <CopyButton note={note} size="icon-sm" />
               <MoveToWorkspaceMenu noteId={note.id} currentWorkspaceId={note.workspaceId} />
               <button
@@ -502,7 +606,16 @@ function NoteCard({ note, compact, selected, onToggleSelect, onOpen, onTogglePin
   );
 }
 
-function NoteRow({ note, selected, onToggleSelect, onOpen, onTogglePin, onTrash }: ItemProps) {
+function NoteRow({
+  note,
+  selected,
+  onToggleSelect,
+  onOpen,
+  onTogglePin,
+  onToggleComplete,
+  onArchive,
+  onTrash,
+}: ItemProps) {
   return (
     <li
       className={cn(
@@ -517,6 +630,20 @@ function NoteRow({ note, selected, onToggleSelect, onOpen, onTogglePin, onTrash 
         className="flex size-7 shrink-0 items-center justify-center rounded-xs text-slate hover:bg-surface/70"
       >
         {selected ? <CheckSquare className="size-4 text-ink" /> : <Square className="size-4" />}
+      </button>
+
+      <button
+        type="button"
+        onClick={onToggleComplete}
+        title={note.completed ? "100% Covered (click to uncheck)" : "Mark 100% Covered"}
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-full transition-all",
+          note.completed
+            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/25"
+            : "text-muted hover:bg-stone/80 hover:text-emerald-500",
+        )}
+      >
+        <CheckCircle2 className={cn("size-4", note.completed ? "text-emerald-500" : "text-muted")} />
       </button>
 
       {note.kind === "prompt" ? (
@@ -550,6 +677,15 @@ function NoteRow({ note, selected, onToggleSelect, onOpen, onTogglePin, onTrash 
       </span>
 
       <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          aria-label="Archive"
+          title="Move to Archive Space"
+          onClick={onArchive}
+          className="flex size-7 items-center justify-center rounded-full text-muted hover:text-accent"
+        >
+          <Archive className="size-3.5" />
+        </button>
         <CopyButton note={note} size="icon-sm" />
         <button
           type="button"

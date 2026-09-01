@@ -23,7 +23,7 @@ export type Typeface =
   | "mono";
 export type TextSize = "s" | "m" | "l";
 export type LineSpacing = "tight" | "normal" | "relaxed";
-export type View = "editor" | "all" | "cards" | "suggestions" | "shared" | "trash" | "labels" | "secrets";
+export type View = "editor" | "all" | "cards" | "suggestions" | "shared" | "trash" | "labels" | "secrets" | "archive";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type NoteKind = "note" | "prompt" | "promptCard";
 export type SecretCategory = "api" | "password" | "other";
@@ -63,6 +63,14 @@ export interface Note {
   size: TextSize;
   spacing: LineSpacing;
   pinned: boolean;
+  /** Marked as 100% completed/covered. */
+  completed?: boolean;
+  /** Timestamp when the note was marked completed. */
+  completedAt?: number | null;
+  /** Archived notes are kept safe in the Archive space. */
+  archived?: boolean;
+  /** Timestamp when moved to archive. */
+  archivedAt?: number | null;
   createdAt: number;
   updatedAt: number;
   /** Last time the note was opened in the editor. Falls back to updatedAt. */
@@ -225,6 +233,10 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     size: raw.size ?? "m",
     spacing: raw.spacing ?? "normal",
     pinned: Boolean(raw.pinned),
+    completed: Boolean(raw.completed),
+    completedAt: typeof raw.completedAt === "number" ? raw.completedAt : null,
+    archived: Boolean(raw.archived),
+    archivedAt: typeof raw.archivedAt === "number" ? raw.archivedAt : null,
     createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
     updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
     openedAt:

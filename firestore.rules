@@ -119,7 +119,8 @@ service cloud.firestore {
       return d.keys().hasOnly([
           'id', 'kind', 'workspaceId', 'title', 'subtitle', 'tags', 'html', 'text', 'coverUrl',
           'theme', 'typeface', 'size', 'spacing',
-          'pinned', 'createdAt', 'updatedAt', 'openedAt', 'deletedAt', 'fileName'
+          'pinned', 'createdAt', 'updatedAt', 'openedAt', 'deletedAt', 'fileName',
+          'completed', 'completedAt', 'archived', 'archivedAt'
         ])
         && d.keys().hasAll([
           'id', 'kind', 'title', 'tags', 'html', 'text',
@@ -146,6 +147,10 @@ service cloud.firestore {
         && d.size in ['s', 'm', 'l']
         && d.spacing in ['tight', 'normal', 'relaxed']
         && d.pinned is bool
+        && (!d.keys().hasAny(['completed']) || d.completed is bool)
+        && (!d.keys().hasAny(['completedAt']) || d.completedAt == null || d.completedAt is number)
+        && (!d.keys().hasAny(['archived']) || d.archived is bool)
+        && (!d.keys().hasAny(['archivedAt']) || d.archivedAt == null || d.archivedAt is number)
         && d.createdAt is number
         && d.updatedAt is number
         && (d.deletedAt == null || d.deletedAt is number)

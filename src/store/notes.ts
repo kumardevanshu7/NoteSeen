@@ -179,6 +179,9 @@ interface NotesState {
   togglePin: (id: string) => void;
   convertPromptCardToNote: (id: string) => void;
   duplicateNote: (id: string) => string | null;
+  toggleComplete: (id: string, forced?: boolean) => boolean;
+  archiveNotes: (ids: string[]) => number;
+  unarchiveNotes: (ids: string[]) => number;
   trashNote: (id: string) => Promise<boolean>;
   trashNotes: (ids: string[]) => Promise<boolean>;
   restoreNote: (id: string) => void;
@@ -735,6 +738,89 @@ export const useNotes = create<NotesState>((set, get) => {
       get().setActive(id);
       set({ view: "editor" });
       toast.success("Converted to Note");
+    },
+
+    toggleComplete(id, forced) {
+      const note = get().notes[id];
+      if (!note) return false;
+      const nextCompleted = forced !== undefined ? forced : !note.completed;
+      get().patchNote(
+        id,
+        {
+          completed: nextCompleted,
+          completedAt: nextCompleted ? Date.now() : null,
+        },
+        { touch: false },
+      );
+      return nextCompleted;
+    },
+
+    archiveNotes(ids) {
+      const unique = [...new Set(ids)].filter((id) => get().notes[id] && !get().notes[id]?.deletedAt);
+      if (unique.length === 0) return 0;
+      const stamp = Date.now();
+      let archivedCount = 0;
+      const { openTabs, activeId } = get();
+      let nextTabs = openTabs;
+      let nextActive = activeId;
+
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const id of unique) {
+          const note = notes[id];
+          if (!note || note.archived) continue;
+          notes[id] = {
+            ...note,
+            archived: true,
+            archivedAt: stamp,
+            pinned: false,
+            updatedAt: stamp,
+          };
+          dirtyNotes.add(id);
+          archivedCount += 1;
+          if (nextTabs.includes(id)) {
+            nextTabs = nextTabs.filter((tab) => tab !== id);
+            if (nextActive === id) nextActive = nextTabs[nextTabs.length - 1] ?? null;
+          }
+        }
+        return { notes, openTabs: nextTabs, activeId: nextActive };
+      });
+
+      if (archivedCount > 0) {
+        scheduleIdb();
+        void setMeta(TABS_KEY, get().openTabs);
+        if (nextActive !== activeId) void setMeta(ACTIVE_KEY, nextActive);
+      }
+      return archivedCount;
+    },
+
+    unarchiveNotes(ids) {
+      const unique = [...new Set(ids)].filter((id) => get().notes[id] && get().notes[id]?.archived);
+      if (unique.length === 0) return 0;
+      const stamp = Date.now();
+      let unarchivedCount = 0;
+
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const id of unique) {
+          const note = notes[id];
+          if (!note || !note.archived) continue;
+          notes[id] = {
+            ...note,
+            archived: false,
+            archivedAt: null,
+            updatedAt: stamp,
+          };
+          dirtyNotes.add(id);
+          unarchivedCount += 1;
+        }
+        return { notes };
+      });
+
+      if (unarchivedCount > 0) {
+        scheduleIdb();
+      }
+      return unarchivedCount;
     },
 
     async trashNote(id) {

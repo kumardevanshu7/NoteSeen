@@ -35,8 +35,14 @@ export function noteCountInWorkspace(notes: Record<string, Note>, workspaceId: s
 
 export function liveNotes(notes: Record<string, Note>): Note[] {
   return Object.values(notes)
-    .filter((note) => !note.deletedAt)
+    .filter((note) => !note.deletedAt && !note.archived)
     .sort(pinnedFirst);
+}
+
+export function archivedNotes(notes: Record<string, Note>): Note[] {
+  return Object.values(notes)
+    .filter((note) => !note.deletedAt && note.archived)
+    .sort((a, b) => (b.archivedAt ?? b.updatedAt) - (a.archivedAt ?? a.updatedAt));
 }
 
 export function editorNotes(notes: Record<string, Note>): Note[] {

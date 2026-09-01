@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Archive,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -25,6 +26,7 @@ import { ArigatoMark, LogoMark } from "@/components/Logo";
 import { useNotes } from "@/store/notes";
 import { useSecrets } from "@/store/secrets";
 import {
+  archivedNotes,
   collectLabels,
   editorNotes,
   liveNotes,
@@ -42,6 +44,7 @@ const NAV: { id: View; label: string; icon: LucideIcon }[] = [
   { id: "suggestions", label: "Suggestions", icon: Lightbulb },
   { id: "editor", label: "Notes Editor", icon: NotebookPen },
   { id: "all", label: "My Notes", icon: FileText },
+  { id: "archive", label: "Archive Space", icon: Archive },
   { id: "cards", label: "Prompt Cards", icon: Images },
   { id: "labels", label: "Labels", icon: Tags },
   { id: "secrets", label: "Secret Vault", icon: KeyRound },
@@ -89,6 +92,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
   const live = useMemo(() => liveNotes(scopedNotes), [scopedNotes]);
   const recent = useMemo(() => editorNotes(scopedNotes), [scopedNotes]);
   const trashed = useMemo(() => trashedNotes(scopedNotes), [scopedNotes]);
+  const archived = useMemo(() => archivedNotes(scopedNotes), [scopedNotes]);
   const visible = useMemo(
     () => searchNotes(query.trim() ? live : recent, query),
     [live, recent, query],
@@ -139,6 +143,9 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                 <span className="flex-1 truncate">{item.label}</span>
                 {item.id === "all" ? (
                   <span className="ns-mono text-muted">{live.length}</span>
+                ) : null}
+                {item.id === "archive" && archived.length > 0 ? (
+                  <span className="ns-mono text-muted">{archived.length}</span>
                 ) : null}
                 {item.id === "cards" && cardCount > 0 ? (
                   <span className="ns-mono text-muted">{cardCount}</span>
