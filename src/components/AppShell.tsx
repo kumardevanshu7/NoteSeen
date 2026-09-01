@@ -371,10 +371,12 @@ export function AppShell() {
                   }`}
                 >
                   <article
-                    className={`ns-paper mx-auto w-full transition-all duration-200 ${
+                    className={`ns-paper mx-auto w-full transition-all duration-300 ${
                       isFullscreen
                         ? "max-w-5xl xl:max-w-6xl 2xl:max-w-7xl px-6 py-10 sm:px-16 sm:py-14 md:px-24 md:py-16 rounded-none border-none shadow-none"
-                        : "max-w-4xl lg:max-w-5xl xl:max-w-[64rem] 2xl:max-w-[72rem] px-5 py-7 sm:px-12 sm:py-10 md:px-16 md:py-12"
+                        : styleOpen
+                          ? "max-w-4xl lg:max-w-5xl xl:max-w-[62rem] px-5 py-7 sm:px-12 sm:py-10 md:px-14 md:py-12"
+                          : "max-w-5xl lg:max-w-6xl xl:max-w-[76rem] 2xl:max-w-[84rem] px-5 py-7 sm:px-12 sm:py-10 md:px-16 md:py-12"
                     }`}
                     data-fullscreen={isFullscreen ? "true" : undefined}
                     data-theme={note.theme}

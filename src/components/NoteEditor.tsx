@@ -37,8 +37,10 @@ import { syncAdapter } from "@/lib/sync/adapter";
 import type { Note } from "@/lib/types";
 import { countWords, formatClock, readingMinutes } from "@/lib/utils";
 import { createSlashCommandsExtension } from "@/lib/slash-commands";
+import { CustomInputRules } from "@/lib/custom-input-rules";
 import { SelectionMenu } from "./SelectionMenu";
 import { SlashCommandMenu } from "./SlashCommandMenu";
+import { TableControls } from "./TableControls";
 
 const CONTENT_DEBOUNCE_MS = 320;
 const MAX_NOTE_HTML = 15_000_000;
@@ -128,6 +130,7 @@ export function NoteEditor({ note }: { note: Note }) {
       TableRow,
       TableHeader,
       TableCell,
+      CustomInputRules,
       createSlashCommandsExtension(() => noteIdRef.current),
       Placeholder.configure({ placeholder: "Type '/' for commands, or start typing…" }),
       CharacterCount,
@@ -428,6 +431,7 @@ export function NoteEditor({ note }: { note: Note }) {
 
         {editor && canEdit ? <SelectionMenu editor={editor} /> : null}
         {editor && canEdit ? <SlashCommandMenu /> : null}
+        {editor && canEdit ? <TableControls editor={editor} /> : null}
       </div>
     </EditorErrorBoundary>
   );
