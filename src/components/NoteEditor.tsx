@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CopyButton } from "@/components/CopyButton";
 import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
+import { BundlePicker } from "@/components/BundlePicker";
 import { ArchivePromptDialog } from "@/components/ArchivePromptDialog";
 import { imageFilesFromData, insertPastedImages } from "@/lib/note-images";
 import {
@@ -443,7 +444,12 @@ export function NoteEditor({ note }: { note: Note }) {
           }}
         />
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <BundlePicker
+            currentBundle={note.bundle}
+            disabled={!canEdit}
+            onSelect={(bundle) => patchNote(note.id, { bundle })}
+          />
           <NoteLabelsField
             tags={note.tags}
             disabled={!canEdit}

@@ -120,7 +120,7 @@ service cloud.firestore {
           'id', 'kind', 'workspaceId', 'title', 'subtitle', 'tags', 'html', 'text', 'coverUrl',
           'theme', 'typeface', 'size', 'spacing',
           'pinned', 'createdAt', 'updatedAt', 'openedAt', 'deletedAt', 'fileName',
-          'completed', 'completedAt', 'archived', 'archivedAt'
+          'completed', 'completedAt', 'archived', 'archivedAt', 'bundle'
         ])
         && d.keys().hasAll([
           'id', 'kind', 'title', 'tags', 'html', 'text',
@@ -147,6 +147,7 @@ service cloud.firestore {
         && d.size in ['s', 'm', 'l']
         && d.spacing in ['tight', 'normal', 'relaxed']
         && d.pinned is bool
+        && (!d.keys().hasAny(['bundle']) || d.bundle == null || stringLen(d.bundle, 1, 120))
         && (!d.keys().hasAny(['completed']) || d.completed is bool)
         && (!d.keys().hasAny(['completedAt']) || d.completedAt == null || d.completedAt is number)
         && (!d.keys().hasAny(['archived']) || d.archived is bool)

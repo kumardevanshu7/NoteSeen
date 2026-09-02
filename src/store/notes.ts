@@ -166,7 +166,7 @@ interface NotesState {
   setActiveWorkspace: (id: string) => void;
   moveNotesToWorkspace: (ids: string[], workspaceId: string) => number;
   createNote: (seed?: Partial<Note>) => string;
-  createItem: (kind: NoteKind) => string;
+  createItem: (kind?: NoteKind, options?: { bundle?: string | null }) => string;
   openForEdit: (id: string) => Promise<boolean>;
   patchNote: (id: string, patch: Partial<Note>, options?: { touch?: boolean }) => void;
   setActive: (id: string | null) => void;
@@ -191,6 +191,12 @@ interface NotesState {
   renameLabel: (from: string, to: string) => number;
   /** Remove a label from every live note that uses it (vault required by caller). */
   removeLabel: (label: string) => number;
+  /** Assign or remove a note from a bundle. */
+  setNoteBundle: (id: string, bundle: string | null) => void;
+  /** Rename a bundle across all notes in current workspace. */
+  renameBundle: (from: string, to: string) => number;
+  /** Disband a bundle across all notes in current workspace (keeps notes, removes bundle association). */
+  deleteBundle: (bundle: string) => number;
 
   flush: (options?: { toDisk?: boolean }) => Promise<void>;
   saveToFile: (id: string, options?: { forcePicker?: boolean }) => Promise<void>;
@@ -561,13 +567,14 @@ export const useNotes = create<NotesState>((set, get) => {
       return note.id;
     },
 
-    createItem(kind) {
+    createItem(kind = "note", options) {
       if (kind === "promptCard") {
         set({ view: "cards" });
         return "";
       }
       return get().createNote({
         kind,
+        bundle: options?.bundle ?? null,
         title: "",
         tags: [],
         html: "<p></p>",
@@ -1000,6 +1007,69 @@ export const useNotes = create<NotesState>((set, get) => {
           if (!note.tags.some((tag) => tag.toLowerCase() === target)) continue;
           const tags = note.tags.filter((tag) => tag.toLowerCase() !== target);
           notes[id] = { ...note, tags, updatedAt: stamp };
+          dirtyNotes.add(id);
+          touched += 1;
+        }
+        return { notes };
+      });
+      if (touched > 0) {
+        scheduleIdb();
+        void get()
+          .flush({ toDisk: false })
+          .then(() => syncAdapter().flushCloud?.());
+      }
+      return touched;
+    },
+
+    setNoteBundle(id, bundle) {
+      const current = get().notes[id];
+      if (!current) return;
+      const normalized =
+        typeof bundle === "string" && bundle.trim() ? bundle.trim().slice(0, 60) : null;
+      get().patchNote(id, { bundle: normalized });
+    },
+
+    renameBundle(from, to) {
+      const source = from.trim().toLowerCase();
+      const nextName = to.trim().replace(/\s+/g, " ").slice(0, 60);
+      if (!source || !nextName) return 0;
+      const workspaceId = get().activeWorkspaceId;
+
+      const stamp = Date.now();
+      let touched = 0;
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const [id, note] of Object.entries(notes)) {
+          if (note.deletedAt || note.workspaceId !== workspaceId) continue;
+          if (note.bundle?.trim().toLowerCase() !== source) continue;
+          notes[id] = { ...note, bundle: nextName, updatedAt: stamp };
+          dirtyNotes.add(id);
+          touched += 1;
+        }
+        return { notes };
+      });
+      if (touched > 0) {
+        scheduleIdb();
+        void get()
+          .flush({ toDisk: false })
+          .then(() => syncAdapter().flushCloud?.());
+      }
+      return touched;
+    },
+
+    deleteBundle(bundle) {
+      const target = bundle.trim().toLowerCase();
+      if (!target) return 0;
+      const workspaceId = get().activeWorkspaceId;
+
+      const stamp = Date.now();
+      let touched = 0;
+      set((state) => {
+        const notes = { ...state.notes };
+        for (const [id, note] of Object.entries(notes)) {
+          if (note.deletedAt || note.workspaceId !== workspaceId) continue;
+          if (note.bundle?.trim().toLowerCase() !== target) continue;
+          notes[id] = { ...note, bundle: null, updatedAt: stamp };
           dirtyNotes.add(id);
           touched += 1;
         }

@@ -124,3 +124,36 @@ export function collectLabels(
 export function normalizeLabelName(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").slice(0, 40);
 }
+
+/** Unique bundles across live notes, sorted by most recently updated with usage counts. */
+export function collectBundles(
+  notes: Record<string, Note>,
+): Array<{ name: string; count: number; updatedAt: number; latestNote?: Note }> {
+  const map = new Map<string, { name: string; count: number; updatedAt: number; latestNote?: Note }>();
+  for (const note of liveNotes(notes)) {
+    if (!note.bundle) continue;
+    const name = note.bundle.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    const existing = map.get(key);
+    if (existing) {
+      existing.count += 1;
+      if (note.updatedAt > existing.updatedAt) {
+        existing.updatedAt = note.updatedAt;
+        existing.latestNote = note;
+      }
+    } else {
+      map.set(key, { name, count: 1, updatedAt: note.updatedAt, latestNote: note });
+    }
+  }
+  return [...map.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export function notesForBundle(notes: Record<string, Note>, bundleName: string): Note[] {
+  const key = bundleName.trim().toLowerCase();
+  return liveNotes(notes).filter((note) => note.bundle?.trim().toLowerCase() === key);
+}
+
+export function normalizeBundleName(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").slice(0, 60);
+}

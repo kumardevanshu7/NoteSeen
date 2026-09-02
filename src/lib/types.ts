@@ -63,6 +63,8 @@ export interface Note {
   size: TextSize;
   spacing: LineSpacing;
   pinned: boolean;
+  /** Name of the subject/category bundle this note belongs to (e.g. "Physics", "Project X"). */
+  bundle?: string | null;
   /** Marked as 100% completed/covered. */
   completed?: boolean;
   /** Timestamp when the note was marked completed. */
@@ -233,6 +235,7 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     size: raw.size ?? "m",
     spacing: raw.spacing ?? "normal",
     pinned: Boolean(raw.pinned),
+    bundle: typeof raw.bundle === "string" && raw.bundle.trim() ? raw.bundle.trim() : null,
     completed: Boolean(raw.completed),
     completedAt: typeof raw.completedAt === "number" ? raw.completedAt : null,
     archived: Boolean(raw.archived),
@@ -248,4 +251,11 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
     deletedAt: raw.deletedAt ?? null,
     fileName: raw.fileName ?? null,
   };
+}
+
+export interface BundleInfo {
+  name: string;
+  count: number;
+  updatedAt: number;
+  latestNote?: Note;
 }

@@ -49,6 +49,7 @@ function toDoc(note: Note): NoteDoc {
     size: note.size,
     spacing: note.spacing,
     pinned: note.pinned,
+    bundle: note.bundle ?? null,
     completed: note.completed ?? false,
     completedAt: note.completedAt ?? null,
     archived: note.archived ?? false,

@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Folder,
   Images,
   KeyRound,
   Lightbulb,
@@ -27,6 +28,7 @@ import { useNotes } from "@/store/notes";
 import { useSecrets } from "@/store/secrets";
 import {
   archivedNotes,
+  collectBundles,
   collectLabels,
   editorNotes,
   liveNotes,
@@ -98,6 +100,7 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
     [live, recent, query],
   );
   const allLabels = useMemo(() => collectLabels(scopedNotes), [scopedNotes]);
+  const allBundles = useMemo(() => collectBundles(scopedNotes), [scopedNotes]);
   const cardCount = useMemo(() => promptCards(notes).length, [notes]);
   const secretCount = useSecrets((state) =>
     state.entries.filter((entry) => entry.workspaceId === activeWorkspaceId).length,
@@ -196,6 +199,41 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
                 ))}
               </div>
             ) : null}
+          </div>
+        ) : null}
+
+        {allBundles.length > 0 ? (
+          <div className="mt-2 px-1">
+            <button
+              type="button"
+              onClick={() => {
+                setView("all");
+                dismiss();
+              }}
+              className="flex w-full items-center gap-1.5 rounded-xs px-1.5 py-1 text-left transition-colors hover:bg-stone/55"
+            >
+              <Folder className="size-3.5 shrink-0 text-muted" />
+              <span className="ns-mono flex-1 text-muted">Your bundles</span>
+              <span className="ns-mono text-muted">{allBundles.length}</span>
+            </button>
+            <div className="ns-scroll mt-1.5 flex max-h-24 flex-wrap gap-1.5 overflow-y-auto">
+              {allBundles.slice(0, 8).map((b) => (
+                <button
+                  key={b.name.toLowerCase()}
+                  type="button"
+                  title={`${b.count} note${b.count === 1 ? "" : "s"}`}
+                  onClick={() => {
+                    setQuery(b.name);
+                    setView("all");
+                    dismiss();
+                  }}
+                  className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-[11px] text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                >
+                  <Folder className="size-2.5 shrink-0" />
+                  <span className="truncate">{b.name}</span>
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
