@@ -1,4 +1,4 @@
-import type { Note, Workspace } from "@/lib/types";
+import type { Bundle, Note, Workspace } from "@/lib/types";
 
 /**
  * Seam for remote sync. NoteSeen is local-first: IndexedDB is the source of
@@ -10,12 +10,16 @@ export interface SyncAdapter {
   /** One-shot pull before live subscribe (avoids push-over-remote race). */
   pullNotes?(): Promise<Note[]>;
   pullWorkspaces?(): Promise<Workspace[]>;
+  pullBundles?(): Promise<Bundle[]>;
   pushNotes(notes: Note[], immediate?: boolean): Promise<void>;
   pushWorkspaces?(workspaces: Workspace[], immediate?: boolean): Promise<void>;
+  pushBundles?(bundles: Bundle[], immediate?: boolean): Promise<void>;
   removeNotes(ids: string[]): Promise<void>;
   removeWorkspaces?(ids: string[]): Promise<void>;
+  removeBundles?(ids: string[]): Promise<void>;
   subscribe(onRemoteNotes: (notes: Note[]) => void): () => void;
   subscribeWorkspaces?(onRemote: (workspaces: Workspace[]) => void): () => void;
+  subscribeBundles?(onRemote: (bundles: Bundle[]) => void): () => void;
   flushCloud?(): Promise<void>;
 }
 
@@ -28,14 +32,22 @@ const localOnly: SyncAdapter = {
   async pullWorkspaces() {
     return [];
   },
+  async pullBundles() {
+    return [];
+  },
   async pushNotes() {},
   async pushWorkspaces() {},
+  async pushBundles() {},
   async removeNotes() {},
   async removeWorkspaces() {},
+  async removeBundles() {},
   subscribe() {
     return () => {};
   },
   subscribeWorkspaces() {
+    return () => {};
+  },
+  subscribeBundles() {
     return () => {};
   },
 };
@@ -72,6 +84,13 @@ export function mergeRemote(local: Note | undefined, remote: Note): Note {
 }
 
 export function mergeRemoteWorkspace(local: Workspace | undefined, remote: Workspace): Workspace {
+  if (!local) return remote;
+  if (remote.updatedAt > local.updatedAt) return remote;
+  if (local.updatedAt > remote.updatedAt) return local;
+  return remote;
+}
+
+export function mergeRemoteBundle(local: Bundle | undefined, remote: Bundle): Bundle {
   if (!local) return remote;
   if (remote.updatedAt > local.updatedAt) return remote;
   if (local.updatedAt > remote.updatedAt) return local;

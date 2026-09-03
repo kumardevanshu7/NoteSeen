@@ -8,8 +8,8 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
-import type { Note, Workspace } from "@/lib/types";
-import { normalizeNote, normalizeWorkspace } from "@/lib/types";
+import type { Bundle, Note, Workspace } from "@/lib/types";
+import { normalizeBundle, normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { type SyncAdapter } from "./adapter";
 
 /** Fast enough to feel instant; still batches rapid keystrokes. */
@@ -31,6 +31,14 @@ function workspacesCol(uid: string) {
 
 function workspaceDoc(uid: string, workspaceId: string) {
   return doc(getFirebaseDb(), "users", uid, "workspaces", workspaceId);
+}
+
+function bundlesCol(uid: string) {
+  return collection(getFirebaseDb(), "users", uid, "bundles");
+}
+
+function bundleDoc(uid: string, bundleId: string) {
+  return doc(getFirebaseDb(), "users", uid, "bundles", bundleId);
 }
 
 function toDoc(note: Note): NoteDoc {
@@ -76,10 +84,13 @@ function fromDoc(data: NoteDoc, fallbackId: string): Note {
 export function createFirestoreAdapter(): SyncAdapter {
   let unsubscribe: Unsubscribe | null = null;
   let unsubscribeWorkspaces: Unsubscribe | null = null;
+  let unsubscribeBundles: Unsubscribe | null = null;
   let pushTimer: ReturnType<typeof setTimeout> | null = null;
   let workspacePushTimer: ReturnType<typeof setTimeout> | null = null;
+  let bundlePushTimer: ReturnType<typeof setTimeout> | null = null;
   const pending = new Map<string, Note>();
   const pendingWorkspaces = new Map<string, Workspace>();
+  const pendingBundles = new Map<string, Bundle>();
   let connectedUid: string | null = null;
   /** Remote ids seen on the last full snapshot — used to detect hard deletes. */
   let knownRemoteIds = new Set<string>();
@@ -100,6 +111,27 @@ export function createFirestoreAdapter(): SyncAdapter {
       const chunk = writeBatch(getFirebaseDb());
       for (const [id, workspace] of slice) {
         chunk.set(workspaceDoc(uid, id), workspace, { merge: true });
+      }
+      await chunk.commit();
+    }
+  }
+
+  async function flushPendingBundles() {
+    if (bundlePushTimer) {
+      clearTimeout(bundlePushTimer);
+      bundlePushTimer = null;
+    }
+    const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
+    if (!uid || pendingBundles.size === 0) return;
+
+    const entries = [...pendingBundles.entries()];
+    pendingBundles.clear();
+
+    for (let i = 0; i < entries.length; i += 450) {
+      const slice = entries.slice(i, i + 450);
+      const chunk = writeBatch(getFirebaseDb());
+      for (const [id, bundle] of slice) {
+        chunk.set(bundleDoc(uid, id), bundle, { merge: true });
       }
       await chunk.commit();
     }
@@ -158,10 +190,33 @@ export function createFirestoreAdapter(): SyncAdapter {
     }, CLOUD_PUSH_DEBOUNCE_MS);
   }
 
+  function scheduleBundlePush(bundles: Bundle[], immediate = false) {
+    for (const b of bundles) pendingBundles.set(b.id, b);
+    if (bundlePushTimer) clearTimeout(bundlePushTimer);
+    if (immediate) {
+      void flushPendingBundles().catch((error) => {
+        console.error("NoteSeen: Firestore bundle push failed", error);
+      });
+      return;
+    }
+    bundlePushTimer = setTimeout(() => {
+      void flushPendingBundles().catch((error) => {
+        console.error("NoteSeen: Firestore bundle push failed", error);
+      });
+    }, CLOUD_PUSH_DEBOUNCE_MS);
+  }
+
   async function readAllWorkspaces(uid: string): Promise<Workspace[]> {
     const snapshot = await getDocs(workspacesCol(uid));
     return snapshot.docs.map((entry) =>
       normalizeWorkspace({ ...(entry.data() as Workspace), id: entry.id }),
+    );
+  }
+
+  async function readAllBundles(uid: string): Promise<Bundle[]> {
+    const snapshot = await getDocs(bundlesCol(uid));
+    return snapshot.docs.map((entry) =>
+      normalizeBundle({ ...(entry.data() as Bundle), id: entry.id }),
     );
   }
 
@@ -218,6 +273,29 @@ export function createFirestoreAdapter(): SyncAdapter {
       }
     },
 
+    async pullBundles() {
+      const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
+      if (!uid) return [];
+      return readAllBundles(uid);
+    },
+
+    async pushBundles(bundles, immediate = false) {
+      if (!getFirebaseAuth().currentUser) return;
+      scheduleBundlePush(bundles, immediate);
+    },
+
+    async removeBundles(ids) {
+      const uid = getFirebaseAuth().currentUser?.uid;
+      if (!uid || ids.length === 0) return;
+      for (const id of ids) pendingBundles.delete(id);
+      for (let i = 0; i < ids.length; i += 450) {
+        const slice = ids.slice(i, i + 450);
+        const batch = writeBatch(getFirebaseDb());
+        for (const id of slice) batch.delete(bundleDoc(uid, id));
+        await batch.commit();
+      }
+    },
+
     async pullNotes() {
       const uid = connectedUid ?? getFirebaseAuth().currentUser?.uid;
       if (!uid) return [];
@@ -246,7 +324,7 @@ export function createFirestoreAdapter(): SyncAdapter {
     },
 
     async flushCloud() {
-      await Promise.all([flushPending(), flushPendingWorkspaces()]);
+      await Promise.all([flushPending(), flushPendingWorkspaces(), flushPendingBundles()]);
     },
 
     subscribeWorkspaces(onRemoteWorkspaces) {
@@ -274,6 +352,34 @@ export function createFirestoreAdapter(): SyncAdapter {
       return () => {
         unsubscribeWorkspaces?.();
         unsubscribeWorkspaces = null;
+      };
+    },
+
+    subscribeBundles(onRemoteBundles) {
+      const uid = getFirebaseAuth().currentUser?.uid;
+      if (!uid) return () => {};
+
+      if (unsubscribeBundles) {
+        unsubscribeBundles();
+        unsubscribeBundles = null;
+      }
+
+      unsubscribeBundles = onSnapshot(
+        bundlesCol(uid),
+        (snapshot) => {
+          const bundles = snapshot.docs.map((entry) =>
+            normalizeBundle({ ...(entry.data() as Bundle), id: entry.id }),
+          );
+          onRemoteBundles(bundles);
+        },
+        (error) => {
+          console.error("NoteSeen: Firestore bundles listener error", error);
+        },
+      );
+
+      return () => {
+        unsubscribeBundles?.();
+        unsubscribeBundles = null;
       };
     },
 
@@ -322,6 +428,8 @@ export function createFirestoreAdapter(): SyncAdapter {
         unsubscribe = null;
         unsubscribeWorkspaces?.();
         unsubscribeWorkspaces = null;
+        unsubscribeBundles?.();
+        unsubscribeBundles = null;
         if (pushTimer) {
           clearTimeout(pushTimer);
           pushTimer = null;
@@ -329,6 +437,10 @@ export function createFirestoreAdapter(): SyncAdapter {
         if (workspacePushTimer) {
           clearTimeout(workspacePushTimer);
           workspacePushTimer = null;
+        }
+        if (bundlePushTimer) {
+          clearTimeout(bundlePushTimer);
+          bundlePushTimer = null;
         }
         connectedUid = null;
         knownRemoteIds = new Set();

@@ -24,14 +24,19 @@ export function BundlePicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const notes = useNotes((state) => state.notes);
+  const bundles = useNotes((state) => state.bundles);
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
+  const createBundle = useNotes((state) => state.createBundle);
 
   const scopedNotes = useMemo(
     () => notesForWorkspace(notes, activeWorkspaceId),
     [notes, activeWorkspaceId],
   );
 
-  const allBundles = useMemo(() => collectBundles(scopedNotes), [scopedNotes]);
+  const allBundles = useMemo(
+    () => collectBundles(scopedNotes, bundles, activeWorkspaceId),
+    [scopedNotes, bundles, activeWorkspaceId],
+  );
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -57,7 +62,8 @@ export function BundlePicker({
 
   const handleCreateNew = () => {
     if (!cleanQuery) return;
-    handleChoose(cleanQuery);
+    const created = createBundle(cleanQuery);
+    handleChoose(created.name);
   };
 
   return (

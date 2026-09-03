@@ -253,6 +253,30 @@ export function normalizeNote(raw: Partial<Note> & { id: string }): Note {
   };
 }
 
+export interface Bundle {
+  id: string;
+  workspaceId: string;
+  name: string;
+  color?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export function normalizeBundle(raw: Partial<Bundle> & { id: string }): Bundle {
+  const name = (raw.name ?? "Bundle").trim().slice(0, 80);
+  return {
+    id: raw.id,
+    workspaceId:
+      typeof raw.workspaceId === "string" && raw.workspaceId.trim()
+        ? raw.workspaceId.trim()
+        : DEFAULT_WORKSPACE_ID,
+    name: name || "Bundle",
+    color: typeof raw.color === "string" ? raw.color : undefined,
+    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : Date.now(),
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : Date.now(),
+  };
+}
+
 export interface BundleInfo {
   name: string;
   count: number;

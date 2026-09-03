@@ -68,6 +68,7 @@ function readLabelsExpanded(): boolean {
 export function SideRail({ onClose }: { onClose?: () => void }) {
   const dismiss = () => onClose?.();
   const notes = useNotes((state) => state.notes);
+  const bundles = useNotes((state) => state.bundles);
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const activeId = useNotes((state) => state.activeId);
   const view = useNotes((state) => state.view);
@@ -100,7 +101,10 @@ export function SideRail({ onClose }: { onClose?: () => void }) {
     [live, recent, query],
   );
   const allLabels = useMemo(() => collectLabels(scopedNotes), [scopedNotes]);
-  const allBundles = useMemo(() => collectBundles(scopedNotes), [scopedNotes]);
+  const allBundles = useMemo(
+    () => collectBundles(scopedNotes, bundles, activeWorkspaceId),
+    [scopedNotes, bundles, activeWorkspaceId],
+  );
   const cardCount = useMemo(() => promptCards(notes).length, [notes]);
   const secretCount = useSecrets((state) =>
     state.entries.filter((entry) => entry.workspaceId === activeWorkspaceId).length,

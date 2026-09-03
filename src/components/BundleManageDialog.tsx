@@ -30,6 +30,7 @@ export function BundleManageDialog({
   onSuccess,
 }: BundleManageDialogProps) {
   const [name, setName] = useState(bundleName);
+  const createBundle = useNotes((state) => state.createBundle);
   const renameBundle = useNotes((state) => state.renameBundle);
   const deleteBundle = useNotes((state) => state.deleteBundle);
 
@@ -40,8 +41,9 @@ export function BundleManageDialog({
       toast.error("Please enter a bundle name");
       return;
     }
-    toast.success(`Bundle "${clean}" ready`);
-    onSuccess?.(clean);
+    const created = createBundle(clean);
+    toast.success(`Bundle "${created.name}" created`);
+    onSuccess?.(created.name);
     onOpenChange(false);
   };
 

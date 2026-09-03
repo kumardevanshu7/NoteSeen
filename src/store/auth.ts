@@ -31,6 +31,7 @@ interface AuthState {
 
 let stopSync: (() => void) | null = null;
 let stopWorkspaceSync: (() => void) | null = null;
+let stopBundleSync: (() => void) | null = null;
 
 function localOnlyAdapter() {
   return {
@@ -63,6 +64,8 @@ async function startCloudSync(user: User) {
   stopSync = null;
   stopWorkspaceSync?.();
   stopWorkspaceSync = null;
+  stopBundleSync?.();
+  stopBundleSync = null;
 
   const adapter = createFirestoreAdapter();
   setSyncAdapter(adapter);
@@ -71,29 +74,43 @@ async function startCloudSync(user: User) {
     await adapter.connect();
     useNotes.getState().setCloudUser(user.uid);
 
-    const remoteWorkspaces = (await adapter.pullWorkspaces?.()) ?? [];
+    const [remoteWorkspaces, remoteBundles, remoteNotes] = await Promise.all([
+      adapter.pullWorkspaces ? adapter.pullWorkspaces() : Promise.resolve([]),
+      adapter.pullBundles ? adapter.pullBundles() : Promise.resolve([]),
+      adapter.pullNotes ? adapter.pullNotes() : Promise.resolve([]),
+    ]);
+
     if (remoteWorkspaces.length > 0) {
       useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
     }
-
-    const remote = (await adapter.pullNotes?.()) ?? [];
-    if (remote.length > 0) {
-      useNotes.getState().mergeRemoteNotes(remote);
+    if (remoteBundles.length > 0) {
+      useNotes.getState().mergeRemoteBundles(remoteBundles);
+    }
+    if (remoteNotes.length > 0) {
+      useNotes.getState().mergeRemoteNotes(remoteNotes);
     }
 
     await useNotes.getState().pushAllToCloud();
 
-    const recovered = await useNotes.getState().recoverOrphanedPromptCards(user.uid);
-    if (recovered > 0) {
-      toast.success(
-        recovered === 1
-          ? "Restored 1 prompt card from your image library"
-          : `Restored ${recovered} prompt cards from your image library`,
-      );
+    try {
+      const recovered = await useNotes.getState().recoverOrphanedPromptCards(user.uid);
+      if (recovered > 0) {
+        toast.success(
+          recovered === 1
+            ? "Restored 1 prompt card from your image library"
+            : `Restored ${recovered} prompt cards from your image library`,
+        );
+      }
+    } catch (e) {
+      console.warn("NoteSeen: prompt card recovery skipped", e);
     }
 
     stopWorkspaceSync = adapter.subscribeWorkspaces?.((remoteWorkspaces) => {
       useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
+    }) ?? null;
+
+    stopBundleSync = adapter.subscribeBundles?.((remoteBundles) => {
+      useNotes.getState().mergeRemoteBundles(remoteBundles);
     }) ?? null;
 
     stopSync = adapter.subscribe((remoteNotes) => {
@@ -120,18 +137,22 @@ export async function syncNow(notify = false): Promise<boolean> {
 
   useAuth.setState({ syncing: true });
   try {
-    // 1. Commit and flush any local pending notes/workspaces to cloud immediately
+    // 1. Commit and flush any local pending notes/workspaces/bundles to cloud immediately
     await useNotes.getState().flush({ toDisk: true });
     await adapter.flushCloud?.();
 
     // 2. Pull latest remote updates
-    const [remoteWorkspaces, remoteNotes] = await Promise.all([
+    const [remoteWorkspaces, remoteBundles, remoteNotes] = await Promise.all([
       adapter.pullWorkspaces ? adapter.pullWorkspaces() : Promise.resolve([]),
+      adapter.pullBundles ? adapter.pullBundles() : Promise.resolve([]),
       adapter.pullNotes ? adapter.pullNotes() : Promise.resolve([]),
     ]);
 
     if (remoteWorkspaces.length > 0) {
       useNotes.getState().mergeRemoteWorkspaces(remoteWorkspaces);
+    }
+    if (remoteBundles.length > 0) {
+      useNotes.getState().mergeRemoteBundles(remoteBundles);
     }
     if (remoteNotes.length > 0) {
       useNotes.getState().mergeRemoteNotes(remoteNotes);
@@ -199,6 +220,8 @@ function stopCloudSync() {
   stopSync = null;
   stopWorkspaceSync?.();
   stopWorkspaceSync = null;
+  stopBundleSync?.();
+  stopBundleSync = null;
   setSyncAdapter(localOnlyAdapter());
   useNotes.getState().setCloudUser(null);
 }

@@ -10,239 +10,28 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    function stringLen(value, min, max) {
-      return value is string
-        && value.size() >= min
-        && value.size() <= max;
-    }
-
-    // ---- User profile (users/{uid}) ----
-    // Auth bootstrap may omit profile fields.
-    // Once any profile field is written, all of them must be valid.
-
-    function userDocKeysOk() {
-      return request.resource.data.keys().hasOnly([
-        'uid', 'email', 'displayName', 'photoURL', 'updatedAt',
-        'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt',
-        'vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt',
-        'secretPinHash', 'secretPinSalt', 'secretPinCreatedAt'
-      ])
-      && request.resource.data.keys().hasAll(['uid', 'updatedAt']);
-    }
-
-    function vaultFieldsOk() {
-      let d = request.resource.data;
-      let hasVault = d.keys().hasAny(['vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt']);
-      return !hasVault || (
-        d.keys().hasAll(['vaultQuestion', 'vaultAnswerHash', 'vaultCreatedAt'])
-        && stringLen(d.vaultQuestion, 3, 200)
-        && d.vaultAnswerHash is string
-        && d.vaultAnswerHash.size() >= 32
-        && d.vaultAnswerHash.size() <= 128
-        && d.vaultCreatedAt is number
-      );
-    }
-
-    function secretPinFieldsOk() {
-      let d = request.resource.data;
-      let hasPin = d.keys().hasAny(['secretPinHash', 'secretPinSalt', 'secretPinCreatedAt']);
-      return !hasPin || (
-        d.keys().hasAll(['secretPinHash', 'secretPinSalt', 'secretPinCreatedAt'])
-        && d.secretPinHash is string
-        && d.secretPinHash.size() >= 32
-        && d.secretPinHash.size() <= 128
-        && d.secretPinSalt is string
-        && d.secretPinSalt.size() >= 16
-        && d.secretPinSalt.size() <= 128
-        && d.secretPinCreatedAt is number
-      );
-    }
-
-    function userIdentityOk(uid) {
-      let d = request.resource.data;
-      return d.uid == uid
-        && d.uid == request.auth.uid
-        && d.updatedAt is number
-        && (!d.keys().hasAny(['email'])
-          || d.email == null
-          || (d.email is string
-            && d.email == request.auth.token.email
-            && d.email.size() <= 320))
-        && (!d.keys().hasAny(['displayName'])
-          || d.displayName == null
-          || stringLen(d.displayName, 0, 120))
-        && (!d.keys().hasAny(['photoURL'])
-          || d.photoURL == null
-          || (d.photoURL is string && d.photoURL.size() <= 2048));
-    }
-
-    function profileFieldsPresent() {
-      return request.resource.data.keys().hasAny([
-        'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt'
-      ]);
-    }
-
-    function validProfile() {
-      let d = request.resource.data;
-      return d.keys().hasAll([
-          'username', 'fullName', 'profession', 'gender', 'age', 'onboardedAt'
-        ])
-        && d.username is string
-        && d.username.matches('^[a-z0-9_]{3,24}$')
-        && stringLen(d.fullName, 2, 80)
-        && d.profession in ['job', 'student', 'freelancer', 'solo_entrepreneur']
-        && d.gender in ['male', 'female', 'other', 'prefer_not']
-        && d.age is number
-        && d.age >= 13
-        && d.age <= 120
-        && d.onboardedAt is number;
-    }
-
-    function validUserWrite(uid) {
-      return isOwner(uid)
-        && userDocKeysOk()
-        && userIdentityOk(uid)
-        && vaultFieldsOk()
-        && secretPinFieldsOk()
-        && (!profileFieldsPresent() || validProfile());
-    }
-
-    // ---- Notes (users/{uid}/notes/{noteId}) ----
-
-    function validTags(tags) {
-      return tags is list
-        && tags.size() <= 24;
-    }
-
-    function validNote(noteId) {
-      let d = request.resource.data;
-      return d.keys().hasOnly([
-          'id', 'kind', 'workspaceId', 'title', 'subtitle', 'tags', 'html', 'text', 'coverUrl',
-          'theme', 'typeface', 'size', 'spacing',
-          'pinned', 'createdAt', 'updatedAt', 'openedAt', 'deletedAt', 'fileName',
-          'completed', 'completedAt', 'archived', 'archivedAt', 'bundle'
-        ])
-        && d.keys().hasAll([
-          'id', 'kind', 'title', 'tags', 'html', 'text',
-          'theme', 'typeface', 'size', 'spacing',
-          'pinned', 'createdAt', 'updatedAt', 'deletedAt'
-        ])
-        && d.id == noteId
-        && d.id is string
-        && d.id.size() > 0
-        && d.id.size() <= 128
-        && d.kind in ['note', 'prompt', 'promptCard']
-        && (!d.keys().hasAny(['workspaceId']) || stringLen(d.workspaceId, 1, 128))
-        && stringLen(d.title, 0, 500)
-        && stringLen(d.html, 0, 500000)
-        && stringLen(d.text, 0, 500000)
-        && validTags(d.tags)
-        && d.theme in ['plain', 'azure', 'sage', 'sand', 'aurora']
-        && d.typeface in [
-          'inter', 'roboto', 'opensans', 'lato', 'montserrat', 'poppins', 'nunito',
-          'spacegrotesk', 'playfair', 'merriweather', 'georgia', 'times',
-          'jetbrains', 'firacode', 'sourcecode', 'courier',
-          'sans', 'display', 'serif', 'mono'
-        ]
-        && d.size in ['s', 'm', 'l']
-        && d.spacing in ['tight', 'normal', 'relaxed']
-        && d.pinned is bool
-        && (!d.keys().hasAny(['bundle']) || d.bundle == null || stringLen(d.bundle, 1, 120))
-        && (!d.keys().hasAny(['completed']) || d.completed is bool)
-        && (!d.keys().hasAny(['completedAt']) || d.completedAt == null || d.completedAt is number)
-        && (!d.keys().hasAny(['archived']) || d.archived is bool)
-        && (!d.keys().hasAny(['archivedAt']) || d.archivedAt == null || d.archivedAt is number)
-        && d.createdAt is number
-        && d.updatedAt is number
-        && (d.deletedAt == null || d.deletedAt is number)
-        && (!d.keys().hasAny(['fileName'])
-          || d.fileName == null
-          || stringLen(d.fileName, 1, 260))
-        && (!d.keys().hasAny(['coverUrl'])
-          || d.coverUrl == null
-          || stringLen(d.coverUrl, 1, 2048))
-        && (!d.keys().hasAny(['subtitle'])
-          || d.subtitle == null
-          || stringLen(d.subtitle, 0, 200))
-        && (!d.keys().hasAny(['openedAt'])
-          || d.openedAt == null
-          || d.openedAt is number);
-    }
-
-    function createdAtImmutable() {
-      return request.resource.data.createdAt == resource.data.createdAt;
-    }
-
-    function validSecret(secretId) {
-      let d = request.resource.data;
-      return d.keys().hasOnly([
-          'id', 'workspaceId', 'title', 'category', 'username',
-          'valueCipher', 'valueIv', 'notes',
-          'createdAt', 'updatedAt'
-        ])
-        && d.keys().hasAll([
-          'id', 'title', 'category', 'username',
-          'valueCipher', 'valueIv', 'notes',
-          'createdAt', 'updatedAt'
-        ])
-        && d.id == secretId
-        && stringLen(d.id, 1, 128)
-        && (!d.keys().hasAny(['workspaceId']) || stringLen(d.workspaceId, 1, 128))
-        && stringLen(d.title, 1, 200)
-        && d.category in ['api', 'password', 'other']
-        && stringLen(d.username, 0, 200)
-        && stringLen(d.valueCipher, 1, 20000)
-        && stringLen(d.valueIv, 16, 64)
-        && stringLen(d.notes, 0, 20000)
-        && d.createdAt is number
-        && d.updatedAt is number;
-    }
-
-    function secretCreatedAtImmutable() {
-      return request.resource.data.createdAt == resource.data.createdAt;
-    }
-
-    function validWorkspace(workspaceId) {
-      let d = request.resource.data;
-      return d.keys().hasOnly(['id', 'name', 'color', 'createdAt', 'updatedAt'])
-        && d.keys().hasAll(['id', 'name', 'createdAt', 'updatedAt'])
-        && d.id == workspaceId
-        && stringLen(d.id, 1, 128)
-        && stringLen(d.name, 1, 80)
-        && (!d.keys().hasAny(['color'])
-          || d.color in ['azure', 'sage', 'sand', 'aurora', 'coral', 'violet'])
-        && d.createdAt is number
-        && d.updatedAt is number;
-    }
-
-    function workspaceCreatedAtImmutable() {
-      return request.resource.data.createdAt == resource.data.createdAt;
-    }
-
+    // User root profile & settings
     match /users/{uid} {
-      allow read: if isOwner(uid);
-      allow create, update: if validUserWrite(uid);
-      allow delete: if false;
+      allow read, write: if isOwner(uid);
 
+      // Notes subcollection
       match /notes/{noteId} {
-        allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && validNote(noteId);
-        allow update: if isOwner(uid) && validNote(noteId) && createdAtImmutable();
-        allow delete: if isOwner(uid);
+        allow read, write: if isOwner(uid);
       }
 
+      // Subject / Category Bundles subcollection
+      match /bundles/{bundleId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      // Secret Vault subcollection
       match /secrets/{secretId} {
-        allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && validSecret(secretId);
-        allow update: if isOwner(uid) && validSecret(secretId) && secretCreatedAtImmutable();
-        allow delete: if isOwner(uid);
+        allow read, write: if isOwner(uid);
       }
 
+      // Workspaces subcollection
       match /workspaces/{workspaceId} {
-        allow read: if isOwner(uid);
-        allow create: if isOwner(uid) && validWorkspace(workspaceId);
-        allow update: if isOwner(uid) && validWorkspace(workspaceId) && workspaceCreatedAtImmutable();
-        allow delete: if isOwner(uid) && workspaceId != 'default';
+        allow read, write: if isOwner(uid);
       }
     }
 

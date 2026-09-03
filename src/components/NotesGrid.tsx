@@ -107,6 +107,7 @@ function useColumnCeiling(): number {
 
 export function NotesGrid() {
   const notes = useNotes((state) => state.notes);
+  const bundles = useNotes((state) => state.bundles);
   const activeWorkspaceId = useNotes((state) => state.activeWorkspaceId);
   const query = useNotes((state) => state.query);
   const setActive = useNotes((state) => state.setActive);
@@ -151,7 +152,10 @@ export function NotesGrid() {
     [scopedNotes],
   );
 
-  const allBundles = useMemo(() => collectBundles(scopedNotes), [scopedNotes]);
+  const allBundles = useMemo(
+    () => collectBundles(scopedNotes, bundles, activeWorkspaceId),
+    [scopedNotes, bundles, activeWorkspaceId],
+  );
 
   const counts = useMemo(
     () => ({

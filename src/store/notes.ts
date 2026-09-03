@@ -23,9 +23,9 @@ import {
   writeNoteToHandle,
   type ImportedNote,
 } from "@/lib/note-file";
-import { mergeRemote, mergeRemoteWorkspace, syncAdapter } from "@/lib/sync/adapter";
-import type { Note, NoteKind, SaveStatus, View, Workspace, WorkspaceColor } from "@/lib/types";
-import { DEFAULT_WORKSPACE_ID, defaultWorkspace, normalizeNote, normalizeWorkspace } from "@/lib/types";
+import { mergeRemote, mergeRemoteBundle, mergeRemoteWorkspace, syncAdapter } from "@/lib/sync/adapter";
+import type { Bundle, Note, NoteKind, SaveStatus, View, Workspace, WorkspaceColor } from "@/lib/types";
+import { DEFAULT_WORKSPACE_ID, defaultWorkspace, normalizeBundle, normalizeNote, normalizeWorkspace } from "@/lib/types";
 import { htmlToPlainText } from "@/lib/utils";
 import { listPromptCardImagesFromStorage } from "@/lib/note-images";
 import { requireVault } from "@/store/vault";
@@ -37,6 +37,7 @@ const SNAPSHOT_KEY = "noteseen.snapshot";
 const ACTIVE_KEY = "activeNoteId";
 const TABS_KEY = "openTabs";
 const WORKSPACE_KEY = "activeWorkspaceId";
+const BUNDLES_KEY = "noteseen.bundles";
 const MAX_OPEN_TABS = 12;
 
 function withOpenTab(tabs: string[], id: string | null): string[] {
@@ -147,6 +148,7 @@ interface NotesState {
   ready: boolean;
   notes: Record<string, Note>;
   workspaces: Record<string, Workspace>;
+  bundles: Record<string, Bundle>;
   activeWorkspaceId: string;
   handles: Record<string, NsFileHandle>;
   activeId: string | null;
@@ -193,6 +195,8 @@ interface NotesState {
   removeLabel: (label: string) => number;
   /** Assign or remove a note from a bundle. */
   setNoteBundle: (id: string, bundle: string | null) => void;
+  /** Explicitly create a new subject bundle. */
+  createBundle: (name: string, color?: string) => Bundle;
   /** Rename a bundle across all notes in current workspace. */
   renameBundle: (from: string, to: string) => number;
   /** Disband a bundle across all notes in current workspace (keeps notes, removes bundle association). */
@@ -207,6 +211,7 @@ interface NotesState {
   setCloudUser: (uid: string | null) => void;
   mergeRemoteNotes: (remoteNotes: Note[]) => void;
   mergeRemoteWorkspaces: (remoteWorkspaces: Workspace[]) => void;
+  mergeRemoteBundles: (remoteBundles: Bundle[]) => void;
   pushAllToCloud: () => Promise<void>;
   recoverOrphanedPromptCards: (uid?: string) => Promise<number>;
 }
@@ -302,10 +307,11 @@ export const useNotes = create<NotesState>((set, get) => {
   }
 
   async function loadEverything() {
-    const [stored, storedWorkspaces, handles, activeId, storedTabs, storedWorkspaceId] =
+    const [stored, storedWorkspaces, storedBundles, handles, activeId, storedTabs, storedWorkspaceId] =
       await Promise.all([
         loadNotes(),
         loadWorkspaces(),
+        getMeta<Bundle[]>(BUNDLES_KEY),
         loadFileHandles(),
         getMeta<string>(ACTIVE_KEY),
         getMeta<string[]>(TABS_KEY),
@@ -314,6 +320,30 @@ export const useNotes = create<NotesState>((set, get) => {
 
     const notes: Record<string, Note> = {};
     for (const note of stored) notes[note.id] = normalizeNote(note);
+
+    const bundles: Record<string, Bundle> = {};
+    for (const b of storedBundles ?? []) bundles[b.id] = normalizeBundle(b);
+    for (const note of Object.values(notes)) {
+      if (note.bundle && !note.deletedAt) {
+        const bName = note.bundle.trim();
+        if (bName) {
+          const exists = Object.values(bundles).some(
+            (b) =>
+              b.workspaceId === note.workspaceId && b.name.toLowerCase() === bName.toLowerCase(),
+          );
+          if (!exists) {
+            const id = `bundle_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            bundles[id] = normalizeBundle({
+              id,
+              workspaceId: note.workspaceId,
+              name: bName,
+              createdAt: note.createdAt,
+              updatedAt: note.updatedAt,
+            });
+          }
+        }
+      }
+    }
 
     // Auto-heal blog notes that were mistakenly converted to promptCard (e.g. pasted images)
     for (const [id, note] of Object.entries(notes)) {
@@ -390,6 +420,7 @@ export const useNotes = create<NotesState>((set, get) => {
     set({
       notes,
       workspaces,
+      bundles,
       activeWorkspaceId,
       handles,
       activeId: resolvedActive,
@@ -398,6 +429,7 @@ export const useNotes = create<NotesState>((set, get) => {
       view: "suggestions",
     });
     void setMeta(TABS_KEY, openTabs);
+    void setMeta(BUNDLES_KEY, Object.values(bundles));
     if (dirtyNotes.size > 0) void get().flush({ toDisk: false });
   }
 
@@ -405,6 +437,7 @@ export const useNotes = create<NotesState>((set, get) => {
     ready: false,
     notes: {},
     workspaces: { [DEFAULT_WORKSPACE_ID]: defaultWorkspace() },
+    bundles: {},
     activeWorkspaceId: DEFAULT_WORKSPACE_ID,
     handles: {},
     activeId: null,
@@ -1026,7 +1059,40 @@ export const useNotes = create<NotesState>((set, get) => {
       if (!current) return;
       const normalized =
         typeof bundle === "string" && bundle.trim() ? bundle.trim().slice(0, 60) : null;
+      if (normalized) {
+        // Ensure bundle exists in store/IDB
+        get().createBundle(normalized);
+      }
       get().patchNote(id, { bundle: normalized });
+    },
+
+    createBundle(name, color) {
+      const clean = name.trim().slice(0, 80);
+      if (!clean) throw new Error("Bundle name is required");
+      const workspaceId = get().activeWorkspaceId;
+      const existing = Object.values(get().bundles).find(
+        (b) => b.workspaceId === workspaceId && b.name.toLowerCase() === clean.toLowerCase(),
+      );
+      if (existing) return existing;
+
+      const now = Date.now();
+      const id = `bundle_${now}_${Math.random().toString(36).slice(2, 8)}`;
+      const bundle: Bundle = {
+        id,
+        workspaceId,
+        name: clean,
+        color,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      set((state) => ({
+        bundles: { ...state.bundles, [id]: bundle },
+      }));
+
+      void setMeta(BUNDLES_KEY, Object.values(get().bundles));
+      void syncAdapter().pushBundles?.([bundle]);
+      return bundle;
     },
 
     renameBundle(from, to) {
@@ -1037,7 +1103,16 @@ export const useNotes = create<NotesState>((set, get) => {
 
       const stamp = Date.now();
       let touched = 0;
+      const updatedBundles: Bundle[] = [];
+
       set((state) => {
+        const bundles = { ...state.bundles };
+        for (const [id, b] of Object.entries(bundles)) {
+          if (b.workspaceId === workspaceId && b.name.toLowerCase() === source) {
+            bundles[id] = { ...b, name: nextName, updatedAt: stamp };
+            updatedBundles.push(bundles[id]);
+          }
+        }
         const notes = { ...state.notes };
         for (const [id, note] of Object.entries(notes)) {
           if (note.deletedAt || note.workspaceId !== workspaceId) continue;
@@ -1046,8 +1121,11 @@ export const useNotes = create<NotesState>((set, get) => {
           dirtyNotes.add(id);
           touched += 1;
         }
-        return { notes };
+        return { bundles, notes };
       });
+
+      void setMeta(BUNDLES_KEY, Object.values(get().bundles));
+      if (updatedBundles.length > 0) void syncAdapter().pushBundles?.(updatedBundles);
       if (touched > 0) {
         scheduleIdb();
         void get()
@@ -1063,8 +1141,17 @@ export const useNotes = create<NotesState>((set, get) => {
       const workspaceId = get().activeWorkspaceId;
 
       const stamp = Date.now();
+      const removedBundleIds: string[] = [];
       let touched = 0;
+
       set((state) => {
+        const bundles = { ...state.bundles };
+        for (const [id, b] of Object.entries(bundles)) {
+          if (b.workspaceId === workspaceId && b.name.toLowerCase() === target) {
+            removedBundleIds.push(id);
+            delete bundles[id];
+          }
+        }
         const notes = { ...state.notes };
         for (const [id, note] of Object.entries(notes)) {
           if (note.deletedAt || note.workspaceId !== workspaceId) continue;
@@ -1073,8 +1160,11 @@ export const useNotes = create<NotesState>((set, get) => {
           dirtyNotes.add(id);
           touched += 1;
         }
-        return { notes };
+        return { bundles, notes };
       });
+
+      void setMeta(BUNDLES_KEY, Object.values(get().bundles));
+      if (removedBundleIds.length > 0) void syncAdapter().removeBundles?.(removedBundleIds);
       if (touched > 0) {
         scheduleIdb();
         void get()
@@ -1331,12 +1421,39 @@ export const useNotes = create<NotesState>((set, get) => {
       }
     },
 
+    mergeRemoteBundles(remoteBundles) {
+      if (!remoteBundles || remoteBundles.length === 0) return;
+      const local = get().bundles;
+      const next = { ...local };
+      let changed = false;
+
+      for (const remoteRaw of remoteBundles) {
+        const remote = normalizeBundle(remoteRaw);
+        const existing = local[remote.id];
+        if (!existing) {
+          next[remote.id] = remote;
+          changed = true;
+          continue;
+        }
+        const merged = mergeRemoteBundle(existing, remote);
+        if (merged === existing) continue;
+        next[remote.id] = merged;
+        changed = true;
+      }
+
+      if (!changed) return;
+      set({ bundles: next });
+      void setMeta(BUNDLES_KEY, Object.values(next));
+    },
+
     async pushAllToCloud() {
       if (!get().cloudUserId) return;
       const all = Object.values(get().notes);
       const allWorkspaces = Object.values(get().workspaces);
+      const allBundles = Object.values(get().bundles);
       if (all.length > 0) await syncAdapter().pushNotes(all);
       if (allWorkspaces.length > 0) await syncAdapter().pushWorkspaces?.(allWorkspaces);
+      if (allBundles.length > 0) await syncAdapter().pushBundles?.(allBundles);
       await syncAdapter().flushCloud?.();
     },
 

@@ -1,4 +1,4 @@
-import type { Note, NoteTheme, Workspace } from "./types";
+import type { Bundle, BundleInfo, Note, NoteTheme, Workspace } from "./types";
 import { DEFAULT_WORKSPACE_ID } from "./types";
 
 function byRecency(a: Note, b: Note): number {
@@ -125,12 +125,26 @@ export function normalizeLabelName(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").slice(0, 40);
 }
 
-/** Unique bundles across live notes, sorted by most recently updated with usage counts. */
+/** Unique bundles across live notes and workspace bundles, sorted by most recently updated. */
 export function collectBundles(
   notes: Record<string, Note>,
-): Array<{ name: string; count: number; updatedAt: number; latestNote?: Note }> {
+  bundles: Record<string, Bundle> = {},
+  workspaceId?: string,
+): BundleInfo[] {
   const map = new Map<string, { name: string; count: number; updatedAt: number; latestNote?: Note }>();
+
+  // 1. First add all explicit bundles in this workspace (even if count is 0!)
+  for (const b of Object.values(bundles)) {
+    if (workspaceId && b.workspaceId !== workspaceId) continue;
+    const name = b.name.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    map.set(key, { name, count: 0, updatedAt: b.updatedAt });
+  }
+
+  // 2. Count notes and find latestNote
   for (const note of liveNotes(notes)) {
+    if (workspaceId && note.workspaceId !== workspaceId) continue;
     if (!note.bundle) continue;
     const name = note.bundle.trim();
     if (!name) continue;
@@ -138,14 +152,15 @@ export function collectBundles(
     const existing = map.get(key);
     if (existing) {
       existing.count += 1;
-      if (note.updatedAt > existing.updatedAt) {
-        existing.updatedAt = note.updatedAt;
+      if (!existing.latestNote || note.updatedAt > existing.updatedAt) {
+        existing.updatedAt = Math.max(existing.updatedAt, note.updatedAt);
         existing.latestNote = note;
       }
     } else {
       map.set(key, { name, count: 1, updatedAt: note.updatedAt, latestNote: note });
     }
   }
+
   return [...map.values()].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
