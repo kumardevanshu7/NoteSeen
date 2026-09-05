@@ -170,9 +170,11 @@ export function serializeSecretValues(
 ): string {
   const clean = fields.filter((f) => f.value.trim().length > 0);
   if (clean.length === 0) return "";
+  // Only use legacy plain-string format for a single unlabeled field (backward compat)
   if (clean.length === 1 && !clean[0].label?.trim()) {
     return clean[0].value;
   }
+  // Multiple fields or any labeled field → always JSON array
   return JSON.stringify(
     clean.map((f, idx) => ({
       id: f.id || `sec_${idx}`,

@@ -1301,8 +1301,8 @@ function SecretEditorDialog({
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={busy}>
-              {entry ? "Save changes" : "Save secret"}
+            <Button type="submit" variant="primary" disabled={busy || loadingValues}>
+              {loadingValues ? "Decrypting…" : entry ? "Save changes" : "Save secret"}
             </Button>
           </DialogFooter>
         </form>
