@@ -829,6 +829,12 @@ function SecretDetailDialog({
   const [shown, setShown] = useState(false);
   const [value, setValue] = useState<string | null>(null);
 
+  // ⚠ All hooks MUST come before any early returns (Rules of Hooks)
+  const fields = useMemo(() => {
+    if (!value) return [];
+    return parseSecretValues(value);
+  }, [value]);
+
   useEffect(() => {
     if (!open) {
       setShown(false);
@@ -840,11 +846,6 @@ function SecretDetailDialog({
 
   const categoryLabel =
     CATEGORIES.find((cat) => cat.id === entry.category)?.label ?? entry.category;
-
-  const fields = useMemo(() => {
-    if (!value) return [];
-    return parseSecretValues(value);
-  }, [value]);
 
   const toggleReveal = async () => {
     if (shown) {
