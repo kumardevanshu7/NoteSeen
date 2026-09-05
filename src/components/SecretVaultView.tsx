@@ -1192,64 +1192,76 @@ function SecretEditorDialog({
                 Decrypting existing secrets...
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {fields.map((field, idx) => (
                   <div
                     key={field.id}
-                    className="rounded-md border border-hairline bg-stone/20 p-2.5 space-y-1.5 transition-colors focus-within:border-primary/40 focus-within:bg-stone/30"
+                    className="rounded-md border border-hairline bg-stone/30 p-3 space-y-2.5 transition-colors focus-within:border-primary/40 focus-within:bg-stone/40"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <input
-                        type="text"
-                        value={field.label}
-                        onChange={(e) => updateField(field.id, { label: e.target.value })}
-                        placeholder={
-                          fields.length > 1
-                            ? idx === 0
-                              ? isApi
-                                ? "Key name (e.g. Primary Key / Public ID)"
-                                : "Label (e.g. Primary Password)"
-                              : isApi
-                                ? `Key name (e.g. Secret Key, Backup #${idx + 1})`
-                                : `Label (e.g. Recovery Code, Pin #${idx + 1})`
-                            : isApi
-                              ? "Key label (optional, e.g. Primary Key, Client Secret)"
-                              : "Label (optional, e.g. Master password)"
-                        }
-                        className="w-full bg-transparent text-xs font-medium text-ink placeholder:text-muted/60 outline-none"
-                      />
+                    <div className="flex items-center justify-between border-b border-hairline/60 pb-1.5">
+                      <span className="ns-mono text-[11px] font-semibold text-primary uppercase tracking-wider">
+                        {isApi ? `API Key #${idx + 1}` : `Secret #${idx + 1}`}
+                        {field.label.trim() ? ` · ${field.label.trim()}` : ""}
+                      </span>
                       {fields.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeField(field.id)}
-                          className="flex size-5 items-center justify-center rounded text-muted hover:bg-error/10 hover:text-error transition-colors"
+                          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted hover:bg-error/10 hover:text-error transition-colors"
                           title="Remove this key"
                         >
                           <Trash2 className="size-3" />
+                          <span>Remove</span>
                         </button>
                       )}
                     </div>
 
-                    <div className="relative flex items-center">
+                    {/* Key title / name input */}
+                    <div className="space-y-1">
+                      <label className="text-[11.5px] font-medium text-slate flex items-center justify-between">
+                        <span>{isApi ? "Key Title / Name" : "Secret Title / Name"}</span>
+                        <span className="text-[10px] text-muted font-normal">optional</span>
+                      </label>
                       <Input
-                        type={field.show ? "text" : "password"}
-                        value={field.value}
-                        onChange={(e) => updateField(field.id, { value: e.target.value })}
+                        type="text"
+                        value={field.label}
+                        onChange={(e) => updateField(field.id, { label: e.target.value })}
                         placeholder={
-                          isApi ? "sk-… or password" : "password or secret"
+                          isApi
+                            ? idx === 0
+                              ? "e.g. Primary Key, Public ID, Production Key"
+                              : `e.g. Secret Key, Backup Key #${idx + 1}, Webhook Token`
+                            : "e.g. Master Password, Pin, Recovery Code"
                         }
-                        required={idx === 0 && !entry}
-                        autoComplete="off"
-                        className="h-9 pr-9 font-mono text-xs"
+                        className="h-8.5 text-xs bg-surface"
                       />
-                      <button
-                        type="button"
-                        onClick={() => updateField(field.id, { show: !field.show })}
-                        className="absolute right-2.5 text-muted hover:text-ink transition-colors"
-                        tabIndex={-1}
-                      >
-                        {field.show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                      </button>
+                    </div>
+
+                    {/* Key secret value input */}
+                    <div className="space-y-1">
+                      <label className="text-[11.5px] font-medium text-slate">
+                        {isApi ? "API Key / Token Value" : "Secret Value"}
+                      </label>
+                      <div className="relative flex items-center">
+                        <Input
+                          type={field.show ? "text" : "password"}
+                          value={field.value}
+                          onChange={(e) => updateField(field.id, { value: e.target.value })}
+                          placeholder={isApi ? "sk-… or API token" : "password or secret"}
+                          required={idx === 0 && !entry}
+                          autoComplete="off"
+                          className="h-9 pr-9 font-mono text-xs bg-surface"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => updateField(field.id, { show: !field.show })}
+                          className="absolute right-2.5 text-muted hover:text-ink transition-colors"
+                          tabIndex={-1}
+                          title={field.show ? "Hide key" : "Show key"}
+                        >
+                          {field.show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
