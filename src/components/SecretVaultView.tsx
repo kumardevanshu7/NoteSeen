@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Grid3x3,
   Info,
   KeyRound,
   LayoutGrid,
@@ -39,12 +40,19 @@ import { useSecrets } from "@/store/secrets";
 import { requireVault } from "@/store/vault";
 import { nanoid } from "nanoid";
 import type { SecretCategory, SecretEntry, SecretField } from "@/lib/types";
-import { parseSecretValues, serializeSecretValues } from "@/lib/types";
+import {
+  parsePatternPath,
+  parseSecretValues,
+  serializePatternPath,
+  serializeSecretValues,
+} from "@/lib/types";
 import { cn, formatRelative } from "@/lib/utils";
+import { PatternLock } from "@/components/PatternLock";
 
 const CATEGORIES: { id: SecretCategory; label: string }[] = [
   { id: "api", label: "API key" },
   { id: "password", label: "Password" },
+  { id: "pattern", label: "Pattern lock" },
   { id: "other", label: "Other" },
 ];
 
@@ -624,6 +632,13 @@ function SecretCard({
   const copyValue = async () => {
     const plain = value ?? (await onReveal());
     if (!plain) return;
+    if (entry.category === "pattern") {
+      const pts = parsePatternPath(plain);
+      const text = pts.map((n) => n + 1).join(" ➔ ");
+      await navigator.clipboard.writeText(text);
+      toast.success("Pattern steps copied", { description: text });
+      return;
+    }
     const parsed = parseSecretValues(plain);
     if (parsed.length > 1) {
       const primary = parsed[0];
@@ -675,11 +690,20 @@ function SecretCard({
           onClick={onOpen}
           className="flex w-full items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-stone/50"
         >
-          <KeyRound className="size-3.5 shrink-0 text-slate" />
+          {entry.category === "pattern" ? (
+            <Grid3x3 className="size-3.5 shrink-0 text-slate" />
+          ) : (
+            <KeyRound className="size-3.5 shrink-0 text-slate" />
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <p className="truncate text-[14px] font-medium text-ink">{entry.title}</p>
-              {shown && fields.length > 1 && (
+              {shown && entry.category === "pattern" && (
+                <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  {parsePatternPath(value || "").length} points
+                </span>
+              )}
+              {shown && entry.category !== "pattern" && fields.length > 1 && (
                 <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
                   {fields.length} keys
                 </span>
@@ -723,13 +747,17 @@ function SecretCard({
           ) : (
             <div className="ns-mono mt-auto flex items-center justify-between gap-1 text-[12px] text-ink">
               <span className="truncate">
-                {shown && fields.length > 0
-                  ? fields[0].label
-                    ? `${fields[0].label}: ${fields[0].value}`
-                    : fields[0].value
+                {shown
+                  ? entry.category === "pattern"
+                    ? `${parsePatternPath(value || "").length}-point pattern`
+                    : fields.length > 0
+                      ? fields[0].label
+                        ? `${fields[0].label}: ${fields[0].value}`
+                        : fields[0].value
+                      : "••••••••••••"
                   : "••••••••••••"}
               </span>
-              {shown && fields.length > 1 && (
+              {shown && entry.category !== "pattern" && fields.length > 1 && (
                 <span className="shrink-0 rounded bg-primary/10 px-1 py-0.5 text-[10px] font-semibold text-primary">
                   +{fields.length - 1} more
                 </span>
@@ -759,7 +787,12 @@ function SecretCard({
               <span className="ns-mono rounded-full border border-hairline px-2 py-px text-muted">
                 {categoryLabel}
               </span>
-              {shown && fields.length > 1 && (
+              {shown && entry.category === "pattern" && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  {parsePatternPath(value || "").length} points
+                </span>
+              )}
+              {shown && entry.category !== "pattern" && fields.length > 1 && (
                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
                   {fields.length} keys
                 </span>
@@ -768,17 +801,25 @@ function SecretCard({
             {entry.username ? (
               <p className="ns-caption mt-1 truncate text-body-muted">{entry.username}</p>
             ) : null}
-            {shown && fields.length > 0 ? (
-              <div className="mt-2 space-y-1">
-                {fields.map((f, idx) => (
-                  <p key={f.id || idx} className="ns-mono break-all text-[13px] text-ink">
-                    {f.label ? (
-                      <span className="mr-1.5 text-xs text-body-muted">{f.label}:</span>
-                    ) : null}
-                    {f.value}
-                  </p>
-                ))}
-              </div>
+            {shown ? (
+              entry.category === "pattern" ? (
+                <p className="ns-mono mt-2 break-all text-[13px] text-ink font-semibold">
+                  Path: {parsePatternPath(value || "").map((n) => n + 1).join(" ➔ ") || "Empty pattern"}
+                </p>
+              ) : fields.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {fields.map((f, idx) => (
+                    <p key={f.id || idx} className="ns-mono break-all text-[13px] text-ink">
+                      {f.label ? (
+                        <span className="mr-1.5 text-xs text-body-muted">{f.label}:</span>
+                      ) : null}
+                      {f.value}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="ns-mono mt-2 break-all text-[13px] text-ink">••••••••••••••••</p>
+              )
             ) : (
               <p className="ns-mono mt-2 break-all text-[13px] text-ink">
                 ••••••••••••••••
@@ -829,12 +870,16 @@ function SecretDetailDialog({
   const [loading, setLoading] = useState(false);
   const [fields, setFields] = useState<SecretField[]>([]);
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+  const [patternNodes, setPatternNodes] = useState<number[]>([]);
+  const [patternMasked, setPatternMasked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !entry) {
       setFields([]);
       setRevealedIds({});
+      setPatternNodes([]);
+      setPatternMasked(false);
       setLoading(false);
       setError(null);
       return;
@@ -848,10 +893,15 @@ function SecretDetailDialog({
       .then((plain) => {
         if (!active) return;
         if (plain != null) {
+          if (entry.category === "pattern") {
+            const pts = parsePatternPath(plain);
+            setPatternNodes(pts);
+          }
           const parsed = parseSecretValues(plain);
           setFields(parsed);
         } else {
           setFields([]);
+          setPatternNodes([]);
           setError("Could not decrypt secrets. Please re-enter your PIN.");
         }
       })
@@ -936,7 +986,56 @@ function SecretDetailDialog({
           ) : null}
 
           {/* Secret keys section */}
-          {loading ? (
+          {entry.category === "pattern" ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="ns-caption font-medium text-ink flex items-center gap-1.5">
+                  <Grid3x3 className="size-4 text-slate" />
+                  Phone Pattern Lock
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-slate hover:text-ink hover:bg-stone/80"
+                  onClick={() => setPatternMasked(!patternMasked)}
+                >
+                  {patternMasked ? (
+                    <>
+                      <Eye className="mr-1 size-3.5" />
+                      Reveal pattern
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="mr-1 size-3.5" />
+                      Hide pattern
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center rounded-xl border border-hairline bg-stone/30 py-12 text-xs text-body-muted">
+                  <span className="animate-pulse">Decrypting pattern…</span>
+                </div>
+              ) : error ? (
+                <div className="rounded-sm border border-error/30 bg-error/5 p-3 text-xs text-error">
+                  {error}
+                </div>
+              ) : patternMasked ? (
+                <div
+                  className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-stone/20 p-8 text-center cursor-pointer hover:border-primary/40 hover:bg-stone/30 transition-all"
+                  onClick={() => setPatternMasked(false)}
+                >
+                  <Grid3x3 className="size-8 text-muted mb-2" />
+                  <span className="text-xs font-medium text-ink">Pattern is hidden for privacy</span>
+                  <span className="text-[11px] text-body-muted mt-0.5">Click to reveal and replay gesture</span>
+                </div>
+              ) : (
+                <PatternLock value={patternNodes} mode="view" size={270} />
+              )}
+            </div>
+          ) : loading ? (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="ns-caption text-ink font-medium">
@@ -1165,6 +1264,7 @@ function SecretEditorDialog({
   const [fields, setFields] = useState<
     Array<{ id: string; label: string; value: string; show?: boolean }>
   >([{ id: "1", label: "", value: "", show: false }]);
+  const [patternPath, setPatternPath] = useState<number[]>([]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadingValues, setLoadingValues] = useState(false);
@@ -1183,6 +1283,10 @@ function SecretEditorDialog({
       void revealValue(entry.id)
         .then((plain) => {
           if (plain) {
+            if (entry.category === "pattern") {
+              const pts = parsePatternPath(plain);
+              setPatternPath(pts);
+            }
             const parsed = parseSecretValues(plain);
             if (parsed.length > 0) {
               setFields(parsed.map((p) => ({ ...p, show: false })));
@@ -1190,6 +1294,7 @@ function SecretEditorDialog({
             }
           }
           setFields([{ id: nanoid(6), label: "", value: "", show: false }]);
+          setPatternPath([]);
         })
         .finally(() => {
           setLoadingValues(false);
@@ -1197,6 +1302,7 @@ function SecretEditorDialog({
     } else {
       setLoadingValues(false);
       setFields([{ id: nanoid(6), label: "", value: "", show: false }]);
+      setPatternPath([]);
     }
   }, [open, entry, revealValue]);
 
@@ -1223,10 +1329,19 @@ function SecretEditorDialog({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const serialized = serializeSecretValues(fields);
-    if (!serialized && !entry) {
-      toast.error("Please enter at least one secret value");
-      return;
+    let serialized = "";
+    if (category === "pattern") {
+      if (patternPath.length < 2 && !entry) {
+        toast.error("Please connect at least 2 dots to save a pattern lock");
+        return;
+      }
+      serialized = serializePatternPath(patternPath);
+    } else {
+      serialized = serializeSecretValues(fields);
+      if (!serialized && !entry) {
+        toast.error("Please enter at least one secret value");
+        return;
+      }
     }
     setBusy(true);
     const ok = await onSave({ title, category, username, value: serialized, notes });
@@ -1234,6 +1349,7 @@ function SecretEditorDialog({
   };
 
   const isApi = category === "api";
+  const isPattern = category === "pattern";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1252,7 +1368,13 @@ function SecretEditorDialog({
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder={isApi ? "OpenAI API / GitHub token" : "Account / Service name"}
+              placeholder={
+                isPattern
+                  ? "e.g. Galaxy S24 Pattern / Work Phone"
+                  : isApi
+                    ? "OpenAI API / GitHub token"
+                    : "Account / Service name"
+              }
               required
               autoFocus
             />
@@ -1274,37 +1396,63 @@ function SecretEditorDialog({
           </label>
 
           <label className="block space-y-1.5">
-            <span className="ns-caption text-ink">Username / account (optional)</span>
+            <span className="ns-caption text-ink">
+              {isPattern ? "Device / phone model (optional)" : "Username / account (optional)"}
+            </span>
             <Input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
-              placeholder="email or handle"
+              placeholder={isPattern ? "e.g. Personal Samsung S24" : "email or handle"}
             />
           </label>
 
-          {/* Secret values / multiple keys section */}
-          <div className="space-y-2 pt-0.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="ns-caption text-ink font-medium">
-                {isApi
-                  ? fields.length > 1
-                    ? `API Keys (${fields.length})`
-                    : "API key"
-                  : fields.length > 1
-                    ? `Secret Values (${fields.length})`
-                    : "Secret value"}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={addField}
-                className="h-7 px-2 text-xs font-medium text-primary hover:bg-primary/10"
-              >
-                <Plus className="mr-1 size-3.5" />
-                <span>{isApi ? "Add another API key" : "Add another secret"}</span>
-              </Button>
+          {/* Secret values / multiple keys section or Pattern Lock */}
+          {isPattern ? (
+            <div className="space-y-2 pt-0.5">
+              <div className="flex items-center justify-between">
+                <span className="ns-caption text-ink font-medium flex items-center gap-1.5">
+                  <Grid3x3 className="size-4 text-slate" />
+                  Draw 9-dots pattern lock
+                </span>
+              </div>
+              {loadingValues ? (
+                <div className="rounded-md border border-hairline bg-stone/30 p-8 text-center text-xs text-body-muted">
+                  <span className="animate-pulse">Decrypting existing pattern…</span>
+                </div>
+              ) : (
+                <div className="rounded-md border border-hairline bg-stone/30 p-3 flex flex-col items-center">
+                  <PatternLock
+                    value={patternPath}
+                    onChange={setPatternPath}
+                    mode="record"
+                    size={250}
+                  />
+                </div>
+              )}
             </div>
+          ) : (
+            <div className="space-y-2 pt-0.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="ns-caption text-ink font-medium">
+                  {isApi
+                    ? fields.length > 1
+                      ? `API Keys (${fields.length})`
+                      : "API key"
+                    : fields.length > 1
+                      ? `Secret Values (${fields.length})`
+                      : "Secret value"}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={addField}
+                  className="h-7 px-2 text-xs font-medium text-primary hover:bg-primary/10"
+                >
+                  <Plus className="mr-1 size-3.5" />
+                  <span>{isApi ? "Add another API key" : "Add another secret"}</span>
+                </Button>
+              </div>
 
             {loadingValues ? (
               <div className="rounded-md border border-hairline bg-stone/30 p-3 text-center text-xs text-body-muted">
@@ -1400,6 +1548,7 @@ function SecretEditorDialog({
               </div>
             )}
           </div>
+        )}
 
           <label className="block space-y-1.5">
             <span className="ns-caption text-ink">Description (optional)</span>

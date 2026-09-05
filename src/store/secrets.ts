@@ -130,7 +130,10 @@ async function loadEntriesFromCloud(uid: string): Promise<SecretEntry[]> {
         id: d.id,
         workspaceId: typeof d.workspaceId === "string" ? d.workspaceId : DEFAULT_WORKSPACE_ID,
         title: d.title,
-        category: d.category === "password" || d.category === "other" ? d.category : "api",
+        category:
+          d.category === "password" || d.category === "pattern" || d.category === "other"
+            ? d.category
+            : "api",
         username: typeof d.username === "string" ? d.username : "",
         valueCipher: d.valueCipher,
         valueIv: d.valueIv,

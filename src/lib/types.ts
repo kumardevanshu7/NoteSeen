@@ -26,7 +26,7 @@ export type LineSpacing = "tight" | "normal" | "relaxed";
 export type View = "editor" | "all" | "cards" | "suggestions" | "shared" | "trash" | "labels" | "secrets" | "archive";
 export type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type NoteKind = "note" | "prompt" | "promptCard";
-export type SecretCategory = "api" | "password" | "other";
+export type SecretCategory = "api" | "password" | "pattern" | "other";
 
 export const DEFAULT_WORKSPACE_ID = "default";
 
@@ -184,6 +184,34 @@ export function serializeSecretValues(
   );
 }
 
+export function parsePatternPath(value: string): number[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed) && parsed.every((n) => typeof n === "number" && n >= 0 && n <= 8)) {
+      return parsed;
+    }
+    if (parsed && Array.isArray(parsed.pattern)) {
+      return parsed.pattern;
+    }
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0]?.value === "string") {
+      return parsePatternPath(parsed[0].value);
+    }
+  } catch {
+    // Maybe comma or dash separated string like "0,1,4,7,8"
+  }
+  if (typeof value === "string") {
+    const parts = value.split(/[,-\s]+/).map((s) => parseInt(s.trim(), 10));
+    const valid = parts.filter((n) => !isNaN(n) && n >= 0 && n <= 8);
+    if (valid.length > 0) return valid;
+  }
+  return [];
+}
+
+export function serializePatternPath(nodes: number[]): string {
+  return JSON.stringify(nodes);
+}
+
 import { isWorkspaceColor } from "@/lib/workspace-colors";
 
 export function normalizeWorkspace(raw: Partial<Workspace> & { id: string }): Workspace {
@@ -216,7 +244,10 @@ export function normalizeSecretEntry(raw: Partial<SecretEntry> & { id: string })
         ? raw.workspaceId.trim()
         : DEFAULT_WORKSPACE_ID,
     title: raw.title ?? "",
-    category: raw.category === "password" || raw.category === "other" ? raw.category : "api",
+    category:
+      raw.category === "password" || raw.category === "pattern" || raw.category === "other"
+        ? raw.category
+        : "api",
     username: typeof raw.username === "string" ? raw.username : "",
     valueCipher: raw.valueCipher ?? "",
     valueIv: raw.valueIv ?? "",
