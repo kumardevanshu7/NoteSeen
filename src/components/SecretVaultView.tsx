@@ -37,7 +37,9 @@ import {
 import { useNotes } from "@/store/notes";
 import { useSecrets } from "@/store/secrets";
 import { requireVault } from "@/store/vault";
+import { nanoid } from "nanoid";
 import type { SecretCategory, SecretEntry } from "@/lib/types";
+import { parseSecretValues, serializeSecretValues } from "@/lib/types";
 import { cn, formatRelative } from "@/lib/utils";
 
 const CATEGORIES: { id: SecretCategory; label: string }[] = [
@@ -614,14 +616,24 @@ function SecretCard({
     setShown(true);
   };
 
+  const fields = useMemo(() => {
+    if (!value) return [];
+    return parseSecretValues(value);
+  }, [value]);
+
   const copyValue = async () => {
     const plain = value ?? (await onReveal());
     if (!plain) return;
-    try {
-      await navigator.clipboard.writeText(plain);
+    const parsed = parseSecretValues(plain);
+    if (parsed.length > 1) {
+      const primary = parsed[0];
+      await navigator.clipboard.writeText(primary.value);
+      toast.success(primary.label ? `Copied ${primary.label}` : "Primary secret copied", {
+        description: `This card has ${parsed.length} keys. Open details to view and copy all.`,
+      });
+    } else {
+      await navigator.clipboard.writeText(parsed[0]?.value ?? plain);
       toast.success("Copied");
-    } catch {
-      toast.error("Could not copy");
     }
   };
 
@@ -665,7 +677,14 @@ function SecretCard({
         >
           <KeyRound className="size-3.5 shrink-0 text-slate" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[14px] font-medium text-ink">{entry.title}</p>
+            <div className="flex items-center gap-2">
+              <p className="truncate text-[14px] font-medium text-ink">{entry.title}</p>
+              {shown && fields.length > 1 && (
+                <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  {fields.length} keys
+                </span>
+              )}
+            </div>
             <p className="ns-caption truncate text-body-muted">
               {entry.username || categoryLabel}
               {entry.notes ? ` · ${entry.notes.split("\n")[0]}` : ""}
@@ -702,9 +721,20 @@ function SecretCard({
               {entry.notes}
             </p>
           ) : (
-            <p className="ns-mono mt-auto truncate text-[12px] text-ink">
-              {shown && value ? value : "••••••••••••"}
-            </p>
+            <div className="ns-mono mt-auto flex items-center justify-between gap-1 text-[12px] text-ink">
+              <span className="truncate">
+                {shown && fields.length > 0
+                  ? fields[0].label
+                    ? `${fields[0].label}: ${fields[0].value}`
+                    : fields[0].value
+                  : "••••••••••••"}
+              </span>
+              {shown && fields.length > 1 && (
+                <span className="shrink-0 rounded bg-primary/10 px-1 py-0.5 text-[10px] font-semibold text-primary">
+                  +{fields.length - 1} more
+                </span>
+              )}
+            </div>
           )}
           <div className="mt-auto flex items-center justify-between gap-1 pt-2">
             <span className="ns-mono text-muted">{formatRelative(entry.updatedAt)}</span>
@@ -729,13 +759,31 @@ function SecretCard({
               <span className="ns-mono rounded-full border border-hairline px-2 py-px text-muted">
                 {categoryLabel}
               </span>
+              {shown && fields.length > 1 && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                  {fields.length} keys
+                </span>
+              )}
             </div>
             {entry.username ? (
               <p className="ns-caption mt-1 truncate text-body-muted">{entry.username}</p>
             ) : null}
-            <p className="ns-mono mt-2 break-all text-[13px] text-ink">
-              {shown && value ? value : "••••••••••••••••"}
-            </p>
+            {shown && fields.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                {fields.map((f, idx) => (
+                  <p key={f.id || idx} className="ns-mono break-all text-[13px] text-ink">
+                    {f.label ? (
+                      <span className="mr-1.5 text-xs text-body-muted">{f.label}:</span>
+                    ) : null}
+                    {f.value}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="ns-mono mt-2 break-all text-[13px] text-ink">
+                ••••••••••••••••
+              </p>
+            )}
             {entry.notes ? (
               <p className="ns-caption mt-2 line-clamp-4 whitespace-pre-wrap text-body-muted">
                 {entry.notes}
@@ -793,6 +841,11 @@ function SecretDetailDialog({
   const categoryLabel =
     CATEGORIES.find((cat) => cat.id === entry.category)?.label ?? entry.category;
 
+  const fields = useMemo(() => {
+    if (!value) return [];
+    return parseSecretValues(value);
+  }, [value]);
+
   const toggleReveal = async () => {
     if (shown) {
       setShown(false);
@@ -843,39 +896,90 @@ function SecretDetailDialog({
             </div>
           ) : null}
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="ns-caption text-ink">Secret value</span>
-              <div className="flex items-center gap-0.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Show or hide"
-                  onClick={() => void toggleReveal()}
-                >
-                  {shown ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Copy secret"
-                  onClick={() =>
-                    void (async () => {
-                      const plain = value ?? (await onReveal());
-                      if (plain) await copyText(plain, "Secret copied");
-                    })()
-                  }
-                >
-                  <Copy className="size-3.5" />
-                </Button>
+          {shown && fields.length > 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="ns-caption text-ink font-medium">
+                  {categoryLabel} {fields.length > 1 ? `values (${fields.length})` : "value"}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Hide secrets"
+                    onClick={() => void toggleReveal()}
+                  >
+                    <EyeOff className="size-3.5" />
+                  </Button>
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-primary hover:bg-primary/10"
+                      onClick={() => {
+                        const allText = fields
+                          .map((f, i) => `${f.label || `Key ${i + 1}`}: ${f.value}`)
+                          .join("\n");
+                        void copyText(allText, "All keys copied");
+                      }}
+                    >
+                      <Copy className="mr-1 size-3" />
+                      Copy all
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {fields.map((f, i) => (
+                  <div
+                    key={f.id || i}
+                    className="rounded-sm border border-hairline bg-stone/50 p-2.5 space-y-1"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="ns-mono text-[11px] font-semibold text-slate uppercase tracking-wider">
+                        {f.label || (fields.length > 1 ? `Key #${i + 1}` : "Secret value")}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Copy ${f.label || "key"}`}
+                        onClick={() => void copyText(f.value, `${f.label || "Key"} copied`)}
+                      >
+                        <Copy className="size-3.5" />
+                      </Button>
+                    </div>
+                    <p className="break-all font-mono text-[13px] text-ink select-all">
+                      {f.value}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
-            <p className="break-all rounded-sm border border-hairline bg-stone/50 px-3 py-2 font-mono text-[13px] text-ink">
-              {shown && value ? value : "••••••••••••••••••••"}
-            </p>
-          </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="ns-caption text-ink font-medium">
+                  {categoryLabel} {entry ? "value" : ""}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Show secret"
+                  onClick={() => void toggleReveal()}
+                >
+                  <Eye className="size-3.5" />
+                </Button>
+              </div>
+              <p className="break-all rounded-sm border border-hairline bg-stone/50 px-3 py-2 font-mono text-[13px] text-ink">
+                ••••••••••••••••••••
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
@@ -939,36 +1043,88 @@ function SecretEditorDialog({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<SecretCategory>("api");
   const [username, setUsername] = useState("");
-  const [value, setValue] = useState("");
+  const [fields, setFields] = useState<
+    Array<{ id: string; label: string; value: string; show?: boolean }>
+  >([{ id: "1", label: "", value: "", show: false }]);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadingValues, setLoadingValues] = useState(false);
+  const revealValue = useSecrets((state) => state.revealValue);
 
   useEffect(() => {
     if (!open) return;
     setTitle(entry?.title ?? "");
     setCategory(entry?.category ?? "api");
     setUsername(entry?.username ?? "");
-    setValue("");
     setNotes(entry?.notes ?? "");
     setBusy(false);
-  }, [open, entry]);
+
+    if (entry) {
+      setLoadingValues(true);
+      void revealValue(entry.id)
+        .then((plain) => {
+          if (plain) {
+            const parsed = parseSecretValues(plain);
+            if (parsed.length > 0) {
+              setFields(parsed.map((p) => ({ ...p, show: false })));
+              return;
+            }
+          }
+          setFields([{ id: nanoid(6), label: "", value: "", show: false }]);
+        })
+        .finally(() => {
+          setLoadingValues(false);
+        });
+    } else {
+      setLoadingValues(false);
+      setFields([{ id: nanoid(6), label: "", value: "", show: false }]);
+    }
+  }, [open, entry, revealValue]);
+
+  const addField = () => {
+    setFields((prev) => [
+      ...prev,
+      { id: nanoid(6), label: "", value: "", show: false },
+    ]);
+  };
+
+  const removeField = (id: string) => {
+    setFields((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((f) => f.id !== id);
+    });
+  };
+
+  const updateField = (
+    id: string,
+    patch: Partial<{ label: string; value: string; show: boolean }>,
+  ) => {
+    setFields((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    const serialized = serializeSecretValues(fields);
+    if (!serialized && !entry) {
+      toast.error("Please enter at least one secret value");
+      return;
+    }
     setBusy(true);
-    const ok = await onSave({ title, category, username, value, notes });
+    const ok = await onSave({ title, category, username, value: serialized, notes });
     if (!ok) setBusy(false);
   };
 
+  const isApi = category === "api";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto ns-scroll">
         <DialogHeader>
           <DialogTitle>{entry ? "Edit secret" : "Add secret"}</DialogTitle>
           <DialogDescription>
             {entry
-              ? "Leave the secret value blank to keep the current one."
-              : "Only the secret value is encrypted with your PIN."}
+              ? "Edit your keys, or click + to add more keys to this card."
+              : "Secret values are securely encrypted on your device with your PIN."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} className="space-y-3.5">
@@ -977,7 +1133,7 @@ function SecretEditorDialog({
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="OpenAI API / GitHub token"
+              placeholder={isApi ? "OpenAI API / GitHub token" : "Account / Service name"}
               required
               autoFocus
             />
@@ -1007,19 +1163,112 @@ function SecretEditorDialog({
             />
           </label>
 
-          <label className="block space-y-1.5">
-            <span className="ns-caption text-ink">
-              {entry ? "New secret value (optional)" : "Secret value"}
-            </span>
-            <Input
-              type="password"
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              placeholder={entry ? "Leave blank to keep current" : "sk-… or password"}
-              required={!entry}
-              autoComplete="off"
-            />
-          </label>
+          {/* Secret values / multiple keys section */}
+          <div className="space-y-2 pt-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="ns-caption text-ink font-medium">
+                {isApi
+                  ? fields.length > 1
+                    ? `API Keys (${fields.length})`
+                    : "API key"
+                  : fields.length > 1
+                    ? `Secret Values (${fields.length})`
+                    : "Secret value"}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={addField}
+                className="h-7 px-2 text-xs font-medium text-primary hover:bg-primary/10"
+              >
+                <Plus className="mr-1 size-3.5" />
+                <span>{isApi ? "Add another API key" : "Add another secret"}</span>
+              </Button>
+            </div>
+
+            {loadingValues ? (
+              <div className="rounded-md border border-hairline bg-stone/30 p-3 text-center text-xs text-body-muted">
+                Decrypting existing secrets...
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {fields.map((field, idx) => (
+                  <div
+                    key={field.id}
+                    className="rounded-md border border-hairline bg-stone/20 p-2.5 space-y-1.5 transition-colors focus-within:border-primary/40 focus-within:bg-stone/30"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        value={field.label}
+                        onChange={(e) => updateField(field.id, { label: e.target.value })}
+                        placeholder={
+                          fields.length > 1
+                            ? idx === 0
+                              ? isApi
+                                ? "Key name (e.g. Primary Key / Public ID)"
+                                : "Label (e.g. Primary Password)"
+                              : isApi
+                                ? `Key name (e.g. Secret Key, Backup #${idx + 1})`
+                                : `Label (e.g. Recovery Code, Pin #${idx + 1})`
+                            : isApi
+                              ? "Key label (optional, e.g. Primary Key, Client Secret)"
+                              : "Label (optional, e.g. Master password)"
+                        }
+                        className="w-full bg-transparent text-xs font-medium text-ink placeholder:text-muted/60 outline-none"
+                      />
+                      {fields.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeField(field.id)}
+                          className="flex size-5 items-center justify-center rounded text-muted hover:bg-error/10 hover:text-error transition-colors"
+                          title="Remove this key"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <Input
+                        type={field.show ? "text" : "password"}
+                        value={field.value}
+                        onChange={(e) => updateField(field.id, { value: e.target.value })}
+                        placeholder={
+                          isApi ? "sk-… or password" : "password or secret"
+                        }
+                        required={idx === 0 && !entry}
+                        autoComplete="off"
+                        className="h-9 pr-9 font-mono text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateField(field.id, { show: !field.show })}
+                        className="absolute right-2.5 text-muted hover:text-ink transition-colors"
+                        tabIndex={-1}
+                      >
+                        {field.show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addField}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-sm border border-dashed border-hairline py-2 text-xs font-medium text-slate hover:border-primary/40 hover:bg-primary/5 hover:text-primary transition-all"
+                >
+                  <Plus className="size-3.5" />
+                  <span>
+                    {isApi
+                      ? "Add another API key to this card"
+                      : "Add another secret to this card"}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <label className="block space-y-1.5">
             <span className="ns-caption text-ink">Description (optional)</span>
@@ -1029,8 +1278,8 @@ function SecretEditorDialog({
               placeholder={
                 "Write as many lines as you need — press Enter for a new line.\nPortal URL, employee id, how to use this key…"
               }
-              rows={6}
-              className="ns-scroll min-h-[8rem] w-full resize-y rounded-sm border border-hairline bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/20"
+              rows={5}
+              className="ns-scroll min-h-[7rem] w-full resize-y rounded-sm border border-hairline bg-surface px-3 py-2.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/20"
             />
             <span className="ns-micro text-muted">{notes.length.toLocaleString()} / 20,000</span>
           </label>

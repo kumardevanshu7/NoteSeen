@@ -137,6 +137,51 @@ export interface SecretEntry {
   updatedAt: number;
 }
 
+export interface SecretField {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export function parseSecretValues(decryptedText: string): SecretField[] {
+  if (!decryptedText) return [];
+  try {
+    const parsed = JSON.parse(decryptedText);
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      typeof parsed[0] === "object" &&
+      parsed[0] !== null
+    ) {
+      return parsed.map((item, idx) => ({
+        id: item.id || `sec_${idx}`,
+        label: typeof item.label === "string" ? item.label : "",
+        value: typeof item.value === "string" ? item.value : String(item.value ?? item ?? ""),
+      }));
+    }
+  } catch {
+    // legacy plain string
+  }
+  return [{ id: "sec_0", label: "", value: decryptedText }];
+}
+
+export function serializeSecretValues(
+  fields: Array<{ id?: string; label?: string; value: string }>,
+): string {
+  const clean = fields.filter((f) => f.value.trim().length > 0);
+  if (clean.length === 0) return "";
+  if (clean.length === 1 && !clean[0].label?.trim()) {
+    return clean[0].value;
+  }
+  return JSON.stringify(
+    clean.map((f, idx) => ({
+      id: f.id || `sec_${idx}`,
+      label: f.label?.trim() || "",
+      value: f.value,
+    })),
+  );
+}
+
 import { isWorkspaceColor } from "@/lib/workspace-colors";
 
 export function normalizeWorkspace(raw: Partial<Workspace> & { id: string }): Workspace {
