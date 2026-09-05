@@ -38,7 +38,7 @@ import { useNotes } from "@/store/notes";
 import { useSecrets } from "@/store/secrets";
 import { requireVault } from "@/store/vault";
 import { nanoid } from "nanoid";
-import type { SecretCategory, SecretEntry } from "@/lib/types";
+import type { SecretCategory, SecretEntry, SecretField } from "@/lib/types";
 import { parseSecretValues, serializeSecretValues } from "@/lib/types";
 import { cn, formatRelative } from "@/lib/utils";
 
@@ -826,37 +826,75 @@ function SecretDetailDialog({
   onDelete: () => void;
   onReveal: () => Promise<string | null>;
 }) {
-  const [shown, setShown] = useState(false);
-  const [value, setValue] = useState<string | null>(null);
-
-  // ⚠ All hooks MUST come before any early returns (Rules of Hooks)
-  const fields = useMemo(() => {
-    if (!value) return [];
-    return parseSecretValues(value);
-  }, [value]);
+  const [loading, setLoading] = useState(false);
+  const [fields, setFields] = useState<SecretField[]>([]);
+  const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setShown(false);
-      setValue(null);
+    if (!open || !entry) {
+      setFields([]);
+      setRevealedIds({});
+      setLoading(false);
+      setError(null);
+      return;
     }
-  }, [open, entry?.id]);
+
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    void onReveal()
+      .then((plain) => {
+        if (!active) return;
+        if (plain != null) {
+          const parsed = parseSecretValues(plain);
+          setFields(parsed);
+        } else {
+          setFields([]);
+          setError("Could not decrypt secrets. Please re-enter your PIN.");
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : "Failed to decrypt secrets.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [open, entry?.id, entry?.updatedAt, onReveal]);
 
   if (!entry) return null;
 
   const categoryLabel =
     CATEGORIES.find((cat) => cat.id === entry.category)?.label ?? entry.category;
+  const isApi = entry.category === "api";
 
-  const toggleReveal = async () => {
-    if (shown) {
-      setShown(false);
-      setValue(null);
-      return;
+  const allRevealed = fields.length > 0 && fields.every((f) => revealedIds[f.id]);
+
+  const toggleRevealAll = () => {
+    const nextState = !allRevealed;
+    const nextMap: Record<string, boolean> = {};
+    for (const f of fields) {
+      nextMap[f.id] = nextState;
     }
-    const plain = await onReveal();
-    if (plain == null) return;
-    setValue(plain);
-    setShown(true);
+    setRevealedIds(nextMap);
+  };
+
+  const toggleFieldReveal = (id: string) => {
+    setRevealedIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const copyAllKeys = async () => {
+    if (fields.length === 0) return;
+    const allText = fields
+      .map((f, i) => `${f.label || (isApi ? `API Key ${i + 1}` : `Key ${i + 1}`)}: ${f.value}`)
+      .join("\n");
+    await copyText(allText, `All ${fields.length} keys copied`);
   };
 
   return (
@@ -897,88 +935,168 @@ function SecretDetailDialog({
             </div>
           ) : null}
 
-          {shown && fields.length > 0 ? (
+          {/* Secret keys section */}
+          {loading ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="ns-caption text-ink font-medium">
+                  {isApi ? "API Keys" : `${categoryLabel} values`}
+                </span>
+              </div>
+              <div className="flex items-center justify-center rounded-sm border border-hairline bg-stone/30 py-6 text-xs text-body-muted">
+                <span className="animate-pulse">Decrypting keys…</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="rounded-sm border border-error/30 bg-error/5 p-3 text-xs text-error">
+              {error}
+            </div>
+          ) : fields.length > 1 ? (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="ns-caption text-ink font-medium">
-                  {categoryLabel} {fields.length > 1 ? `values (${fields.length})` : "value"}
+                <span className="ns-caption font-medium text-ink">
+                  {isApi
+                    ? `API Keys (${fields.length})`
+                    : `${categoryLabel} values (${fields.length})`}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-slate hover:text-ink hover:bg-stone/80"
+                    onClick={toggleRevealAll}
+                  >
+                    {allRevealed ? (
+                      <>
+                        <EyeOff className="mr-1 size-3.5" />
+                        Hide all
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="mr-1 size-3.5" />
+                        Show all
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs text-primary hover:bg-primary/10"
+                    onClick={() => void copyAllKeys()}
+                  >
+                    <Copy className="mr-1 size-3" />
+                    Copy all
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {fields.map((f, i) => {
+                  const isShown = Boolean(revealedIds[f.id]);
+                  return (
+                    <div
+                      key={f.id || i}
+                      className="rounded-sm border border-hairline bg-stone/50 p-2.5 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-hairline/50 pb-1">
+                        <span className="ns-mono text-[11px] font-semibold text-primary uppercase tracking-wider">
+                          {isApi ? `API Key #${i + 1}` : `Key #${i + 1}`}
+                          {f.label ? ` · ${f.label}` : ""}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={isShown ? "Hide key" : "Show key"}
+                            title={isShown ? "Hide key" : "Show key"}
+                            onClick={() => toggleFieldReveal(f.id)}
+                          >
+                            {isShown ? (
+                              <EyeOff className="size-3.5" />
+                            ) : (
+                              <Eye className="size-3.5" />
+                            )}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Copy ${f.label || "key"}`}
+                            title={`Copy ${f.label || "key"}`}
+                            onClick={() =>
+                              void copyText(
+                                f.value,
+                                `${f.label || `Key #${i + 1}`} copied`,
+                              )
+                            }
+                          >
+                            <Copy className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="break-all font-mono text-[13px] text-ink select-all">
+                        {isShown ? f.value : "••••••••••••••••••••"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : fields.length === 1 ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="ns-caption font-medium text-ink">
+                  {isApi ? "API key value" : `${categoryLabel} value`}
+                  {fields[0].label ? ` · ${fields[0].label}` : ""}
                 </span>
                 <div className="flex items-center gap-1">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    aria-label="Hide secrets"
-                    onClick={() => void toggleReveal()}
+                    aria-label={
+                      revealedIds[fields[0].id] ? "Hide secret" : "Show secret"
+                    }
+                    title={
+                      revealedIds[fields[0].id] ? "Hide secret" : "Show secret"
+                    }
+                    onClick={() => toggleFieldReveal(fields[0].id)}
                   >
-                    <EyeOff className="size-3.5" />
+                    {revealedIds[fields[0].id] ? (
+                      <EyeOff className="size-3.5" />
+                    ) : (
+                      <Eye className="size-3.5" />
+                    )}
                   </Button>
-                  {fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-primary hover:bg-primary/10"
-                      onClick={() => {
-                        const allText = fields
-                          .map((f, i) => `${f.label || `Key ${i + 1}`}: ${f.value}`)
-                          .join("\n");
-                        void copyText(allText, "All keys copied");
-                      }}
-                    >
-                      <Copy className="mr-1 size-3" />
-                      Copy all
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Copy secret"
+                    title="Copy secret"
+                    onClick={() =>
+                      void copyText(
+                        fields[0].value,
+                        `${fields[0].label || "Secret"} copied`,
+                      )
+                    }
+                  >
+                    <Copy className="size-3.5" />
+                  </Button>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                {fields.map((f, i) => (
-                  <div
-                    key={f.id || i}
-                    className="rounded-sm border border-hairline bg-stone/50 p-2.5 space-y-1"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="ns-mono text-[11px] font-semibold text-slate uppercase tracking-wider">
-                        {f.label || (fields.length > 1 ? `Key #${i + 1}` : "Secret value")}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Copy ${f.label || "key"}`}
-                        onClick={() => void copyText(f.value, `${f.label || "Key"} copied`)}
-                      >
-                        <Copy className="size-3.5" />
-                      </Button>
-                    </div>
-                    <p className="break-all font-mono text-[13px] text-ink select-all">
-                      {f.value}
-                    </p>
-                  </div>
-                ))}
-              </div>
+              <p className="break-all rounded-sm border border-hairline bg-stone/50 px-3 py-2 font-mono text-[13px] text-ink select-all">
+                {revealedIds[fields[0].id]
+                  ? fields[0].value
+                  : "••••••••••••••••••••"}
+              </p>
             </div>
           ) : (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="ns-caption text-ink font-medium">
-                  {categoryLabel} {entry ? "value" : ""}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Show secret"
-                  onClick={() => void toggleReveal()}
-                >
-                  <Eye className="size-3.5" />
-                </Button>
-              </div>
-              <p className="break-all rounded-sm border border-hairline bg-stone/50 px-3 py-2 font-mono text-[13px] text-ink">
-                ••••••••••••••••••••
-              </p>
+            <div className="rounded-sm border border-hairline bg-stone/30 p-3 text-xs text-body-muted text-center">
+              No secret values saved yet. Click Edit to add keys.
             </div>
           )}
 
