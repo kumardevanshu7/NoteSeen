@@ -26,7 +26,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TableBadgeDialog } from "./TableBadgeDialog";
-import { fillColumnWithBadge } from "@/lib/table-badge";
+import {
+  clearColumnBadges,
+  fillColumnWithBadge,
+  getActiveColumnInfo,
+  setCellBadge,
+  type ActiveColumnInfo,
+} from "@/lib/table-badge";
 
 interface TableControlsProps {
   editor: Editor;
@@ -50,6 +56,13 @@ export function TableControls({ editor }: TableControlsProps) {
   const [tablePos, setTablePos] = useState<TablePosition | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<ContextMenuPosition | null>(null);
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [activeCol, setActiveCol] = useState<ActiveColumnInfo>({
+    colIndex: 0,
+    headerName: "Column",
+    hasBadges: false,
+    choices: [],
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +75,10 @@ export function TableControls({ editor }: TableControlsProps) {
       return setTablePos(null);
     }
 
+    // Refresh active column metadata
+    const colInfo = getActiveColumnInfo(editor);
+    setActiveCol(colInfo);
+
     // Find the currently active table element in the editor DOM
     const { selection } = editor.state;
     const domAtPos = editor.view.domAtPos(selection.from);
@@ -73,7 +90,6 @@ export function TableControls({ editor }: TableControlsProps) {
     }
 
     if (!node || node.nodeName !== "TABLE") {
-      // Fallback: find any table under editor if selection is near
       const tables = editor.view.dom.querySelectorAll("table");
       if (tables.length === 1) {
         node = tables[0];
@@ -119,6 +135,8 @@ export function TableControls({ editor }: TableControlsProps) {
 
       if (insideTable) {
         e.preventDefault();
+        const colInfo = getActiveColumnInfo(editor);
+        setActiveCol(colInfo);
         setContextMenuPos({ x: e.clientX, y: e.clientY });
       } else {
         setContextMenuPos(null);
@@ -162,16 +180,12 @@ export function TableControls({ editor }: TableControlsProps) {
   }, [contextMenuPos]);
 
   const insertYesNoCell = () => {
-    editor
-      .chain()
-      .focus()
-      .insertTableBadge({
-        value: "Yes",
-        variant: "yes",
-        color: "green",
-        options: JSON.stringify(["Yes", "No"]),
-      })
-      .run();
+    setCellBadge(editor, {
+      value: "Yes",
+      variant: "yes",
+      color: "green",
+      options: JSON.stringify(["Yes", "No"]),
+    });
     setContextMenuPos(null);
   };
 
@@ -287,7 +301,7 @@ export function TableControls({ editor }: TableControlsProps) {
 
         <div className="h-3.5 w-px bg-hairline" />
 
-        {/* ── Badges / Options Dropdown ──────────────────────────────────── */}
+        {/* ── Badges / Options Dropdown (Isolated per Column) ────────────── */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -299,25 +313,114 @@ export function TableControls({ editor }: TableControlsProps) {
               <ChevronDown className="size-2.5 opacity-60" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-52 z-50">
-            <DropdownMenuItem onClick={insertYesNoCell} className="gap-2 text-xs">
-              <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-500">
-                ✓
-              </span>
-              <span>Insert Yes / No (Cell)</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={fillYesNoColumn} className="gap-2 text-xs">
-              <Check className="size-3.5 text-emerald-500" />
-              <span>Fill column with Yes / No</span>
-            </DropdownMenuItem>
+          <DropdownMenuContent align="start" className="min-w-56 z-50">
+            <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted">
+              Column: {activeCol.headerName}
+            </div>
+
+            {/* If this column has defined choices, show them directly */}
+            {activeCol.choices.length > 0 ? (
+              <>
+                <div className="px-2.5 py-0.5 text-[11px] text-slate">
+                  Select option for this cell:
+                </div>
+                {activeCol.choices.map((choice, i) => (
+                  <DropdownMenuItem
+                    key={i}
+                    onClick={() =>
+                      setCellBadge(editor, {
+                        value: choice.label,
+                        variant:
+                          choice.label.toLowerCase() === "no"
+                            ? "no"
+                            : choice.label.toLowerCase() === "yes"
+                            ? "yes"
+                            : "custom",
+                        color: choice.color || "green",
+                        options: JSON.stringify(activeCol.choices),
+                      })
+                    }
+                    className="gap-2 text-xs cursor-pointer"
+                  >
+                    <span
+                      className="size-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          choice.color === "green"
+                            ? "#10b981"
+                            : choice.color === "red"
+                            ? "#f43f5e"
+                            : choice.color === "blue"
+                            ? "#3b82f6"
+                            : choice.color === "amber"
+                            ? "#f59e0b"
+                            : choice.color === "purple"
+                            ? "#8b5cf6"
+                            : "#9ca3af",
+                      }}
+                    />
+                    <span className="font-medium">{choice.label}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() =>
+                    fillColumnWithBadge(
+                      editor,
+                      {
+                        value: activeCol.choices[0].label,
+                        variant:
+                          activeCol.choices[0].label.toLowerCase() === "no"
+                            ? "no"
+                            : activeCol.choices[0].label.toLowerCase() === "yes"
+                            ? "yes"
+                            : "custom",
+                        color: activeCol.choices[0].color || "green",
+                        options: JSON.stringify(activeCol.choices),
+                      },
+                      true,
+                    )
+                  }
+                  className="gap-2 text-xs"
+                >
+                  <Check className="size-3.5 text-emerald-500" />
+                  <span>Fill column with "{activeCol.choices[0].label}"</span>
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={insertYesNoCell} className="gap-2 text-xs">
+                  <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-500">
+                    ✓
+                  </span>
+                  <span>Insert Yes / No (Cell)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={fillYesNoColumn} className="gap-2 text-xs">
+                  <Check className="size-3.5 text-emerald-500" />
+                  <span>Fill column with Yes / No</span>
+                </DropdownMenuItem>
+              </>
+            )}
+
             <DropdownMenuSeparator />
+
             <DropdownMenuItem
               onClick={() => setCustomDialogOpen(true)}
-              className="gap-2 text-xs font-medium text-ink"
+              className="gap-2 text-xs font-medium text-ink cursor-pointer"
             >
               <Sparkles className="size-3.5 text-emerald-500" />
-              <span>Custom Options (2-5 choices)...</span>
+              <span>Configure Column Options (2-5)...</span>
             </DropdownMenuItem>
+
+            {activeCol.hasBadges && (
+              <DropdownMenuItem
+                onClick={() => clearColumnBadges(editor)}
+                className="gap-2 text-xs text-muted hover:text-error cursor-pointer"
+              >
+                <X className="size-3.5" />
+                <span>Clear Column Badges</span>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -377,34 +480,107 @@ export function TableControls({ editor }: TableControlsProps) {
           ref={contextMenuRef}
           style={{
             position: "fixed",
-            top: Math.min(window.innerHeight - 300, Math.max(10, contextMenuPos.y)),
-            left: Math.min(window.innerWidth - 240, Math.max(10, contextMenuPos.x)),
+            top: Math.min(window.innerHeight - 340, Math.max(10, contextMenuPos.y)),
+            left: Math.min(window.innerWidth - 250, Math.max(10, contextMenuPos.x)),
           }}
           className="pointer-events-auto z-50 min-w-56 overflow-hidden rounded-md border border-hairline bg-surface p-1.5 text-ink shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className="px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted">
-            Table Cell & Column
+          <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-emerald-500">
+            Column: {activeCol.headerName}
           </div>
 
-          {/* Badge Options */}
-          <button
-            type="button"
-            onClick={insertYesNoCell}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
-          >
-            <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-500">
-              ✓
-            </span>
-            <span>Insert Yes / No Badge</span>
-          </button>
-          <button
-            type="button"
-            onClick={fillYesNoColumn}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
-          >
-            <Check className="size-3.5 text-emerald-500" />
-            <span>Fill Column with Yes / No</span>
-          </button>
+          {/* Quick choices for THIS specific column */}
+          {activeCol.choices.length > 0 ? (
+            <>
+              {activeCol.choices.map((choice, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setCellBadge(editor, {
+                      value: choice.label,
+                      variant:
+                        choice.label.toLowerCase() === "no"
+                          ? "no"
+                          : choice.label.toLowerCase() === "yes"
+                          ? "yes"
+                          : "custom",
+                      color: choice.color || "green",
+                      options: JSON.stringify(activeCol.choices),
+                    });
+                    setContextMenuPos(null);
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+                >
+                  <span
+                    className="size-2 rounded-full"
+                    style={{
+                      backgroundColor:
+                        choice.color === "green"
+                          ? "#10b981"
+                          : choice.color === "red"
+                          ? "#f43f5e"
+                          : choice.color === "blue"
+                          ? "#3b82f6"
+                          : choice.color === "amber"
+                          ? "#f59e0b"
+                          : choice.color === "purple"
+                          ? "#8b5cf6"
+                          : "#9ca3af",
+                    }}
+                  />
+                  <span>{choice.label}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  fillColumnWithBadge(
+                    editor,
+                    {
+                      value: activeCol.choices[0].label,
+                      variant:
+                        activeCol.choices[0].label.toLowerCase() === "no"
+                          ? "no"
+                          : activeCol.choices[0].label.toLowerCase() === "yes"
+                          ? "yes"
+                          : "custom",
+                      color: activeCol.choices[0].color || "green",
+                      options: JSON.stringify(activeCol.choices),
+                    },
+                    true,
+                  );
+                  setContextMenuPos(null);
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+              >
+                <Check className="size-3.5 text-emerald-500" />
+                <span>Fill Column with "{activeCol.choices[0].label}"</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={insertYesNoCell}
+                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+              >
+                <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-500">
+                  ✓
+                </span>
+                <span>Insert Yes / No Badge</span>
+              </button>
+              <button
+                type="button"
+                onClick={fillYesNoColumn}
+                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+              >
+                <Check className="size-3.5 text-emerald-500" />
+                <span>Fill Column with Yes / No</span>
+              </button>
+            </>
+          )}
+
           <button
             type="button"
             onClick={() => {
@@ -414,8 +590,22 @@ export function TableControls({ editor }: TableControlsProps) {
             className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-stone"
           >
             <Sparkles className="size-3.5" />
-            <span>Custom Options (2-5)...</span>
+            <span>Configure Options (2-5)...</span>
           </button>
+
+          {activeCol.hasBadges && (
+            <button
+              type="button"
+              onClick={() => {
+                clearColumnBadges(editor);
+                setContextMenuPos(null);
+              }}
+              className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-muted hover:text-error transition-colors"
+            >
+              <X className="size-3.5" />
+              <span>Clear Column Badges</span>
+            </button>
+          )}
 
           <div className="my-1 h-px bg-hairline" />
 
@@ -566,11 +756,13 @@ export function TableControls({ editor }: TableControlsProps) {
         <TooltipContent side="bottom">Add row</TooltipContent>
       </Tooltip>
 
-      {/* ── Custom Options & Badges Dialog ───────────────────────────────── */}
+      {/* ── Custom Options & Badges Dialog (Isolated per Column) ─────────── */}
       <TableBadgeDialog
         open={customDialogOpen}
         onOpenChange={setCustomDialogOpen}
         editor={editor}
+        columnTitle={activeCol.headerName}
+        initialChoices={activeCol.choices.length > 0 ? activeCol.choices : undefined}
       />
     </div>,
     document.body,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   Dialog,
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   fillColumnWithBadge,
+  setCellBadge,
   type BadgeColor,
   type BadgeChoice,
 } from "@/lib/table-badge";
@@ -20,24 +21,89 @@ interface TableBadgeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editor: Editor;
+  columnTitle?: string;
+  initialChoices?: BadgeChoice[];
 }
 
-const COLOR_OPTIONS: { label: string; value: BadgeColor; bg: string; text: string; border: string }[] = [
-  { label: "Green", value: "green", bg: "rgba(16, 185, 129, 0.16)", text: "#10b981", border: "rgba(16, 185, 129, 0.38)" },
-  { label: "Red", value: "red", bg: "rgba(244, 63, 94, 0.16)", text: "#f43f5e", border: "rgba(244, 63, 94, 0.38)" },
-  { label: "Blue", value: "blue", bg: "rgba(59, 130, 246, 0.16)", text: "#3b82f6", border: "rgba(59, 130, 246, 0.38)" },
-  { label: "Amber", value: "amber", bg: "rgba(245, 158, 11, 0.16)", text: "#f59e0b", border: "rgba(245, 158, 11, 0.38)" },
-  { label: "Purple", value: "purple", bg: "rgba(139, 92, 246, 0.16)", text: "#8b5cf6", border: "rgba(139, 92, 246, 0.38)" },
-  { label: "Gray", value: "gray", bg: "rgba(156, 163, 175, 0.16)", text: "#9ca3af", border: "rgba(156, 163, 175, 0.38)" },
+const COLOR_OPTIONS: {
+  label: string;
+  value: BadgeColor;
+  bg: string;
+  text: string;
+  border: string;
+}[] = [
+  {
+    label: "Green",
+    value: "green",
+    bg: "rgba(16, 185, 129, 0.16)",
+    text: "#10b981",
+    border: "rgba(16, 185, 129, 0.38)",
+  },
+  {
+    label: "Red",
+    value: "red",
+    bg: "rgba(244, 63, 94, 0.16)",
+    text: "#f43f5e",
+    border: "rgba(244, 63, 94, 0.38)",
+  },
+  {
+    label: "Blue",
+    value: "blue",
+    bg: "rgba(59, 130, 246, 0.16)",
+    text: "#3b82f6",
+    border: "rgba(59, 130, 246, 0.38)",
+  },
+  {
+    label: "Amber",
+    value: "amber",
+    bg: "rgba(245, 158, 11, 0.16)",
+    text: "#f59e0b",
+    border: "rgba(245, 158, 11, 0.38)",
+  },
+  {
+    label: "Purple",
+    value: "purple",
+    bg: "rgba(139, 92, 246, 0.16)",
+    text: "#8b5cf6",
+    border: "rgba(139, 92, 246, 0.38)",
+  },
+  {
+    label: "Gray",
+    value: "gray",
+    bg: "rgba(156, 163, 175, 0.16)",
+    text: "#9ca3af",
+    border: "rgba(156, 163, 175, 0.38)",
+  },
 ];
 
-export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialogProps) {
+export function TableBadgeDialog({
+  open,
+  onOpenChange,
+  editor,
+  columnTitle,
+  initialChoices,
+}: TableBadgeDialogProps) {
   const [choices, setChoices] = useState<BadgeChoice[]>([
     { label: "Yes", color: "green" },
     { label: "No", color: "red" },
     { label: "(No Chance)", color: "amber" },
   ]);
   const [applyToColumn, setApplyToColumn] = useState(true);
+
+  // Synchronize choices with the active column when dialog is opened
+  useEffect(() => {
+    if (open) {
+      if (initialChoices && initialChoices.length >= 2) {
+        setChoices(initialChoices);
+      } else {
+        setChoices([
+          { label: "Yes", color: "green" },
+          { label: "No", color: "red" },
+          { label: "(No Chance)", color: "amber" },
+        ]);
+      }
+    }
+  }, [open, initialChoices]);
 
   const setChoiceCount = (count: number) => {
     if (count < 2 || count > 5) return;
@@ -122,21 +188,17 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
         true,
       );
     } else {
-      editor
-        .chain()
-        .focus()
-        .insertTableBadge({
-          value: first.label,
-          variant:
-            first.label.toLowerCase() === "no"
-              ? "no"
-              : first.label.toLowerCase() === "yes"
-              ? "yes"
-              : "custom",
-          color: first.color || "green",
-          options: optionsJson,
-        })
-        .run();
+      setCellBadge(editor, {
+        value: first.label,
+        variant:
+          first.label.toLowerCase() === "no"
+            ? "no"
+            : first.label.toLowerCase() === "yes"
+            ? "yes"
+            : "custom",
+        color: first.color || "green",
+        options: optionsJson,
+      });
     }
 
     onOpenChange(false);
@@ -148,10 +210,10 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-semibold">
             <Sparkles className="size-4 text-emerald-500" />
-            Custom Table Options & Badges
+            <span>{columnTitle ? `${columnTitle} — Options` : "Custom Table Options & Badges"}</span>
           </DialogTitle>
           <p className="text-xs text-muted">
-            Configure 2 to 5 selectable options. Click any badge in the table to cycle through choices!
+            Configure 2 to 5 selectable options for this column. Each column remembers its own choices!
           </p>
         </DialogHeader>
 
@@ -165,28 +227,28 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
               <button
                 type="button"
                 onClick={() => applyPreset("yesno")}
-                className="rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink transition-colors hover:bg-stone"
+                className="rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink transition-colors hover:bg-stone cursor-pointer"
               >
                 Yes / No
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset("yesno_chance")}
-                className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-emerald-500/20"
+                className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-emerald-500/20 cursor-pointer"
               >
                 Yes / No / (No Chance)
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset("todo")}
-                className="rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink transition-colors hover:bg-stone"
+                className="rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink transition-colors hover:bg-stone cursor-pointer"
               >
                 To Do / In Progress / Done
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset("priority")}
-                className="rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink transition-colors hover:bg-stone"
+                className="rounded-full border border-hairline bg-surface px-2.5 py-0.5 text-xs text-ink transition-colors hover:bg-stone cursor-pointer"
               >
                 Low / Med / High
               </button>
@@ -205,7 +267,7 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
                     key={cnt}
                     type="button"
                     onClick={() => setChoiceCount(cnt)}
-                    className={`size-6 rounded text-xs font-semibold transition-all ${
+                    className={`size-6 rounded text-xs font-semibold transition-all cursor-pointer ${
                       choices.length === cnt
                         ? "bg-accent text-white shadow-xs"
                         : "text-muted hover:text-ink"
@@ -245,7 +307,7 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
                         type="button"
                         onClick={() => updateColor(idx, c.value)}
                         title={c.label}
-                        className="relative flex size-5 items-center justify-center rounded-full transition-transform hover:scale-115"
+                        className="relative flex size-5 items-center justify-center rounded-full transition-transform hover:scale-115 cursor-pointer"
                         style={{
                           backgroundColor: c.bg,
                           border: `1.5px solid ${c.border}`,
@@ -296,7 +358,7 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
               type="checkbox"
               checked={applyToColumn}
               onChange={(e) => setApplyToColumn(e.target.checked)}
-              className="size-4 rounded accent-emerald-500"
+              className="size-4 rounded accent-emerald-500 cursor-pointer"
             />
             <span>Apply to all rows in this column (keeps header title intact)</span>
           </label>
@@ -306,7 +368,11 @@ export function TableBadgeDialog({ open, onOpenChange, editor }: TableBadgeDialo
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleApply} className="bg-emerald-600 text-white hover:bg-emerald-500">
+          <Button
+            size="sm"
+            onClick={handleApply}
+            className="bg-emerald-600 text-white hover:bg-emerald-500 cursor-pointer"
+          >
             Apply Badges
           </Button>
         </DialogFooter>
