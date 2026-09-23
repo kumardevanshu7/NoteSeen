@@ -41,6 +41,7 @@ import { countWords, formatClock, readingMinutes, cn } from "@/lib/utils";
 import { createSlashCommandsExtension } from "@/lib/slash-commands";
 import { CustomInputRules } from "@/lib/custom-input-rules";
 import { CodeBlockWithCopy } from "@/lib/code-block-extension";
+import { TableBadge, cycleTableBadge } from "@/lib/table-badge";
 import { SelectionMenu } from "./SelectionMenu";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { TableControls } from "./TableControls";
@@ -148,6 +149,7 @@ export function NoteEditor({ note }: { note: Note }) {
       TableRow,
       TableHeader,
       TableCell,
+      TableBadge,
       CustomInputRules,
       createSlashCommandsExtension(() => noteIdRef.current),
       Placeholder.configure({ placeholder: "Type '/' for commands, or start typing…" }),
@@ -254,6 +256,68 @@ export function NoteEditor({ note }: { note: Note }) {
         }
         void insertPastedImages(ed, images, noteIdRef.current);
         return true;
+      },
+      handleClick(view, _pos, event) {
+        const target = event.target as HTMLElement | null;
+        if (!target) return false;
+
+        // 1. Handle clicking link or go-to link arrow
+        const anchor = target.closest("a");
+        if (anchor) {
+          const href = anchor.getAttribute("href");
+          if (href) {
+            event.preventDefault();
+            window.open(href, "_blank", "noopener,noreferrer");
+            return true;
+          }
+        }
+
+        // 2. Handle clicking table choice badge (toggle or cycle)
+        const badgeEl = target.closest("[data-table-badge]") as HTMLElement | null;
+        if (badgeEl && canEditRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const directPos = view.posAtDOM(badgeEl, 0);
+          let targetPos = -1;
+          let targetNode: any = null;
+
+          const doc = view.state.doc;
+          const candidates = [directPos, directPos - 1, directPos + 1];
+          for (const p of candidates) {
+            if (p >= 0 && p < doc.content.size) {
+              const n = doc.nodeAt(p);
+              if (n && n.type.name === "tableBadge") {
+                targetPos = p;
+                targetNode = n;
+                break;
+              }
+            }
+          }
+
+          if (!targetNode) {
+            try {
+              const $pos = doc.resolve(Math.min(Math.max(0, directPos), doc.content.size));
+              if ($pos.parent) {
+                $pos.parent.forEach((child, offset) => {
+                  if (child.type.name === "tableBadge" && !targetNode) {
+                    targetPos = $pos.start() + offset;
+                    targetNode = child;
+                  }
+                });
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          if (targetNode && targetPos >= 0) {
+            cycleTableBadge(view, targetPos, targetNode);
+            return true;
+          }
+        }
+
+        return false;
       },
     },
     onUpdate({ editor: instance }) {

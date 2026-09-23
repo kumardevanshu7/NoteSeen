@@ -84,6 +84,7 @@ const KEEP_TAGS = new Set([
   "TR",
   "TH",
   "TD",
+  "SPAN",
 ]);
 
 function unwrapElement(el: Element) {
@@ -100,6 +101,15 @@ function cleanAttributes(el: Element) {
   const tag = el.tagName;
   const allowed = new Set<string>();
   if (tag === "A") allowed.add("href");
+  if (tag === "SPAN") {
+    allowed.add("class");
+    allowed.add("data-table-badge");
+    allowed.add("data-variant");
+    allowed.add("data-color");
+    allowed.add("data-value");
+    allowed.add("data-options");
+    allowed.add("contenteditable");
+  }
   if (tag === "TH" || tag === "TD") {
     allowed.add("colspan");
     allowed.add("rowspan");

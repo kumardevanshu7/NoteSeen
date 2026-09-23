@@ -6,7 +6,9 @@ import Suggestion, {
   type SuggestionKeyDownProps,
 } from "@tiptap/suggestion";
 import {
+  CheckSquare,
   Code2,
+  ExternalLink,
   Heading1,
   Heading2,
   Heading3,
@@ -212,6 +214,53 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
     command: ({ editor, range, noteId }) => {
       editor.chain().focus().deleteRange(range).run();
       triggerImageUpload(noteId);
+    },
+  },
+  {
+    id: "link",
+    title: "Link",
+    description: "Insert a clickable web link with go-to arrow.",
+    icon: ExternalLink,
+    category: "Advanced & Media",
+    keywords: ["link", "url", "href", "web", "website", "instagram", "http", "https"],
+    shortcut: "link",
+    command: ({ editor, range }) => {
+      const url = window.prompt("Enter URL (e.g. https://...):");
+      if (!url || !url.trim()) return;
+      const cleanUrl = url.trim();
+      const finalUrl = /^https?:\/\//i.test(cleanUrl) ? cleanUrl : `https://${cleanUrl}`;
+
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertContent({
+          type: "text",
+          text: finalUrl,
+          marks: [{ type: "link", attrs: { href: finalUrl } }],
+        })
+        .run();
+    },
+  },
+  {
+    id: "yesno",
+    title: "Yes / No Badge",
+    description: "Insert an interactive Yes / No choice pill.",
+    icon: CheckSquare,
+    category: "Advanced & Media",
+    keywords: ["yes", "no", "badge", "pill", "status", "tag", "choice", "filter"],
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTableBadge({
+          value: "Yes",
+          variant: "yes",
+          color: "green",
+          options: JSON.stringify(["Yes", "No"]),
+        })
+        .run();
     },
   },
 ];
