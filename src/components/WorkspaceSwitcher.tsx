@@ -38,6 +38,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [color, setColor] = useState<WorkspaceColor>("azure");
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -151,7 +152,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-error focus:text-error"
-                onSelect={() => void deleteWorkspace(active.id)}
+                onSelect={() => setDeleteConfirmOpen(true)}
               >
                 <Trash2 />
                 Delete workspace
@@ -216,6 +217,32 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
             </Button>
             <Button variant="primary" size="sm" onClick={submitRename}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete workspace?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove “{active?.name}”? All notes and prompt cards inside it will be moved safely to your General workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={async () => {
+                setDeleteConfirmOpen(false);
+                if (active) await deleteWorkspace(active.id);
+              }}
+            >
+              Delete workspace
             </Button>
           </DialogFooter>
         </DialogContent>

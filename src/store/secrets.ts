@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -25,6 +26,43 @@ import { DEFAULT_WORKSPACE_ID, normalizeSecretEntry } from "@/lib/types";
 
 const PIN_KEY = "secret.vault.pin";
 const ENTRIES_KEY = "secret.vault.entries";
+const DELETED_IDS_KEY = "secret.vault.deleted_ids";
+
+let failedAttempts = 0;
+let lockedUntil: number | null = null;
+
+async function markEntryDeletedLocal(id: string) {
+  const current = (await getMeta<string[]>(DELETED_IDS_KEY)) ?? [];
+  if (!current.includes(id)) {
+    const next = [...current.slice(-200), id];
+    await setMeta(DELETED_IDS_KEY, next);
+  }
+}
+
+async function getLocalDeletedIds(): Promise<Set<string>> {
+  const current = (await getMeta<string[]>(DELETED_IDS_KEY)) ?? [];
+  return new Set(current);
+}
+
+async function markEntryDeletedCloud(id: string) {
+  const user = await currentUserWhenReady();
+  if (!user) return;
+  await setDoc(
+    doc(getFirebaseDb(), "users", user.uid),
+    {
+      deletedSecretIds: arrayUnion(id),
+      updatedAt: Date.now(),
+    },
+    { merge: true },
+  );
+}
+
+async function loadCloudDeletedIds(uid: string): Promise<string[]> {
+  const snap = await getDoc(doc(getFirebaseDb(), "users", uid));
+  if (!snap.exists()) return [];
+  const data = snap.data() as { deletedSecretIds?: string[] };
+  return Array.isArray(data.deletedSecretIds) ? data.deletedSecretIds : [];
+}
 
 interface SecretDraft {
   title: string;
@@ -215,24 +253,36 @@ export const useSecrets = create<SecretsState>((set, get) => ({
         await persistPinCloud(localPin);
       }
 
-      const remoteEntries = await loadEntriesFromCloud(user.uid);
-      const merged = mergeEntries(localEntries, remoteEntries);
+      const [remoteEntries, cloudDeletedIds] = await Promise.all([
+        loadEntriesFromCloud(user.uid),
+        loadCloudDeletedIds(user.uid),
+      ]);
+
+      const localDeletedIds = await getLocalDeletedIds();
+      for (const id of cloudDeletedIds) localDeletedIds.add(id);
+      await setMeta(DELETED_IDS_KEY, [...localDeletedIds]);
+
+      const activeLocalEntries = localEntries.filter((e) => !localDeletedIds.has(e.id));
+      const activeRemoteEntries = remoteEntries.filter((e) => !localDeletedIds.has(e.id));
+      const merged = mergeEntries(activeLocalEntries, activeRemoteEntries);
       await persistEntriesLocal(merged);
       set({ entries: merged });
 
-      // Push local-only rows that cloud is missing.
-      if (remoteEntries.length === 0 && localEntries.length > 0) {
+      // Push local-only rows that cloud is missing (guaranteed NOT deleted)
+      if (activeRemoteEntries.length === 0 && activeLocalEntries.length > 0) {
         const batch = writeBatch(getFirebaseDb());
-        for (const entry of localEntries) {
+        for (const entry of activeLocalEntries) {
           batch.set(doc(getFirebaseDb(), "users", user.uid, "secrets", entry.id), entry, {
             merge: true,
           });
         }
         await batch.commit();
       } else {
-        const remoteIds = new Set(remoteEntries.map((e) => e.id));
-        for (const entry of localEntries) {
-          if (!remoteIds.has(entry.id)) await upsertEntryCloud(entry);
+        const remoteIds = new Set(activeRemoteEntries.map((e) => e.id));
+        for (const entry of activeLocalEntries) {
+          if (!remoteIds.has(entry.id) && !localDeletedIds.has(entry.id)) {
+            await upsertEntryCloud(entry);
+          }
         }
       }
     } catch (error) {
@@ -264,8 +314,31 @@ export const useSecrets = create<SecretsState>((set, get) => ({
   async unlock(pin) {
     const config = get().pinConfig;
     if (!config) return false;
+
+    const now = Date.now();
+    if (lockedUntil && now < lockedUntil) {
+      const waitSec = Math.ceil((lockedUntil - now) / 1000);
+      toast.error(`Vault is temporarily locked. Try again in ${waitSec}s.`);
+      return false;
+    }
+
+    // Small delay to thwart automated fast brute-force loops
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
     const ok = await verifySecretPin(pin, config.salt, config.pinHash);
-    if (!ok) return false;
+    if (!ok) {
+      failedAttempts += 1;
+      if (failedAttempts >= 5) {
+        const lockoutMs = failedAttempts >= 10 ? 120_000 : 30_000;
+        lockedUntil = Date.now() + lockoutMs;
+        const waitSec = Math.ceil(lockoutMs / 1000);
+        toast.error(`Too many failed attempts. Locked for ${waitSec}s.`);
+      }
+      return false;
+    }
+
+    failedAttempts = 0;
+    lockedUntil = null;
     set({ sessionPin: pin, unlocked: true });
     return true;
   },
@@ -364,8 +437,9 @@ export const useSecrets = create<SecretsState>((set, get) => ({
     const next = get().entries.filter((row) => row.id !== id);
     await persistEntriesLocal(next);
     set({ entries: next });
+    await markEntryDeletedLocal(id);
     try {
-      await deleteEntryCloud(id);
+      await Promise.all([deleteEntryCloud(id), markEntryDeletedCloud(id)]);
     } catch (error) {
       console.warn("NoteSeen: secret cloud delete failed", error);
     }

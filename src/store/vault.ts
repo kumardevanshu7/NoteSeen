@@ -3,7 +3,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { getMeta, setMeta } from "@/lib/db";
 import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase";
-import { hashVaultAnswer, verifyVaultAnswer } from "@/lib/vault-crypto";
+import { hashVaultAnswer, randomVaultSaltHex, verifyVaultAnswer } from "@/lib/vault-crypto";
 import type { VaultConfig } from "@/lib/types";
 
 const VAULT_KEY = "vault.config";
@@ -84,6 +84,7 @@ async function persistVaultCloud(config: VaultConfig) {
       uid: user.uid,
       vaultQuestion: config.question,
       vaultAnswerHash: config.answerHash,
+      vaultSalt: config.salt ?? "",
       vaultCreatedAt: config.createdAt,
       updatedAt: Date.now(),
     },
@@ -97,6 +98,7 @@ async function loadVaultFromCloud(uid: string): Promise<VaultConfig | null> {
   const data = snap.data() as {
     vaultQuestion?: string;
     vaultAnswerHash?: string;
+    vaultSalt?: string;
     vaultCreatedAt?: number;
   };
   if (
@@ -110,6 +112,7 @@ async function loadVaultFromCloud(uid: string): Promise<VaultConfig | null> {
   return {
     question: data.vaultQuestion.trim(),
     answerHash: data.vaultAnswerHash,
+    salt: typeof data.vaultSalt === "string" && data.vaultSalt.length >= 16 ? data.vaultSalt : undefined,
     createdAt: typeof data.vaultCreatedAt === "number" ? data.vaultCreatedAt : Date.now(),
   };
 }
@@ -214,9 +217,11 @@ export const useVault = create<VaultState>((set, get) => ({
     const trimmedA = answer.trim();
     if (!trimmedQ || !trimmedA) throw new Error("Question and answer are required.");
 
+    const salt = randomVaultSaltHex();
     const config: VaultConfig = {
       question: trimmedQ,
-      answerHash: await hashVaultAnswer(trimmedA),
+      answerHash: await hashVaultAnswer(trimmedA, salt),
+      salt,
       createdAt: Date.now(),
     };
     await persistVaultLocal(config);
@@ -241,8 +246,24 @@ export const useVault = create<VaultState>((set, get) => ({
   async unlockWithAnswer(answer, timerMinutes) {
     const config = get().config;
     if (!config) return false;
-    const ok = await verifyVaultAnswer(answer, config.answerHash);
+    const ok = await verifyVaultAnswer(answer, config.answerHash, config.salt);
     if (!ok) return false;
+
+    // Transparently upgrade legacy unsalted config to salted
+    if (!config.salt) {
+      void (async () => {
+        try {
+          const salt = randomVaultSaltHex();
+          const answerHash = await hashVaultAnswer(answer, salt);
+          const upgraded: VaultConfig = { ...config, answerHash, salt };
+          set({ config: upgraded });
+          await persistVaultLocal(upgraded);
+          await persistVaultCloud(upgraded);
+        } catch {
+          // ignore auto-upgrade errors
+        }
+      })();
+    }
 
     if (timerMinutes && timerMinutes > 0) {
       get().startEditUnlockTimer(timerMinutes);
@@ -260,7 +281,7 @@ export const useVault = create<VaultState>((set, get) => ({
   async verifyAndStartTimer(answer, minutes) {
     const config = get().config;
     if (!config) return false;
-    const ok = await verifyVaultAnswer(answer, config.answerHash);
+    const ok = await verifyVaultAnswer(answer, config.answerHash, config.salt);
     if (!ok) return false;
     get().startEditUnlockTimer(minutes);
     return true;

@@ -489,6 +489,12 @@
   background: color-mix(in oklab, var(--ink) 3%, transparent);
 }
 
+/* Custom row background colors */
+.ns-editor .tiptap table tr[data-row-color] td,
+.ns-editor .tiptap table tr[data-row-color] th {
+  background-color: var(--row-bg) !important;
+}
+
 .ns-editor .tiptap table p {
   margin: 0;
 }

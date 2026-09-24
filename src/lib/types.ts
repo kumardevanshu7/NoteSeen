@@ -107,8 +107,10 @@ export interface NoteFilePayload {
 /** Site-wide vault: one security question + answer for edit/delete. */
 export interface VaultConfig {
   question: string;
-  /** SHA-256 hex of the normalized answer. */
+  /** SHA-256 hex of the normalized answer (with optional salt). */
   answerHash: string;
+  /** Hex salt used to protect against rainbow table attacks. */
+  salt?: string;
   createdAt: number;
 }
 

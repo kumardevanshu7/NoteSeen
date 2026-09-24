@@ -9,7 +9,6 @@ import Placeholder from "@tiptap/extension-placeholder";
 import Table from "@tiptap/extension-table";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
-import TableRow from "@tiptap/extension-table-row";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import TextAlign from "@tiptap/extension-text-align";
@@ -41,7 +40,7 @@ import { countWords, formatClock, readingMinutes, cn } from "@/lib/utils";
 import { createSlashCommandsExtension } from "@/lib/slash-commands";
 import { CustomInputRules } from "@/lib/custom-input-rules";
 import { CodeBlockWithCopy } from "@/lib/code-block-extension";
-import { TableBadge, cycleTableBadge } from "@/lib/table-badge";
+import { CustomTableRow, TableBadge, cycleTableBadge } from "@/lib/table-badge";
 import { SelectionMenu } from "./SelectionMenu";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { TableControls } from "./TableControls";
@@ -146,7 +145,7 @@ export function NoteEditor({ note }: { note: Note }) {
       }),
       ResizableImage,
       Table.configure({ resizable: false, handleWidth: 3, cellMinWidth: 60 }),
-      TableRow,
+      CustomTableRow,
       TableHeader,
       TableCell,
       TableBadge,
@@ -345,6 +344,17 @@ export function NoteEditor({ note }: { note: Note }) {
   useEffect(() => {
     editor?.setEditable(canEdit);
   }, [editor, canEdit]);
+
+  useEffect(() => {
+    const handleFlush = () => commit();
+    window.addEventListener("beforeunload", handleFlush);
+    window.addEventListener("pagehide", handleFlush);
+    return () => {
+      commit();
+      window.removeEventListener("beforeunload", handleFlush);
+      window.removeEventListener("pagehide", handleFlush);
+    };
+  }, [commit]);
 
   useEffect(() => {
     if (!editor) return;

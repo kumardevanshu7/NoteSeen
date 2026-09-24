@@ -4,6 +4,7 @@ import { toast } from "sonner";
 export const CodeBlockWithCopy = CodeBlock.extend<CodeBlockOptions>({
   addNodeView() {
     return ({ node }) => {
+      let currentNode = node;
       const container = document.createElement("div");
       container.className = "ns-code-block-container group relative";
 
@@ -54,7 +55,7 @@ export const CodeBlockWithCopy = CodeBlock.extend<CodeBlockOptions>({
         e.preventDefault();
         e.stopPropagation();
 
-        const codeContent = node.textContent || "";
+        const codeContent = code.textContent || currentNode.textContent || "";
         if (!codeContent) {
           toast.info("Code block is empty");
           return;
@@ -97,6 +98,7 @@ export const CodeBlockWithCopy = CodeBlock.extend<CodeBlockOptions>({
         contentDOM: code,
         update(updatedNode) {
           if (updatedNode.type.name !== "codeBlock") return false;
+          currentNode = updatedNode;
           langLabel.textContent = (updatedNode.attrs.language as string) || "Code";
           if (updatedNode.attrs.language) {
             code.className = "language-" + (updatedNode.attrs.language as string);

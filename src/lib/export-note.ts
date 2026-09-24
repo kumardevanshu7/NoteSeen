@@ -126,6 +126,110 @@ export function buildExportHtml(note: Note, logoUrl: string): string {
     }
     .content code { font-family: ui-monospace, "Courier New", monospace; font-size: 0.9em; }
     .content img { max-width: 100%; height: auto; }
+
+    /* Table styling */
+    .content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5em 0;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      page-break-inside: auto;
+    }
+    .content tr {
+      page-break-inside: avoid;
+      page-break-after: auto;
+    }
+    .content th,
+    .content td {
+      border: 1px solid #dcd7ce;
+      padding: 8px 12px;
+      vertical-align: top;
+      text-align: left;
+      box-sizing: border-box;
+    }
+    .content th {
+      background-color: #f4f2ee !important;
+      color: #14171a !important;
+      font-weight: 700;
+      border-bottom: 2.5px solid #3b82f6 !important;
+    }
+    .content tr:nth-child(even) td {
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+    /* Custom colored rows */
+    .content tr[data-row-color] td,
+    .content tr[data-row-color] th {
+      background-color: var(--row-bg) !important;
+    }
+
+    /* Links in content & tables */
+    .content a {
+      color: #2563eb !important;
+      text-decoration: underline;
+      text-underline-offset: 2.5px;
+    }
+    .content a::after {
+      content: " ↗";
+      font-size: 0.85em;
+      opacity: 0.8;
+      text-decoration: none;
+    }
+
+    /* Table Badges & Choice Pills */
+    .content .ns-badge-pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      font-size: 11.5px;
+      font-weight: 600;
+      line-height: 1.4;
+      white-space: nowrap;
+      border: 1px solid transparent;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .content .ns-badge-yes,
+    .content .ns-badge-color-green {
+      background: #dcfce7 !important;
+      color: #15803d !important;
+      border-color: #86efac !important;
+    }
+    .content .ns-badge-yes::before {
+      content: "✓ ";
+      font-weight: 700;
+    }
+    .content .ns-badge-no,
+    .content .ns-badge-color-red {
+      background: #ffe4e6 !important;
+      color: #b91c1c !important;
+      border-color: #fca5a5 !important;
+    }
+    .content .ns-badge-no::before {
+      content: "✕ ";
+      font-weight: 700;
+    }
+    .content .ns-badge-color-blue {
+      background: #dbeafe !important;
+      color: #1d4ed8 !important;
+      border-color: #93c5fd !important;
+    }
+    .content .ns-badge-color-amber {
+      background: #fef3c7 !important;
+      color: #b45309 !important;
+      border-color: #fde68a !important;
+    }
+    .content .ns-badge-color-purple {
+      background: #ede9fe !important;
+      color: #6d28d9 !important;
+      border-color: #c4b5fd !important;
+    }
+    .content .ns-badge-color-gray {
+      background: #f3f4f6 !important;
+      color: #4b5563 !important;
+      border-color: #e5e7eb !important;
+    }
+
     .footer {
       margin-top: 48px;
       padding-top: 16px;

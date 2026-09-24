@@ -10,11 +10,14 @@ import {
   ChevronDown,
   Columns3,
   Heading,
+  Paintbrush,
+  Pin,
   Plus,
   Rows3,
   Sparkles,
   Tag,
   Trash2,
+  Wand2,
   X,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -28,9 +31,15 @@ import {
 import { TableBadgeDialog } from "./TableBadgeDialog";
 import {
   clearColumnBadges,
+  convertColumnTextToBadges,
   fillColumnWithBadge,
   getActiveColumnInfo,
+  pinCurrentRowToTop,
+  selectCurrentColumn,
+  selectCurrentRow,
   setCellBadge,
+  setRowColor,
+  ROW_LIGHT_COLORS,
   type ActiveColumnInfo,
 } from "@/lib/table-badge";
 
@@ -58,6 +67,8 @@ export function TableControls({ editor }: TableControlsProps) {
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
   const [activeCol, setActiveCol] = useState<ActiveColumnInfo>({
     colIndex: 0,
+    rowIndex: 0,
+    isHeaderRow: false,
     headerName: "Column",
     hasBadges: false,
     choices: [],
@@ -318,7 +329,7 @@ export function TableControls({ editor }: TableControlsProps) {
               Column: {activeCol.headerName}
             </div>
 
-            {/* If this column has defined choices, show them directly */}
+            {/* Direct column choices */}
             {activeCol.choices.length > 0 ? (
               <>
                 <div className="px-2.5 py-0.5 text-[11px] text-slate">
@@ -404,6 +415,15 @@ export function TableControls({ editor }: TableControlsProps) {
 
             <DropdownMenuSeparator />
 
+            {/* Convert Column Text to Badges (Instant fix for plain text columns) */}
+            <DropdownMenuItem
+              onClick={() => convertColumnTextToBadges(editor, activeCol.choices)}
+              className="gap-2 text-xs font-medium text-emerald-500 cursor-pointer"
+            >
+              <Wand2 className="size-3.5" />
+              <span>Convert Column Text to Badges</span>
+            </DropdownMenuItem>
+
             <DropdownMenuItem
               onClick={() => setCustomDialogOpen(true)}
               className="gap-2 text-xs font-medium text-ink cursor-pointer"
@@ -421,6 +441,50 @@ export function TableControls({ editor }: TableControlsProps) {
                 <span>Clear Column Badges</span>
               </DropdownMenuItem>
             )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <div className="h-3.5 w-px bg-hairline" />
+
+        {/* ── Row Color Dropdown (10 Light Colors) ────────────────────────── */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded px-2 py-1 text-[11.5px] font-medium text-slate transition-colors hover:bg-stone hover:text-ink cursor-pointer"
+              title="Color current row"
+            >
+              <Paintbrush className="size-3 text-accent" />
+              <span>Color</span>
+              <ChevronDown className="size-2.5 opacity-60" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-48 p-2 z-50">
+            <div className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">
+              Row Light Colors
+            </div>
+            <div className="grid grid-cols-5 gap-1.5 p-1">
+              {ROW_LIGHT_COLORS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  title={item.name}
+                  onClick={() => setRowColor(editor, item.color)}
+                  style={{
+                    backgroundColor: item.color,
+                    border: `1.5px solid ${item.border}`,
+                  }}
+                  className="size-6 rounded-md transition-transform hover:scale-120 hover:shadow-xs cursor-pointer"
+                />
+              ))}
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setRowColor(editor, null)}
+              className="text-xs text-muted hover:text-ink cursor-pointer"
+            >
+              <span>Default (Clear row color)</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -480,11 +544,12 @@ export function TableControls({ editor }: TableControlsProps) {
           ref={contextMenuRef}
           style={{
             position: "fixed",
-            top: Math.min(window.innerHeight - 340, Math.max(10, contextMenuPos.y)),
-            left: Math.min(window.innerWidth - 250, Math.max(10, contextMenuPos.x)),
+            top: Math.min(window.innerHeight - 440, Math.max(10, contextMenuPos.y)),
+            left: Math.min(window.innerWidth - 260, Math.max(10, contextMenuPos.x)),
           }}
-          className="pointer-events-auto z-50 min-w-56 overflow-hidden rounded-md border border-hairline bg-surface p-1.5 text-ink shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
+          className="pointer-events-auto z-50 min-w-60 overflow-hidden rounded-md border border-hairline bg-surface p-1.5 text-ink shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-100"
         >
+          {/* Column Header */}
           <div className="px-2 py-1 text-[10.5px] font-bold uppercase tracking-wider text-emerald-500">
             Column: {activeCol.headerName}
           </div>
@@ -510,7 +575,7 @@ export function TableControls({ editor }: TableControlsProps) {
                     });
                     setContextMenuPos(null);
                   }}
-                  className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+                  className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
                 >
                   <span
                     className="size-2 rounded-full"
@@ -552,7 +617,7 @@ export function TableControls({ editor }: TableControlsProps) {
                   );
                   setContextMenuPos(null);
                 }}
-                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
               >
                 <Check className="size-3.5 text-emerald-500" />
                 <span>Fill Column with "{activeCol.choices[0].label}"</span>
@@ -563,7 +628,7 @@ export function TableControls({ editor }: TableControlsProps) {
               <button
                 type="button"
                 onClick={insertYesNoCell}
-                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
               >
                 <span className="flex size-4 items-center justify-center rounded-full bg-emerald-500/20 text-[10px] text-emerald-500">
                   ✓
@@ -573,7 +638,7 @@ export function TableControls({ editor }: TableControlsProps) {
               <button
                 type="button"
                 onClick={fillYesNoColumn}
-                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+                className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
               >
                 <Check className="size-3.5 text-emerald-500" />
                 <span>Fill Column with Yes / No</span>
@@ -584,39 +649,111 @@ export function TableControls({ editor }: TableControlsProps) {
           <button
             type="button"
             onClick={() => {
+              convertColumnTextToBadges(editor, activeCol.choices);
+              setContextMenuPos(null);
+            }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs font-medium text-emerald-500 transition-colors hover:bg-stone"
+          >
+            <Wand2 className="size-3.5" />
+            <span>Convert Column Text to Badges</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
               setContextMenuPos(null);
               setCustomDialogOpen(true);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs font-medium text-emerald-500 transition-colors hover:bg-stone"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:bg-stone"
           >
-            <Sparkles className="size-3.5" />
+            <Sparkles className="size-3.5 text-emerald-500" />
             <span>Configure Options (2-5)...</span>
           </button>
 
-          {activeCol.hasBadges && (
-            <button
-              type="button"
-              onClick={() => {
-                clearColumnBadges(editor);
-                setContextMenuPos(null);
-              }}
-              className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-muted hover:text-error transition-colors"
-            >
-              <X className="size-3.5" />
-              <span>Clear Column Badges</span>
-            </button>
-          )}
+          <div className="my-1 h-px bg-hairline" />
+
+          {/* ── Selection Features ───────────────────────────────────────── */}
+          <button
+            type="button"
+            onClick={() => {
+              selectCurrentRow(editor);
+              setContextMenuPos(null);
+            }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+          >
+            <Rows3 className="size-3.5 text-accent" />
+            <span>Select this Row</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              selectCurrentColumn(editor);
+              setContextMenuPos(null);
+            }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+          >
+            <Columns3 className="size-3.5 text-accent" />
+            <span>Select this Column</span>
+          </button>
 
           <div className="my-1 h-px bg-hairline" />
 
-          {/* Rows */}
+          {/* ── Pin Row to Top ───────────────────────────────────────────── */}
+          <button
+            type="button"
+            onClick={() => {
+              pinCurrentRowToTop(editor);
+              setContextMenuPos(null);
+            }}
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+          >
+            <Pin className="size-3.5 text-accent" />
+            <span>Pin this Row to Top</span>
+          </button>
+
+          {/* ── 10 Row Colors Picker ─────────────────────────────────────── */}
+          <div className="px-2.5 py-1 text-[11px] font-semibold text-muted flex items-center justify-between">
+            <span>Color this row:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setRowColor(editor, null);
+                setContextMenuPos(null);
+              }}
+              className="text-[10px] text-muted hover:text-ink underline cursor-pointer"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="grid grid-cols-5 gap-1 px-2.5 py-1">
+            {ROW_LIGHT_COLORS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                title={item.name}
+                onClick={() => {
+                  setRowColor(editor, item.color);
+                  setContextMenuPos(null);
+                }}
+                style={{
+                  backgroundColor: item.color,
+                  border: `1.5px solid ${item.border}`,
+                }}
+                className="size-5 rounded-md transition-transform hover:scale-120 cursor-pointer"
+              />
+            ))}
+          </div>
+
+          <div className="my-1 h-px bg-hairline" />
+
+          {/* ── Row & Column Insertion ────────────────────────────────────── */}
           <button
             type="button"
             onClick={() => {
               editor.chain().focus().addRowBefore().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
           >
             <ArrowUp className="size-3.5 text-accent" />
             <span>Insert Row Above</span>
@@ -627,22 +764,19 @@ export function TableControls({ editor }: TableControlsProps) {
               editor.chain().focus().addRowAfter().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
           >
             <ArrowDown className="size-3.5 text-accent" />
             <span>Insert Row Below</span>
           </button>
 
-          <div className="my-1 h-px bg-hairline" />
-
-          {/* Columns */}
           <button
             type="button"
             onClick={() => {
               editor.chain().focus().addColumnBefore().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
           >
             <ArrowLeft className="size-3.5 text-accent" />
             <span>Insert Column Left</span>
@@ -653,7 +787,7 @@ export function TableControls({ editor }: TableControlsProps) {
               editor.chain().focus().addColumnAfter().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
           >
             <ArrowRight className="size-3.5 text-accent" />
             <span>Insert Column Right</span>
@@ -668,7 +802,7 @@ export function TableControls({ editor }: TableControlsProps) {
               editor.chain().focus().toggleHeaderRow().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-ink transition-colors hover:bg-stone"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-ink transition-colors hover:bg-stone"
           >
             <Heading className="size-3.5 text-accent" />
             <span>Make 1st Row as Header</span>
@@ -683,7 +817,7 @@ export function TableControls({ editor }: TableControlsProps) {
               editor.chain().focus().deleteRow().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-error transition-colors hover:bg-error/10"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-error transition-colors hover:bg-error/10"
           >
             <Rows3 className="size-3.5" />
             <span>Delete Current Row</span>
@@ -694,7 +828,7 @@ export function TableControls({ editor }: TableControlsProps) {
               editor.chain().focus().deleteColumn().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-error transition-colors hover:bg-error/10"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-error transition-colors hover:bg-error/10"
           >
             <Columns3 className="size-3.5" />
             <span>Delete Current Column</span>
@@ -705,7 +839,7 @@ export function TableControls({ editor }: TableControlsProps) {
               editor.chain().focus().deleteTable().run();
               setContextMenuPos(null);
             }}
-            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1.5 text-xs text-error transition-colors hover:bg-error/10"
+            className="flex w-full cursor-pointer items-center gap-2 rounded px-2.5 py-1 text-xs text-error transition-colors hover:bg-error/10"
           >
             <Trash2 className="size-3.5" />
             <span>Delete Entire Table</span>

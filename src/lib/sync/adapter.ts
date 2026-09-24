@@ -23,7 +23,7 @@ export interface SyncAdapter {
   flushCloud?(): Promise<void>;
 }
 
-const localOnly: SyncAdapter = {
+export const localOnly: SyncAdapter = {
   id: "local-only",
   async connect() {},
   async pullNotes() {

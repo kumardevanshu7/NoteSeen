@@ -1,8 +1,11 @@
 import { mergeAttributes, Node } from "@tiptap/core";
+import TableRow from "@tiptap/extension-table-row";
 import type { Editor } from "@tiptap/react";
 import type { EditorView } from "@tiptap/pm/view";
 import type { Node as ProsemirrorNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { CellSelection, moveTableRow } from "@tiptap/pm/tables";
+import { toast } from "sonner";
 
 export type BadgeColor = "green" | "red" | "blue" | "amber" | "purple" | "gray";
 
@@ -30,11 +33,59 @@ export interface ActiveColumnInfo {
   hasBadges: boolean;
   choices: BadgeChoice[];
   currentBadgeValue?: string;
+  rowIndex: number;
+  isHeaderRow: boolean;
+  currentRowColor?: string | null;
 }
 
 export interface TableBadgeOptions {
   HTMLAttributes: Record<string, unknown>;
 }
+
+export interface RowColorOption {
+  id: string;
+  name: string;
+  color: string;
+  border: string;
+}
+
+export const ROW_LIGHT_COLORS: RowColorOption[] = [
+  { id: "mint", name: "Mint Green", color: "rgba(16, 185, 129, 0.16)", border: "rgba(16, 185, 129, 0.35)" },
+  { id: "sky", name: "Sky Blue", color: "rgba(59, 130, 246, 0.16)", border: "rgba(59, 130, 246, 0.35)" },
+  { id: "lavender", name: "Lavender", color: "rgba(139, 92, 246, 0.16)", border: "rgba(139, 92, 246, 0.35)" },
+  { id: "amber", name: "Warm Amber", color: "rgba(245, 158, 11, 0.17)", border: "rgba(245, 158, 11, 0.35)" },
+  { id: "coral", name: "Coral Rose", color: "rgba(244, 63, 94, 0.16)", border: "rgba(244, 63, 94, 0.35)" },
+  { id: "cyan", name: "Soft Cyan", color: "rgba(6, 182, 212, 0.16)", border: "rgba(6, 182, 212, 0.35)" },
+  { id: "lime", name: "Sage Lime", color: "rgba(132, 204, 22, 0.17)", border: "rgba(132, 204, 22, 0.35)" },
+  { id: "pink", name: "Pink Fuchsia", color: "rgba(217, 70, 239, 0.16)", border: "rgba(217, 70, 239, 0.35)" },
+  { id: "indigo", name: "Periwinkle", color: "rgba(99, 102, 241, 0.16)", border: "rgba(99, 102, 241, 0.35)" },
+  { id: "slate", name: "Slate Stone", color: "rgba(148, 163, 184, 0.18)", border: "rgba(148, 163, 184, 0.35)" },
+];
+
+/**
+ * Extended TableRow supporting row background color attribute.
+ */
+export const CustomTableRow = TableRow.extend({
+  addAttributes() {
+    return {
+      color: {
+        default: null,
+        parseHTML: (element) =>
+          element.getAttribute("data-row-color") ||
+          element.style.getPropertyValue("--row-bg") ||
+          element.style.backgroundColor ||
+          null,
+        renderHTML: (attributes) => {
+          if (!attributes.color) return {};
+          return {
+            "data-row-color": attributes.color,
+            style: `--row-bg: ${attributes.color}; background-color: ${attributes.color} !important`,
+          };
+        },
+      },
+    };
+  },
+});
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -44,7 +95,7 @@ declare module "@tiptap/core" {
         value: string;
         variant?: "yes" | "no" | "custom";
         color?: BadgeColor;
-        options?: string; // serialized JSON array of choices if part of a set
+        options?: string;
       }) => ReturnType;
     };
   }
@@ -52,7 +103,6 @@ declare module "@tiptap/core" {
 
 /**
  * Scans a table node and extracts a template map for every column.
- * Remembers each column's distinct header, options list, and default badge.
  */
 export function getColumnsTemplateMap(
   tableNode: ProsemirrorNode,
@@ -122,7 +172,7 @@ export function getColumnsTemplateMap(
 }
 
 /**
- * Returns column info (index, header name, choices) for the currently focused cell.
+ * Returns column info (index, header name, choices, row position) for the currently focused cell.
  */
 export function getActiveColumnInfo(editor: Editor): ActiveColumnInfo {
   const { state } = editor;
@@ -143,6 +193,8 @@ export function getActiveColumnInfo(editor: Editor): ActiveColumnInfo {
   if (tableDepth === -1 || rowDepth === -1 || cellDepth === -1) {
     return {
       colIndex: 0,
+      rowIndex: 0,
+      isHeaderRow: false,
       headerName: "Column",
       hasBadges: false,
       choices: [],
@@ -161,6 +213,14 @@ export function getActiveColumnInfo(editor: Editor): ActiveColumnInfo {
     }
   }
 
+  let targetRowIndex = 0;
+  for (let r = 0; r < tableNode.childCount; r++) {
+    if (tableNode.child(r) === rowNode) {
+      targetRowIndex = r;
+      break;
+    }
+  }
+
   let currentBadgeValue: string | undefined;
   cellNode.descendants((node) => {
     if (node.type.name === "tableBadge") {
@@ -175,10 +235,13 @@ export function getActiveColumnInfo(editor: Editor): ActiveColumnInfo {
 
   return {
     colIndex: targetColIndex,
+    rowIndex: targetRowIndex,
+    isHeaderRow: targetRowIndex === 0 && rowNode.child(0)?.type.name === "tableHeader",
     headerName: template?.headerName || `Column ${targetColIndex + 1}`,
     hasBadges: template?.hasBadges || false,
     choices: template?.choices || [],
     currentBadgeValue,
+    currentRowColor: (rowNode.attrs.color as string | undefined) || null,
   };
 }
 
@@ -199,15 +262,36 @@ export const TableBadge = Node.create<TableBadgeOptions>({
     return {
       value: {
         default: "Yes",
+        parseHTML: (element) =>
+          element.getAttribute("data-value") ||
+          element.getAttribute("value") ||
+          element.textContent?.trim() ||
+          "Yes",
+        renderHTML: (attributes) => ({ "data-value": attributes.value }),
       },
       variant: {
         default: "yes",
+        parseHTML: (element) =>
+          element.getAttribute("data-variant") ||
+          element.getAttribute("variant") ||
+          "yes",
+        renderHTML: (attributes) => ({ "data-variant": attributes.variant }),
       },
       color: {
         default: "green",
+        parseHTML: (element) =>
+          (element.getAttribute("data-color") ||
+            element.getAttribute("color") ||
+            "green") as BadgeColor,
+        renderHTML: (attributes) => ({ "data-color": attributes.color }),
       },
       options: {
         default: "",
+        parseHTML: (element) =>
+          element.getAttribute("data-options") ||
+          element.getAttribute("options") ||
+          "",
+        renderHTML: (attributes) => ({ "data-options": attributes.options }),
       },
     };
   },
@@ -216,53 +300,15 @@ export const TableBadge = Node.create<TableBadgeOptions>({
     return [
       {
         tag: "span[data-table-badge]",
-        getAttrs: (element) => {
-          const el = element as HTMLElement;
-          const val = el.getAttribute("data-value") || el.textContent?.trim() || "Yes";
-          const rawVariant = el.getAttribute("data-variant");
-          const variant =
-            rawVariant === "yes" || rawVariant === "no" || rawVariant === "custom"
-              ? rawVariant
-              : val.toLowerCase() === "no"
-              ? "no"
-              : val.toLowerCase() === "yes"
-              ? "yes"
-              : "custom";
-          const color =
-            (el.getAttribute("data-color") as BadgeColor) ||
-            (variant === "no" ? "red" : "green");
-          return {
-            value: val,
-            variant,
-            color,
-            options: el.getAttribute("data-options") || "",
-          };
-        },
+        priority: 60,
       },
       {
         tag: "span.ns-badge-pill",
-        getAttrs: (element) => {
-          const el = element as HTMLElement;
-          const val = el.getAttribute("data-value") || el.textContent?.trim() || "Yes";
-          const rawVariant = el.getAttribute("data-variant");
-          const variant =
-            rawVariant === "yes" || rawVariant === "no" || rawVariant === "custom"
-              ? rawVariant
-              : val.toLowerCase() === "no"
-              ? "no"
-              : val.toLowerCase() === "yes"
-              ? "yes"
-              : "custom";
-          const color =
-            (el.getAttribute("data-color") as BadgeColor) ||
-            (variant === "no" ? "red" : "green");
-          return {
-            value: val,
-            variant,
-            color,
-            options: el.getAttribute("data-options") || "",
-          };
-        },
+        priority: 55,
+      },
+      {
+        tag: "span[data-variant]",
+        priority: 50,
       },
     ];
   },
@@ -359,7 +405,7 @@ export const TableBadge = Node.create<TableBadgeOptions>({
                 continue;
               }
 
-              // Check if row is freshly created / completely empty
+              // Check if row is completely empty (newly added row)
               let isRowEmpty = true;
               for (let c = 0; c < rowNode.childCount; c++) {
                 const cell = rowNode.child(c);
@@ -424,7 +470,6 @@ export const TableBadge = Node.create<TableBadgeOptions>({
 
 /**
  * Sets a badge on the current cell, replacing its entire inner content.
- * Prevents multiple badges from ever accumulating in the same cell.
  */
 export function setCellBadge(
   editor: Editor,
@@ -483,6 +528,265 @@ export function setCellBadge(
     cellPos + cellNode.nodeSize - 1,
     replacementParagraph,
   );
+  view.dispatch(tr);
+}
+
+/**
+ * Converts existing plain text cells in a column into styled badges.
+ */
+export function convertColumnTextToBadges(
+  editor: Editor,
+  fallbackChoices?: BadgeChoice[],
+) {
+  const { state, view } = editor;
+  const { selection } = state;
+  const { $from } = selection;
+
+  let tableDepth = -1;
+  let rowDepth = -1;
+  let cellDepth = -1;
+
+  for (let d = $from.depth; d > 0; d--) {
+    const name = $from.node(d).type.name;
+    if (name === "table") tableDepth = d;
+    else if (name === "tableRow") rowDepth = d;
+    else if (name === "tableCell" || name === "tableHeader") cellDepth = d;
+  }
+
+  if (tableDepth === -1 || rowDepth === -1 || cellDepth === -1) return;
+
+  const tableNode = $from.node(tableDepth);
+  const tablePos = $from.before(tableDepth);
+  const rowNode = $from.node(rowDepth);
+  const cellNode = $from.node(cellDepth);
+
+  let targetColIndex = 0;
+  for (let c = 0; c < rowNode.childCount; c++) {
+    if (rowNode.child(c) === cellNode) {
+      targetColIndex = c;
+      break;
+    }
+  }
+
+  const templates = getColumnsTemplateMap(tableNode);
+  const colTemplate = templates.get(targetColIndex);
+
+  let choices = fallbackChoices && fallbackChoices.length > 0 ? fallbackChoices : colTemplate?.choices || [];
+  if (choices.length === 0) {
+    choices = [
+      { label: "Yes", color: "green" },
+      { label: "No", color: "red" },
+      { label: "(No Chance)", color: "amber" },
+    ];
+  }
+
+  const optionsJson = JSON.stringify(choices);
+  const badgeType = state.schema.nodes.tableBadge;
+  const pType = state.schema.nodes.paragraph;
+  if (!badgeType || !pType) return;
+
+  const cellsToReplace: { from: number; to: number; badge: ProsemirrorNode }[] = [];
+  let currentPos = tablePos + 1;
+
+  for (let r = 0; r < tableNode.childCount; r++) {
+    const rNode = tableNode.child(r);
+    const isFirstRow = r === 0;
+    const isHeader = rNode.child(0)?.type.name === "tableHeader";
+
+    if (!(isHeader || (isFirstRow && tableNode.childCount > 1))) {
+      let cPos = currentPos + 1;
+      for (let c = 0; c < rNode.childCount; c++) {
+        const cNode = rNode.child(c);
+        if (c === targetColIndex) {
+          const rawText = cNode.textContent.trim();
+          if (rawText.length > 0) {
+            // Find matched choice or create custom badge
+            const matchedChoice = choices.find(
+              (ch) => ch.label.toLowerCase() === rawText.toLowerCase(),
+            );
+            const val = matchedChoice ? matchedChoice.label : rawText;
+            const color =
+              matchedChoice?.color ||
+              (val.toLowerCase() === "yes" || val.toLowerCase().includes("insta")
+                ? "green"
+                : val.toLowerCase() === "no"
+                ? "red"
+                : val.toLowerCase().includes("chance")
+                ? "purple"
+                : "blue");
+            const variant: "yes" | "no" | "custom" =
+              val.toLowerCase() === "yes"
+                ? "yes"
+                : val.toLowerCase() === "no"
+                ? "no"
+                : "custom";
+
+            const newBadge = badgeType.create({
+              value: val,
+              variant,
+              color,
+              options: optionsJson,
+            });
+
+            cellsToReplace.push({
+              from: cPos + 1,
+              to: cPos + cNode.nodeSize - 1,
+              badge: newBadge,
+            });
+          }
+          break;
+        }
+        cPos += cNode.nodeSize;
+      }
+    }
+    currentPos += rNode.nodeSize;
+  }
+
+  if (cellsToReplace.length === 0) return;
+
+  let tr = state.tr;
+  for (let i = cellsToReplace.length - 1; i >= 0; i--) {
+    const item = cellsToReplace[i];
+    const p = pType.create(null, item.badge);
+    tr = tr.replaceWith(item.from, item.to, p);
+  }
+  view.dispatch(tr);
+  toast.success("Converted column text into interactive badges");
+}
+
+/**
+ * Selects the entire row of the current cell.
+ */
+export function selectCurrentRow(editor: Editor) {
+  const { state, view } = editor;
+  const { selection } = state;
+  const { $from } = selection;
+
+  let cellDepth = -1;
+  for (let d = $from.depth; d > 0; d--) {
+    const name = $from.node(d).type.name;
+    if (name === "tableCell" || name === "tableHeader") {
+      cellDepth = d;
+      break;
+    }
+  }
+
+  if (cellDepth === -1) return;
+  const cellPos = $from.before(cellDepth);
+  const $cell = state.doc.resolve(cellPos);
+
+  try {
+    const sel = CellSelection.rowSelection($cell);
+    view.dispatch(state.tr.setSelection(sel));
+  } catch (err) {
+    console.error("Select row error", err);
+  }
+}
+
+/**
+ * Selects the entire column of the current cell.
+ */
+export function selectCurrentColumn(editor: Editor) {
+  const { state, view } = editor;
+  const { selection } = state;
+  const { $from } = selection;
+
+  let cellDepth = -1;
+  for (let d = $from.depth; d > 0; d--) {
+    const name = $from.node(d).type.name;
+    if (name === "tableCell" || name === "tableHeader") {
+      cellDepth = d;
+      break;
+    }
+  }
+
+  if (cellDepth === -1) return;
+  const cellPos = $from.before(cellDepth);
+  const $cell = state.doc.resolve(cellPos);
+
+  try {
+    const sel = CellSelection.colSelection($cell);
+    view.dispatch(state.tr.setSelection(sel));
+  } catch (err) {
+    console.error("Select column error", err);
+  }
+}
+
+/**
+ * Pins the current row to the top of data rows (directly beneath header row).
+ */
+export function pinCurrentRowToTop(editor: Editor) {
+  const { state, view } = editor;
+  const { selection } = state;
+  const { $from } = selection;
+
+  let tableDepth = -1;
+  let rowDepth = -1;
+
+  for (let d = $from.depth; d > 0; d--) {
+    const name = $from.node(d).type.name;
+    if (name === "table") tableDepth = d;
+    else if (name === "tableRow") rowDepth = d;
+  }
+
+  if (tableDepth === -1 || rowDepth === -1) return;
+
+  const tableNode = $from.node(tableDepth);
+  const rowNode = $from.node(rowDepth);
+
+  let originIndex = -1;
+  for (let r = 0; r < tableNode.childCount; r++) {
+    if (tableNode.child(r) === rowNode) {
+      originIndex = r;
+      break;
+    }
+  }
+
+  if (originIndex === -1) return;
+
+  const hasHeader = tableNode.child(0)?.child(0)?.type.name === "tableHeader";
+  const targetIndex = hasHeader ? 1 : 0;
+
+  if (originIndex === targetIndex) {
+    toast.info("Row is already at the top");
+    return;
+  }
+
+  const success = moveTableRow({
+    from: originIndex,
+    to: targetIndex,
+    select: true,
+  })(state, view.dispatch);
+
+  if (success) {
+    toast.success("📌 Row pinned to the top");
+  }
+}
+
+/**
+ * Sets background color on the current table row.
+ */
+export function setRowColor(editor: Editor, color: string | null) {
+  const { state, view } = editor;
+  const { selection } = state;
+
+  let rowDepth = -1;
+  for (let d = selection.$from.depth; d > 0; d--) {
+    if (selection.$from.node(d).type.name === "tableRow") {
+      rowDepth = d;
+      break;
+    }
+  }
+
+  if (rowDepth === -1) return;
+
+  const rowPos = selection.$from.before(rowDepth);
+  const rowNode = selection.$from.node(rowDepth);
+
+  const tr = state.tr.setNodeMarkup(rowPos, undefined, {
+    ...rowNode.attrs,
+    color: color || null,
+  });
   view.dispatch(tr);
 }
 
@@ -669,7 +973,7 @@ export function fillColumnWithBadge(
 
 /**
  * Cycles a badge to its next choice or toggles Yes/No when clicked.
- * Also cleans up any duplicate badges in the parent paragraph if present.
+ * Cleans up any duplicate badges in the parent paragraph.
  */
 export function cycleTableBadge(
   view: EditorView,
@@ -744,7 +1048,6 @@ export function cycleTableBadge(
     color: nextColor,
   });
 
-  // Check if parent paragraph has duplicate badges and clean them up
   try {
     const $pos = tr.doc.resolve(targetPos);
     if ($pos.parent && $pos.parent.childCount > 1) {

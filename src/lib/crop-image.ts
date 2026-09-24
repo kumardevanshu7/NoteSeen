@@ -40,13 +40,19 @@ export async function cropImageToFile(
   ctx.drawImage(image, 0, 0);
 
   const base = fileName.replace(/\.[^.]+$/, "") || "image";
+  const isPng = /\.png$/i.test(fileName) || imageSrc.startsWith("data:image/png");
+  const isWebp = /\.webp$/i.test(fileName) || imageSrc.startsWith("data:image/webp");
+  const mimeType = isPng ? "image/png" : isWebp ? "image/webp" : "image/jpeg";
+  const ext = isPng ? ".png" : isWebp ? ".webp" : ".jpg";
+  const quality = isPng ? undefined : 0.9;
+
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (result) => (result ? resolve(result) : reject(new Error("Could not crop that image."))),
-      "image/jpeg",
-      0.88,
+      mimeType,
+      quality,
     );
   });
 
-  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
+  return new File([blob], `${base}${ext}`, { type: mimeType });
 }

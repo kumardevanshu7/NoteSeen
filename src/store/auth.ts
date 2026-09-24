@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 import { getFirebaseAuth, getGoogleProvider, startAnalytics } from "@/lib/firebase";
 import { fetchUserProfile, saveUserProfile, type UserProfile } from "@/lib/profile";
-import { setSyncAdapter, syncAdapter } from "@/lib/sync/adapter";
+import { localOnly, setSyncAdapter, syncAdapter } from "@/lib/sync/adapter";
 import { createFirestoreAdapter } from "@/lib/sync/firestore";
 import { navigate } from "@/lib/nav";
 import { useNotes } from "@/store/notes";
@@ -32,18 +32,6 @@ interface AuthState {
 let stopSync: (() => void) | null = null;
 let stopWorkspaceSync: (() => void) | null = null;
 let stopBundleSync: (() => void) | null = null;
-
-function localOnlyAdapter() {
-  return {
-    id: "local-only" as const,
-    async connect() {},
-    async pushNotes() {},
-    async removeNotes() {},
-    subscribe() {
-      return () => {};
-    },
-  };
-}
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -222,7 +210,7 @@ function stopCloudSync() {
   stopWorkspaceSync = null;
   stopBundleSync?.();
   stopBundleSync = null;
-  setSyncAdapter(localOnlyAdapter());
+  setSyncAdapter(localOnly);
   useNotes.getState().setCloudUser(null);
 }
 

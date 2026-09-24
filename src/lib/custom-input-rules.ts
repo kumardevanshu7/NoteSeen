@@ -33,11 +33,11 @@ export const CustomInputRules = Extension.create({
       );
     }
 
-    // Circle / Bullet list input rule: [[]] or o at start of line
+    // Circle / Bullet list input rule: [[]] at start of line
     if (this.editor.schema.nodes.bulletList) {
       rules.push(
         wrappingInputRule({
-          find: /^\s*(\[\[\]\]|o)\s$/,
+          find: /^\s*(\[\[\]\])\s$/,
           type: this.editor.schema.nodes.bulletList,
         }),
       );
