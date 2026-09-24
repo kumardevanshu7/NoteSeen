@@ -1425,6 +1425,17 @@ body.ns-is-resizing * {
   opacity: 1;
 }
 
+.ns-width-badge {
+  font-size: 0.68rem;
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--primary);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  margin-right: 0.2rem;
+}
+
 .ns-side-by-side-width-toggle {
   display: flex;
   align-items: center;
@@ -1479,7 +1490,7 @@ body.ns-is-resizing * {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: 1.25rem;
+  gap: 0.5rem;
   min-height: 140px;
 }
 
@@ -1493,7 +1504,7 @@ body.ns-is-resizing * {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  min-width: 140px;
+  min-width: 120px;
 }
 
 @media (max-width: 640px) {
@@ -1501,6 +1512,42 @@ body.ns-is-resizing * {
     max-width: 100% !important;
     flex-basis: 100% !important;
   }
+}
+
+/* ── Draggable Column Resizer ── */
+.ns-side-by-side-resizer {
+  width: 14px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  user-select: none;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .ns-side-by-side-resizer {
+    display: none;
+  }
+}
+
+.ns-resizer-grip {
+  width: 3px;
+  height: 36px;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--ink) 20%, var(--hairline));
+  transition: all 0.15s ease;
+}
+
+.ns-side-by-side-resizer:hover .ns-resizer-grip,
+.ns-side-by-side-card.is-resizing .ns-resizer-grip {
+  background: var(--primary);
+  width: 4px;
+  height: 56px;
+  box-shadow: 0 0 8px color-mix(in oklab, var(--primary) 50%, transparent);
 }
 
 .ns-side-by-side-dropzone {
@@ -1555,69 +1602,94 @@ body.ns-is-resizing * {
   margin-top: 0.15rem;
 }
 
+/* ── Image Display (Preserves Original Natural Aspect Ratio) ── */
 .ns-side-by-side-img-wrapper {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 130px;
+  height: auto;
   border-radius: 0.6rem;
   overflow: hidden;
   border: 1px solid var(--hairline);
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: color-mix(in oklab, var(--stone) 20%, var(--surface));
+  display: block;
 }
 
 .ns-side-by-side-img {
   width: 100%;
-  height: 100%;
-  max-height: 380px;
-  object-fit: cover;
+  height: auto;
+  max-width: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
   display: block;
+  border-radius: 0.55rem;
 }
 
-.ns-side-by-side-img-overlay {
+/* Top-right Cross (Remove) Button with Vault Protection */
+.ns-media-cross-btn {
   position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  top: 0.45rem;
+  right: 0.45rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.ns-side-by-side-img-wrapper:hover .ns-side-by-side-img-overlay {
-  opacity: 1;
+.ns-media-cross-btn:hover {
+  background: #dc2626;
+  border-color: #ef4444;
+  transform: scale(1.1);
+  color: #ffffff;
 }
 
-.ns-media-overlay-btn {
+/* Bottom-left Replace Button */
+.ns-media-replace-btn {
+  position: absolute;
+  bottom: 0.45rem;
+  left: 0.45rem;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 500;
-  padding: 0.3rem 0.6rem;
+  padding: 0.25rem 0.55rem;
   border-radius: 0.35rem;
-  background: rgba(255, 255, 255, 0.95);
-  color: #111827;
-  border: none;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  transition: transform 0.1s ease, background 0.1s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+  opacity: 0;
+  z-index: 10;
 }
 
-.ns-media-overlay-btn:hover {
+.ns-side-by-side-img-wrapper:hover .ns-media-replace-btn {
+  opacity: 1;
+}
+
+.ns-media-replace-btn:hover {
+  background: var(--surface);
+  color: var(--ink);
   transform: scale(1.04);
-  background: #ffffff;
 }
 
 .ns-side-by-side-content {
   flex: 1 1 0%;
   min-width: 0;
   outline: none;
+  padding-left: 0.4rem;
 }
 
 .ns-side-by-side-content > *:first-child {

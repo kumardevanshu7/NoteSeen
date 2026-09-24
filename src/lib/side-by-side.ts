@@ -1,6 +1,7 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 import { toast } from "sonner";
 import { useAuth } from "@/store/auth";
+import { requireVault } from "@/store/vault";
 import { isImageStorageConfigured } from "@/lib/supabase";
 import { imageFileToOptimizedDataUrl, uploadPublicImage } from "@/lib/note-images";
 
@@ -173,16 +174,21 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
       headerControls.className = "ns-side-by-side-controls";
       headerControls.contentEditable = "false";
 
-      // Width buttons
+      // Live Width Indicator
+      const widthBadge = document.createElement("span");
+      widthBadge.className = "ns-width-badge";
+      widthBadge.textContent = currentNode.attrs.imageWidth || "35%";
+
+      // Preset Width Buttons
       const widthToggle = document.createElement("div");
       widthToggle.className = "ns-side-by-side-width-toggle";
-      const widths = ["30%", "40%", "50%"];
-      widths.forEach((w) => {
+      const presetWidths = ["25%", "35%", "50%", "65%"];
+      presetWidths.forEach((w) => {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `ns-width-btn ${currentNode.attrs.imageWidth === w ? "is-active" : ""}`;
         btn.textContent = w;
-        btn.title = `Set picture width to ${w}`;
+        btn.title = `Set picture box width to ${w}`;
         btn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -199,30 +205,39 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
         widthToggle.appendChild(btn);
       });
 
-      // Delete card button
+      // Delete block button (Requires vault password if card has picture/content)
       const deleteCardBtn = document.createElement("button");
       deleteCardBtn.type = "button";
       deleteCardBtn.className = "ns-card-del-btn";
-      deleteCardBtn.title = "Delete block";
+      deleteCardBtn.title = "Delete this block";
       deleteCardBtn.innerHTML = `
         <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
         </svg>
       `;
-      deleteCardBtn.addEventListener("click", (e) => {
+      deleteCardBtn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
+
+        // Require vault password if card contains a picture
+        if (currentNode.attrs.imageSrc) {
+          const ok = await requireVault("delete");
+          if (!ok) return;
+        }
+
         const pos = typeof getPos === "function" ? getPos() : null;
         if (typeof pos === "number") {
           editor.view.dispatch(editor.view.state.tr.delete(pos, pos + currentNode.nodeSize));
+          toast.success("Block deleted");
         }
       });
 
+      headerControls.appendChild(widthBadge);
       headerControls.appendChild(widthToggle);
       headerControls.appendChild(deleteCardBtn);
       container.appendChild(headerControls);
 
-      // ── Main Body (Side-by-side columns) ────────────────────────────────
+      // ── Main Body (Side-by-side columns + Resizer) ──────────────────────
       const body = document.createElement("div");
       body.className = "ns-side-by-side-body";
 
@@ -230,8 +245,9 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
       const mediaCol = document.createElement("div");
       mediaCol.className = "ns-side-by-side-media";
       mediaCol.contentEditable = "false";
-      mediaCol.style.flex = `0 0 ${currentNode.attrs.imageWidth || "35%"}`;
-      mediaCol.style.maxWidth = `${currentNode.attrs.imageWidth || "35%"}`;
+      const initialWidth = currentNode.attrs.imageWidth || "35%";
+      mediaCol.style.flex = `0 0 ${initialWidth}`;
+      mediaCol.style.maxWidth = `${initialWidth}`;
 
       const fileInput = document.createElement("input");
       fileInput.type = "file";
@@ -296,7 +312,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
 
         const currentSrc = currentNode.attrs.imageSrc;
         if (currentSrc) {
-          // Display actual image with hover controls
+          // Display actual image in its natural aspect ratio
           const imgWrapper = document.createElement("div");
           imgWrapper.className = "ns-side-by-side-img-wrapper group/media relative";
 
@@ -306,12 +322,45 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
           img.className = "ns-side-by-side-img";
           img.loading = "lazy";
 
-          const mediaOverlay = document.createElement("div");
-          mediaOverlay.className = "ns-side-by-side-img-overlay";
+          // Cross (Remove) Button on top-right of image (Password protected)
+          const crossBtn = document.createElement("button");
+          crossBtn.type = "button";
+          crossBtn.className = "ns-media-cross-btn";
+          crossBtn.title = "Remove picture (Vault protected)";
+          crossBtn.setAttribute("aria-label", "Remove picture");
+          crossBtn.innerHTML = `
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          `;
+          crossBtn.addEventListener("click", async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
+            // Password / Security question prompt before deleting picture
+            const ok = await requireVault("delete");
+            if (!ok) {
+              toast.info("Picture kept (vault check cancelled)");
+              return;
+            }
+
+            const pos = typeof getPos === "function" ? getPos() : null;
+            if (typeof pos === "number") {
+              editor.view.dispatch(
+                editor.view.state.tr.setNodeMarkup(pos, undefined, {
+                  ...currentNode.attrs,
+                  imageSrc: null,
+                })
+              );
+              toast.success("Picture removed");
+            }
+          });
+
+          // Bottom-left Replace Button
           const replaceBtn = document.createElement("button");
           replaceBtn.type = "button";
-          replaceBtn.className = "ns-media-overlay-btn";
+          replaceBtn.className = "ns-media-replace-btn";
           replaceBtn.title = "Change picture";
           replaceBtn.innerHTML = `
             <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -325,33 +374,9 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
             fileInput.click();
           });
 
-          const removeBtn = document.createElement("button");
-          removeBtn.type = "button";
-          removeBtn.className = "ns-media-overlay-btn text-rose-500 hover:text-rose-600";
-          removeBtn.title = "Remove picture";
-          removeBtn.innerHTML = `
-            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          `;
-          removeBtn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const pos = typeof getPos === "function" ? getPos() : null;
-            if (typeof pos === "number") {
-              editor.view.dispatch(
-                editor.view.state.tr.setNodeMarkup(pos, undefined, {
-                  ...currentNode.attrs,
-                  imageSrc: null,
-                })
-              );
-            }
-          });
-
-          mediaOverlay.appendChild(replaceBtn);
-          mediaOverlay.appendChild(removeBtn);
           imgWrapper.appendChild(img);
-          imgWrapper.appendChild(mediaOverlay);
+          imgWrapper.appendChild(crossBtn);
+          imgWrapper.appendChild(replaceBtn);
           mediaCol.appendChild(imgWrapper);
         } else {
           // Placeholder dropzone for empty Pic
@@ -403,6 +428,77 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
       renderMedia();
       body.appendChild(mediaCol);
 
+      // ── Interactive Column Drag Resizer Handle ───────────────────────────
+      const resizer = document.createElement("div");
+      resizer.className = "ns-side-by-side-resizer";
+      resizer.contentEditable = "false";
+      resizer.title = "Drag to resize picture box width";
+
+      const resizerGrip = document.createElement("div");
+      resizerGrip.className = "ns-resizer-grip";
+      resizer.appendChild(resizerGrip);
+
+      let isResizing = false;
+      let startX = 0;
+      let startWidthPx = 0;
+      let containerWidthPx = 0;
+      let currentPctVal = parseInt(currentNode.attrs.imageWidth || "35", 10) || 35;
+
+      const onPointerMove = (e: PointerEvent) => {
+        if (!isResizing) return;
+        const dx = e.clientX - startX;
+        const newWidthPx = startWidthPx + dx;
+        const newPct = Math.min(75, Math.max(15, Math.round((newWidthPx / containerWidthPx) * 100)));
+        currentPctVal = newPct;
+        mediaCol.style.flex = `0 0 ${newPct}%`;
+        mediaCol.style.maxWidth = `${newPct}%`;
+        widthBadge.textContent = `${newPct}%`;
+      };
+
+      const onPointerUp = (e: PointerEvent) => {
+        if (!isResizing) return;
+        isResizing = false;
+        document.body.classList.remove("ns-is-resizing");
+        container.classList.remove("is-resizing");
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        try {
+          resizer.releasePointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
+
+        const pos = typeof getPos === "function" ? getPos() : null;
+        if (typeof pos === "number") {
+          editor.view.dispatch(
+            editor.view.state.tr.setNodeMarkup(pos, undefined, {
+              ...currentNode.attrs,
+              imageWidth: `${currentPctVal}%`,
+            })
+          );
+        }
+      };
+
+      resizer.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+        startX = e.clientX;
+        startWidthPx = mediaCol.getBoundingClientRect().width;
+        containerWidthPx = body.getBoundingClientRect().width || 1;
+        document.body.classList.add("ns-is-resizing");
+        container.classList.add("is-resizing");
+        try {
+          resizer.setPointerCapture(e.pointerId);
+        } catch {
+          // ignore
+        }
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", onPointerUp);
+      });
+
+      body.appendChild(resizer);
+
       // ── Right Column: Details (contentDOM) ──────────────────────────────
       const contentCol = document.createElement("div");
       contentCol.className = "ns-side-by-side-content";
@@ -411,7 +507,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
 
       container.appendChild(body);
 
-      // ── Bottom Plus (+) Button (exactly as drawn in user diagram) ────────
+      // ── Bottom Plus (+) Button (as drawn in user diagram) ────────────────
       const addRowWrapper = document.createElement("div");
       addRowWrapper.className = "ns-side-by-side-bottom-add";
       addRowWrapper.contentEditable = "false";
@@ -468,6 +564,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
           const newWidth = updatedNode.attrs.imageWidth || "35%";
           mediaCol.style.flex = `0 0 ${newWidth}`;
           mediaCol.style.maxWidth = `${newWidth}`;
+          widthBadge.textContent = newWidth;
 
           // Update active width button styling
           widthToggle.querySelectorAll(".ns-width-btn").forEach((b) => {
