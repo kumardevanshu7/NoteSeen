@@ -230,6 +230,51 @@ export function buildExportHtml(note: Note, logoUrl: string): string {
       border-color: #e5e7eb !important;
     }
 
+    /* Side-by-side Card (Pic & Details) */
+    .content .ns-side-by-side-card {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: stretch !important;
+      gap: 16px !important;
+      margin: 18px 0 !important;
+      padding: 14px !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 8px !important;
+      background: #f8fafc !important;
+      page-break-inside: avoid !important;
+    }
+    .content .ns-side-by-side-media {
+      flex-shrink: 0 !important;
+      display: flex !important;
+      align-items: flex-start !important;
+      justify-content: center !important;
+    }
+    .content .ns-side-by-side-img {
+      width: 100% !important;
+      max-height: 280px !important;
+      object-fit: cover !important;
+      border-radius: 6px !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    .content .ns-side-by-side-placeholder-static {
+      width: 100% !important;
+      min-height: 120px !important;
+      border: 1px dashed #cbd5e1 !important;
+      border-radius: 6px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: #94a3b8 !important;
+      font-size: 13px !important;
+      background: #ffffff !important;
+    }
+    .content .ns-side-by-side-content {
+      flex: 1 1 0% !important;
+      min-width: 0 !important;
+    }
+    .content .ns-side-by-side-content > *:first-child { margin-top: 0 !important; }
+    .content .ns-side-by-side-content > *:last-child { margin-bottom: 0 !important; }
+
     .footer {
       margin-top: 48px;
       padding-top: 16px;

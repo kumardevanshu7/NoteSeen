@@ -41,6 +41,7 @@ import { createSlashCommandsExtension } from "@/lib/slash-commands";
 import { CustomInputRules } from "@/lib/custom-input-rules";
 import { CodeBlockWithCopy } from "@/lib/code-block-extension";
 import { CustomTableRow, TableBadge, cycleTableBadge } from "@/lib/table-badge";
+import { SideBySideCard } from "@/lib/side-by-side";
 import { SelectionMenu } from "./SelectionMenu";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import { TableControls } from "./TableControls";
@@ -149,6 +150,7 @@ export function NoteEditor({ note }: { note: Note }) {
       TableHeader,
       TableCell,
       TableBadge,
+      SideBySideCard.configure({ getNoteId: () => noteIdRef.current }),
       CustomInputRules,
       createSlashCommandsExtension(() => noteIdRef.current),
       Placeholder.configure({ placeholder: "Type '/' for commands, or start typing…" }),

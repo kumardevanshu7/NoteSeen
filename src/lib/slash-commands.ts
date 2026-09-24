@@ -14,6 +14,7 @@ import {
   Heading3,
   Highlighter,
   ImagePlus,
+  LayoutPanelLeft,
   List,
   ListOrdered,
   ListTodo,
@@ -166,6 +167,35 @@ export const SLASH_COMMAND_ITEMS: SlashCommandItem[] = [
         .focus()
         .deleteRange(range)
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run();
+    },
+  },
+  {
+    id: "side-by-side",
+    title: "Pic & Details (Side-by-side)",
+    description: "Picture on the left with details & notes on the right.",
+    icon: LayoutPanelLeft,
+    category: "Advanced & Media",
+    keywords: [
+      "pic",
+      "details",
+      "side",
+      "split",
+      "card",
+      "photo",
+      "image text",
+      "columns",
+      "media",
+      "layout",
+      "box",
+    ],
+    shortcut: "pic",
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertSideBySideCard()
         .run();
     },
   },
