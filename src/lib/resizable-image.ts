@@ -1,5 +1,6 @@
 import { mergeAttributes, Node, nodeInputRule } from "@tiptap/core";
 import type { NodeViewRendererProps } from "@tiptap/core";
+import { downloadImage } from "./download-image";
 
 const MIN_PCT = 15;
 const MAX_PCT = 100;
@@ -208,6 +209,23 @@ export const ResizableImage = Node.create({
       const label = document.createElement("span");
       label.className = "ns-img-size";
 
+      // Download button
+      const downloadBtn = document.createElement("button");
+      downloadBtn.type = "button";
+      downloadBtn.className = "ns-img-download-btn";
+      downloadBtn.setAttribute("title", "Download image");
+      downloadBtn.setAttribute("aria-label", "Download image");
+      downloadBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+      downloadBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const src = node.attrs.src;
+        if (src) {
+          const suggestedName = node.attrs.title || node.attrs.alt || "note-picture";
+          void downloadImage(src, suggestedName);
+        }
+      });
+
       // Delete button
       const delBtn = document.createElement("button");
       delBtn.type = "button";
@@ -225,7 +243,7 @@ export const ResizableImage = Node.create({
         }
       });
 
-      tools.append(alignGroup, presetsWrap, label, delBtn);
+      tools.append(alignGroup, presetsWrap, label, downloadBtn, delBtn);
       box.append(img, leftHandle, rightHandle);
       wrap.append(box, tools);
 

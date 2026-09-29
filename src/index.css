@@ -943,6 +943,7 @@ body.ns-is-resizing * {
 
 .ns-editor .ns-img-align-btn,
 .ns-editor .ns-img-preset-btn,
+.ns-editor .ns-img-download-btn,
 .ns-editor .ns-img-del-btn {
   display: inline-flex;
   align-items: center;
@@ -959,7 +960,8 @@ body.ns-is-resizing * {
 }
 
 .ns-editor .ns-img-align-btn:hover,
-.ns-editor .ns-img-preset-btn:hover {
+.ns-editor .ns-img-preset-btn:hover,
+.ns-editor .ns-img-download-btn:hover {
   background: var(--stone);
   border-color: #3b82f6;
   color: #3b82f6;
@@ -987,9 +989,13 @@ body.ns-is-resizing * {
   color: var(--muted);
 }
 
+.ns-editor .ns-img-download-btn {
+  margin-left: auto;
+}
+
 .ns-editor .ns-img-del-btn {
   color: var(--error);
-  margin-left: auto;
+  margin-left: 2px;
 }
 
 .ns-editor .ns-img-del-btn:hover {
@@ -1648,6 +1654,34 @@ body.ns-is-resizing * {
 .ns-media-cross-btn:hover {
   background: #dc2626;
   border-color: #ef4444;
+  transform: scale(1.1);
+  color: #ffffff;
+}
+
+/* Top-right Download Button */
+.ns-media-download-btn {
+  position: absolute;
+  top: 0.45rem;
+  right: 2.35rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.ns-media-download-btn:hover {
+  background: #2563eb;
+  border-color: #3b82f6;
   transform: scale(1.1);
   color: #ffffff;
 }

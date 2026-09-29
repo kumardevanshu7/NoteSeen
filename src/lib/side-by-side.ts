@@ -4,6 +4,7 @@ import { useAuth } from "@/store/auth";
 import { requireVault } from "@/store/vault";
 import { isImageStorageConfigured } from "@/lib/supabase";
 import { imageFileToOptimizedDataUrl, uploadPublicImage } from "@/lib/note-images";
+import { downloadImage } from "@/lib/download-image";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -362,6 +363,26 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
             }
           });
 
+          // Download Button on top-right of image (next to cross button)
+          const downloadBtn = document.createElement("button");
+          downloadBtn.type = "button";
+          downloadBtn.className = "ns-media-download-btn";
+          downloadBtn.title = "Download picture";
+          downloadBtn.setAttribute("aria-label", "Download picture");
+          downloadBtn.innerHTML = `
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          `;
+          downloadBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const suggestedName = currentNode.attrs.imageAlt || "side-by-side-picture";
+            void downloadImage(currentSrc, suggestedName);
+          });
+
           // Bottom-left Replace Button
           const replaceBtn = document.createElement("button");
           replaceBtn.type = "button";
@@ -380,6 +401,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
           });
 
           imgWrapper.appendChild(img);
+          imgWrapper.appendChild(downloadBtn);
           imgWrapper.appendChild(crossBtn);
           imgWrapper.appendChild(replaceBtn);
           mediaCol.appendChild(imgWrapper);

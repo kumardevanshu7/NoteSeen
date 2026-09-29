@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { FileText, Images, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { Download, FileText, Images, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
+import { downloadImage } from "@/lib/download-image";
 import { PromptCardForm } from "@/components/PromptCardForm";
 import {
   Dialog,
@@ -337,6 +338,17 @@ export function PromptCardsView() {
                   onMoved={() => setViewing(null)}
                 />
                 <CopyButton note={viewingLive} label="Copy prompt" />
+                {viewingLive.coverUrl ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void downloadImage(viewingLive.coverUrl!, `${noteLabel(viewingLive)}.png`)}
+                  >
+                    <Download className="size-3.5" />
+                    Download picture
+                  </Button>
+                ) : null}
                 <Button type="button" variant="ghost" size="sm" onClick={() => setViewing(null)}>
                   <X className="size-3.5" />
                   Close
