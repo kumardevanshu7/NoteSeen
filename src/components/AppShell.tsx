@@ -119,6 +119,20 @@ export function AppShell() {
     }
   }, [styleOpen]);
 
+  // Prevent body scrolling when mobile drawers are open
+  useEffect(() => {
+    const isMobileNav = navOpen && window.innerWidth < 1024;
+    const isMobileStyle = styleOpen && window.innerWidth < 1280;
+    if (isMobileNav || isMobileStyle) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [navOpen, styleOpen]);
+
   // Edge swipe (from left) opens the sidebar on phones.
   useEffect(() => {
     let startX = 0;
@@ -366,19 +380,6 @@ export function AppShell() {
       </div>
     );
   }
-
-  useEffect(() => {
-    const isMobileNav = navOpen && window.innerWidth < 1024;
-    const isMobileStyle = styleOpen && window.innerWidth < 1280;
-    if (isMobileNav || isMobileStyle) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [navOpen, styleOpen]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
