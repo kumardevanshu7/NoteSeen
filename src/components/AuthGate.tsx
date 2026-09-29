@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Logo";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
@@ -15,13 +16,48 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const profileReady = useAuth((state) => state.profileReady);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
 
+  const [signingIn, setSigningIn] = useState(false);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
+  const [profileTimedOut, setProfileTimedOut] = useState(false);
+
   useEffect(() => {
     if (ready) hideBootSplash();
   }, [ready]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!useAuth.getState().ready) setAuthTimedOut(true);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (user && !profileReady) {
+      const timer = setTimeout(() => {
+        if (!useAuth.getState().profileReady) setProfileTimedOut(true);
+      }, 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, profileReady]);
+
+  const handleSignIn = async () => {
+    if (signingIn) return;
+    setSigningIn(true);
+    try {
+      await signInWithGoogle();
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Sign-in could not be completed";
+      if (!msg.includes("popup-closed-by-user") && !msg.includes("cancelled-popup-request")) {
+        toast.error("Could not sign in with Google", { description: msg });
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
+
   if (!ready) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas">
+      <div className="flex h-full flex-col items-center justify-center bg-canvas p-6 text-center">
         <img
           src="/noteseen-mark.png?v=2"
           alt=""
@@ -29,6 +65,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
           width={48}
           height={48}
         />
+        {authTimedOut && (
+          <div className="mt-4 max-w-sm rounded-lg border border-hairline bg-surface p-4 text-xs text-body-muted">
+            <p className="font-semibold text-ink mb-1">Connecting to authentication…</p>
+            <p>If you are offline or have an ad-blocker blocking Google Auth, try reloading.</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => window.location.reload()}
+            >
+              Reload
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
@@ -49,9 +99,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
             variant="primary"
             size="lg"
             className="mt-8 w-full sm:w-auto"
-            onClick={() => void signInWithGoogle()}
+            disabled={signingIn}
+            onClick={() => void handleSignIn()}
           >
-            Continue with Google
+            {signingIn ? "Connecting with Google…" : "Continue with Google"}
           </Button>
         </main>
         <SiteFooter />
@@ -61,8 +112,22 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (!profileReady) {
     return (
-      <div className="flex h-full items-center justify-center bg-canvas">
+      <div className="flex h-full flex-col items-center justify-center bg-canvas p-6 text-center">
         <span className="ns-mono text-muted">Loading profile…</span>
+        {profileTimedOut && (
+          <div className="mt-4 max-w-sm rounded-lg border border-hairline bg-surface p-4 text-xs text-body-muted">
+            <p className="font-semibold text-ink mb-1">Slow connection?</p>
+            <p>Could not fetch cloud profile. You can retry or continue.</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

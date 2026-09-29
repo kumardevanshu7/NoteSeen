@@ -564,12 +564,17 @@ export const useNotes = create<NotesState>((set, get) => {
           notes[id] = { ...note, workspaceId, updatedAt: stamp };
           dirtyNotes.add(id);
           moved += 1;
-          if (workspaceId !== activeWorkspaceId && nextTabs.includes(id)) {
-            nextTabs = nextTabs.filter((tab) => tab !== id);
-            if (nextActive === id) nextActive = nextTabs[nextTabs.length - 1] ?? null;
+          if (workspaceId !== activeWorkspaceId) {
+            if (nextTabs.includes(id)) {
+              nextTabs = nextTabs.filter((tab) => tab !== id);
+            }
+            if (nextActive === id) {
+              nextActive = nextTabs[nextTabs.length - 1] ?? null;
+            }
           }
         }
-        return { notes, openTabs: nextTabs, activeId: nextActive };
+        const nextView: View = state.view === "editor" && !nextActive ? "all" : state.view;
+        return { notes, openTabs: nextTabs, activeId: nextActive, view: nextView };
       });
 
       if (moved > 0) {

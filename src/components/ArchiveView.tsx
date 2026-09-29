@@ -10,7 +10,9 @@ import {
   Sparkles,
   Square,
   Trash2,
+  X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,17 +30,15 @@ import { cn, excerpt, formatRelative } from "@/lib/utils";
 type KindFilter = "all" | "note" | "prompt";
 type ViewMode = "grid" | "list";
 
-const COLUMN_CHOICES = [2, 3, 4, 5, 6] as const;
 const PREFS_KEY = "noteseen.archive-prefs";
 
 interface ArchivePrefs {
   kind: KindFilter;
   view: ViewMode;
-  cols: number;
 }
 
 function readPrefs(): ArchivePrefs {
-  const fallback: ArchivePrefs = { kind: "all", view: "grid", cols: 3 };
+  const fallback: ArchivePrefs = { kind: "all", view: "grid" };
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (!raw) return fallback;
@@ -46,9 +46,6 @@ function readPrefs(): ArchivePrefs {
     return {
       kind: parsed.kind === "note" || parsed.kind === "prompt" ? parsed.kind : "all",
       view: parsed.view === "list" ? "list" : "grid",
-      cols: COLUMN_CHOICES.includes(parsed.cols as (typeof COLUMN_CHOICES)[number])
-        ? (parsed.cols as number)
-        : 3,
     };
   } catch {
     return fallback;
@@ -134,9 +131,19 @@ export function ArchiveView() {
     setSelected(next);
   };
 
+  const handleSingleUnarchive = (id: string) => {
+    unarchiveNotes([id]);
+    toast.success("Restored note to active workspace");
+  };
+
   const handleBulkUnarchive = () => {
     if (selectedIds.length === 0) return;
     unarchiveNotes(selectedIds);
+    toast.success(
+      selectedIds.length === 1
+        ? "Restored 1 note to active workspace"
+        : `Restored ${selectedIds.length} notes to active workspace`,
+    );
     setSelected({});
   };
 
@@ -155,9 +162,7 @@ export function ArchiveView() {
           <div>
             <div className="flex items-center gap-2">
               <Archive className="size-5 text-accent" />
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-                Archive Space
-              </h1>
+              <h1 className="ns-display text-ink">Archive Space</h1>
             </div>
             <p className="ns-caption mt-1.5 max-w-xl text-xs sm:text-sm text-body-muted leading-relaxed">
               Notes that you have 100% completed and archived. Safely preserved without cluttering your active workspace.
@@ -176,7 +181,7 @@ export function ArchiveView() {
               <>
                 <Button variant="outline" size="sm" onClick={handleBulkUnarchive} className="gap-1.5 text-accent">
                   <ArchiveRestore className="size-3.5" />
-                  <span>Unarchive ({selectedIds.length})</span>
+                  <span>Restore ({selectedIds.length})</span>
                 </Button>
                 <Button variant="outline" size="sm" className="gap-1.5 text-error" onClick={handleBulkDelete}>
                   <Trash2 className="size-3.5" />
@@ -225,25 +230,38 @@ export function ArchiveView() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            {allLabels.length > 0 ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    {labelFilter ? `Label: ${labelFilter}` : "All labels"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>Filter by label</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setLabelFilter(null)}>
-                    All labels
-                  </DropdownMenuItem>
-                  {allLabels.map((tag) => (
-                    <DropdownMenuItem key={tag} onClick={() => setLabelFilter(tag)}>
-                      {tag}
+            {allLabels.length > 0 || labelFilter ? (
+              <div className="flex items-center gap-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {labelFilter ? `Label: ${labelFilter}` : "All labels"}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuLabel>Filter by label</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => setLabelFilter(null)}>
+                      All labels
                     </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    {allLabels.map((tag) => (
+                      <DropdownMenuItem key={tag} onClick={() => setLabelFilter(tag)}>
+                        {tag}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {labelFilter ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setLabelFilter(null)}
+                    title="Clear label filter"
+                    aria-label="Clear label filter"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
 
             <div className="flex items-center gap-1 rounded-full border border-hairline p-0.5">
@@ -322,10 +340,12 @@ export function ArchiveView() {
                     <span className="truncate text-[14px] font-medium text-ink">
                       {noteLabel(note)}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle2 className="size-3" />
-                      <span>100% Covered</span>
-                    </span>
+                    {note.completed ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="size-3" />
+                        <span>100% Covered</span>
+                      </span>
+                    ) : null}
                   </div>
                   <span className="ns-caption block truncate text-body-muted text-xs mt-0.5">
                     {excerpt(note.text, 90) || "Empty note"}
@@ -337,15 +357,16 @@ export function ArchiveView() {
                     variant="outline"
                     size="sm"
                     className="h-8 gap-1.5 px-2.5 text-xs text-accent"
-                    onClick={() => unarchiveNotes([note.id])}
+                    onClick={() => handleSingleUnarchive(note.id)}
                   >
                     <ArchiveRestore className="size-3.5" />
-                    <span className="hidden sm:inline">Unarchive</span>
+                    <span className="hidden sm:inline">Restore</span>
                   </Button>
                   <CopyButton note={note} size="icon-sm" />
                   <Button
                     variant="ghost"
                     size="icon-sm"
+                    aria-label="Move to trash"
                     className="text-muted hover:text-error"
                     onClick={() => void trashNotes([note.id])}
                   >
@@ -385,10 +406,12 @@ export function ArchiveView() {
                           )}
                         </button>
 
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle2 className="size-3" />
-                          <span>100% Covered</span>
-                        </span>
+                        {note.completed ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="size-3" />
+                            <span>100% Covered</span>
+                          </span>
+                        ) : null}
                       </div>
 
                       <button
@@ -414,7 +437,7 @@ export function ArchiveView() {
                           variant="outline"
                           size="sm"
                           className="h-8 gap-1 rounded-lg px-2.5 text-xs font-medium text-accent"
-                          onClick={() => unarchiveNotes([note.id])}
+                          onClick={() => handleSingleUnarchive(note.id)}
                           title="Restore note to active notes"
                         >
                           <ArchiveRestore className="size-3.5" />
@@ -424,6 +447,7 @@ export function ArchiveView() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
+                          aria-label="Move to trash"
                           className="size-8 text-muted hover:text-error"
                           onClick={() => void trashNotes([note.id])}
                         >

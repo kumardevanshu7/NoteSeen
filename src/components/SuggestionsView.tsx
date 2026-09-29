@@ -34,7 +34,7 @@ export function SuggestionsView() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 border-b border-hairline/60 pb-4 sm:pb-6">
           <div className="min-w-0">
             <p className="ns-mono text-[10.5px] font-semibold uppercase tracking-wider text-muted">Home</p>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink mt-0.5 sm:mt-1">Suggestions</h1>
+            <h1 className="ns-display text-ink mt-0.5 sm:mt-1">Suggestions</h1>
             <p className="ns-caption mt-1 max-w-xl text-xs sm:text-sm text-body-muted leading-relaxed">
               Notes and prompts untouched for a week or more. Each gets a distinct color accent so quiet items stand out.
             </p>

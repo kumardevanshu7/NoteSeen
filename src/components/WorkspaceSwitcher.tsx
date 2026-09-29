@@ -181,7 +181,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
                 if (event.key === "Enter") submitCreate();
               }}
             />
-            <WorkspaceColorPicker value={color} onChange={(next) => setColor(next as WorkspaceColor)} />
+            <WorkspaceColorPicker value={color} onChange={setColor} />
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
@@ -198,6 +198,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Edit workspace</DialogTitle>
+            <DialogDescription>Rename this workspace or change its color.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <Input
@@ -209,7 +210,7 @@ export function WorkspaceSwitcher({ className }: { className?: string }) {
                 if (event.key === "Enter") submitRename();
               }}
             />
-            <WorkspaceColorPicker value={color} onChange={(next) => setColor(next as WorkspaceColor)} />
+            <WorkspaceColorPicker value={color} onChange={setColor} />
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setRenameOpen(false)}>

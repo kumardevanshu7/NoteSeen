@@ -112,7 +112,7 @@ export function SlashCommandMenu() {
         left: coords.left,
         width: MENU_WIDTH,
         maxHeight: MENU_MAX_HEIGHT,
-        zIndex: 9999,
+        zIndex: 35,
       }}
       className="ns-scroll flex flex-col overflow-hidden rounded-xl border border-hairline/80 bg-popover/95 text-popover-foreground shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100"
     >

@@ -72,7 +72,7 @@ export const ResizableImage = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: "img[src]" }];
+    return [{ tag: "img[src]:not(.ns-side-by-side-img):not([data-side-by-side-img])" }];
   },
 
   renderHTML({ HTMLAttributes }) {

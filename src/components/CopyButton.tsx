@@ -32,7 +32,11 @@ function escapeHtml(value: string): string {
 function copyNoteHtml(note: Note): string {
   const title = note.title.trim();
   const heading = title ? `<h1>${escapeHtml(title)}</h1>` : "";
-  const body = note.html?.trim() || `<p>${escapeHtml(note.text)}</p>`;
+  let body = note.html?.trim() || `<p>${escapeHtml(note.text)}</p>`;
+  // If HTML contains huge base64 images that might cause clipboard write failure, omit the raw data URL
+  if (body.length > 400_000) {
+    body = body.replace(/src="data:image\/[^;]+;base64,[^"]+"/g, 'src="" alt="[Image]"');
+  }
   return `<meta charset="utf-8">${heading}${body}`;
 }
 
@@ -84,6 +88,8 @@ export function CopyButton({
   label?: string;
 }) {
   const [done, setDone] = useState(false);
+  const noteName = note.title?.trim() || "note";
+  const defaultLabel = `Copy "${noteName}"`;
 
   return (
     <Button
@@ -91,7 +97,7 @@ export function CopyButton({
       variant={size === "icon-sm" ? "ghost" : "outline"}
       size={size}
       className={cn(size !== "icon-sm" && "gap-1.5", className)}
-      aria-label={label ?? "Copy"}
+      aria-label={label ?? defaultLabel}
       onClick={(event) => {
         event.stopPropagation();
         void copyNoteToClipboard(note).then((ok) => {

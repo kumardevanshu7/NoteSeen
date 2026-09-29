@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
-import { RotateCcw, RotateCw, ZoomIn } from "lucide-react";
+import { AlertCircle, RotateCcw, RotateCw, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +42,7 @@ export function ImageEditDialog() {
   const [mediaAspect, setMediaAspect] = useState(4 / 3);
   const [pixels, setPixels] = useState<Area | null>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const aspect =
     aspectId === "square" ? 1 : aspectId === "43" ? 4 / 3 : aspectId === "169" ? 16 / 9 : mediaAspect;
@@ -49,6 +50,7 @@ export function ImageEditDialog() {
   useEffect(() => {
     if (!file) {
       setSrc(null);
+      setLoadError(false);
       return;
     }
     const url = URL.createObjectURL(file);
@@ -58,6 +60,7 @@ export function ImageEditDialog() {
     setRotation(0);
     setAspectId("free");
     setPixels(null);
+    setLoadError(false);
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
@@ -81,8 +84,17 @@ export function ImageEditDialog() {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
-      <DialogContent className="max-w-2xl" showClose={!busy}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && !busy && close()}>
+      <DialogContent
+        className="max-w-2xl"
+        showClose={!busy}
+        onPointerDownOutside={(e) => {
+          if (busy) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (busy) e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Edit image</DialogTitle>
           <DialogDescription>
@@ -92,7 +104,15 @@ export function ImageEditDialog() {
         </DialogHeader>
 
         <div className="relative h-[min(52vh,22rem)] overflow-hidden rounded-sm bg-stone">
-          {src ? (
+          {loadError ? (
+            <div className="flex h-full flex-col items-center justify-center p-4 text-center text-muted">
+              <AlertCircle className="size-8 text-error mb-2" />
+              <p className="text-sm font-medium text-ink">Could not load this image file</p>
+              <p className="text-xs text-body-muted mt-1">
+                The file may be corrupt or an unsupported format.
+              </p>
+            </div>
+          ) : src ? (
             <Cropper
               image={src}
               crop={crop}
@@ -102,6 +122,12 @@ export function ImageEditDialog() {
               onCropChange={setCrop}
               onZoomChange={setZoom}
               onRotationChange={setRotation}
+              mediaProps={{
+                onError: () => {
+                  setLoadError(true);
+                  toast.error("Failed to load image preview");
+                },
+              }}
               onMediaLoaded={(size) => {
                 if (size.naturalWidth > 0 && size.naturalHeight > 0) {
                   setMediaAspect(size.naturalWidth / size.naturalHeight);

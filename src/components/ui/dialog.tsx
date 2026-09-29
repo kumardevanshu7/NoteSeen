@@ -15,12 +15,14 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { showClose?: boolean }) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="ns-fade fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]" />
+      <DialogPrimitive.Overlay className="ns-fade fixed inset-0 z-50 bg-black/45" />
       <DialogPrimitive.Content
         className={cn(
-          "ns-pop fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2",
+          "ns-pop ns-scroll fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2",
+          "max-h-[min(90vh,calc(100dvh-2rem))] overflow-y-auto",
           "rounded-lg border border-hairline bg-surface p-6 text-ink",
-          "shadow-[0_30px_80px_-40px_rgb(0_0_0/0.45)]",
+          "shadow-[0_30px_80px_-40px_rgb(0_0_0/0.45)] outline-none",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
           className,
         )}
         {...props}
@@ -29,7 +31,7 @@ function DialogContent({
         {showClose ? (
           <DialogPrimitive.Close
             aria-label="Close"
-            className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full text-slate transition-colors hover:bg-stone hover:text-ink"
+            className="absolute top-4 right-4 z-10 flex size-9 sm:size-8 min-h-[36px] min-w-[36px] items-center justify-center rounded-full text-slate transition-colors hover:bg-stone hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 ring-offset-surface"
           >
             <X className="size-4" />
           </DialogPrimitive.Close>

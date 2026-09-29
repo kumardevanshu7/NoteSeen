@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,7 @@ export function AuthButton() {
   const syncing = useAuth((state) => state.syncing);
   const signInWithGoogle = useAuth((state) => state.signInWithGoogle);
   const signOut = useAuth((state) => state.signOut);
+  const [imgError, setImgError] = useState(false);
 
   if (!ready) {
     return <div className="size-8 rounded-full border border-hairline bg-stone" aria-hidden />;
@@ -29,10 +31,11 @@ export function AuthButton() {
       <Button
         variant="outline"
         size="sm"
-        className="gap-1.5 rounded-full"
+        aria-label="Sign in with Google"
+        className="rounded-full px-3 text-xs"
         onClick={() => void signInWithGoogle()}
       >
-        <span className="hidden sm:inline">Google</span>
+        Sign in
       </Button>
     );
   }
@@ -53,12 +56,13 @@ export function AuthButton() {
               aria-label={label}
               className="relative flex size-8 items-center justify-center overflow-hidden rounded-full border border-hairline bg-stone"
             >
-              {user.photoURL ? (
+              {user.photoURL && !imgError ? (
                 <img
                   src={user.photoURL}
                   alt=""
                   className="size-full object-cover"
                   referrerPolicy="no-referrer"
+                  onError={() => setImgError(true)}
                 />
               ) : (
                 <span className="text-[12px] font-medium text-ink">

@@ -14,6 +14,8 @@ import { requireVault } from "@/store/vault";
 import { cn } from "@/lib/utils";
 
 const ACCEPT = "image/jpeg,image/png,image/gif,image/webp";
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
 
 interface PromptCardFormProps {
   note?: Note;
@@ -42,7 +44,15 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
   }, [preview]);
 
   const pickFile = (next: File | undefined) => {
-    if (!next || !next.type.startsWith("image/")) return;
+    if (!next) return;
+    if (!next.type.startsWith("image/") || !ALLOWED_TYPES.includes(next.type)) {
+      toast.error("Please drop or choose a JPG, PNG, GIF, or WebP image");
+      return;
+    }
+    if (next.size > MAX_IMAGE_BYTES) {
+      toast.error("Image file exceeds the 5 MB limit");
+      return;
+    }
     if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
     setFile(next);
     setPreview(URL.createObjectURL(next));
@@ -109,6 +119,12 @@ export function PromptCardForm({ note, onCancel, onSaved }: PromptCardFormProps)
 
   return (
     <div className="flex flex-col gap-4">
+      {!isImageStorageConfigured() && (
+        <div className="rounded-sm border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+          Cloud image hosting is not configured. Saving prompt cards requires image storage.
+        </div>
+      )}
+
       <input
         ref={fileRef}
         type="file"

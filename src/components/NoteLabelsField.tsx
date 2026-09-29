@@ -51,8 +51,8 @@ export function NoteLabelsField({
 
   const commitDraft = () => {
     const next = normalizeLabelName(draft);
-    if (next && !selectedKeys.has(next.toLowerCase())) {
-      onChange([...selected, next]);
+    if (next && !selectedKeys.has(next.toLowerCase()) && selected.length < 24) {
+      onChange([...selected, next].slice(0, 24));
     }
     setDraft("");
   };
@@ -64,10 +64,10 @@ export function NoteLabelsField({
   };
 
   const addTag = (tag: string) => {
-    if (disabled) return;
+    if (disabled || selected.length >= 24) return;
     const next = normalizeLabelName(tag);
     if (next && !selectedKeys.has(next.toLowerCase())) {
-      onChange([...selected, next]);
+      onChange([...selected, next].slice(0, 24));
     }
     setDraft("");
   };
@@ -99,7 +99,7 @@ export function NoteLabelsField({
       ))}
 
       {/* Inline Add Button or Input */}
-      {!disabled ? (
+      {!disabled && selected.length < 24 ? (
         <div className="relative inline-flex items-center">
           {isInputOpen ? (
             <div className="relative flex items-center">
@@ -110,10 +110,13 @@ export function NoteLabelsField({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onBlur={() => {
-                  commitDraft();
-                  setTimeout(() => setIsInputOpen(false), 150);
+                  setTimeout(() => {
+                    setDraft("");
+                    setIsInputOpen(false);
+                  }, 150);
                 }}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) return;
                   if (e.key === "Enter" || e.key === ",") {
                     e.preventDefault();
                     commitDraft();

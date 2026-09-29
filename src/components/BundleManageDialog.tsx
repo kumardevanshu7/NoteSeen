@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Folder, FolderPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNotes } from "@/store/notes";
+import { requireVault } from "@/store/vault";
 import { normalizeBundleName } from "@/lib/selectors";
 
 interface BundleManageDialogProps {
@@ -34,11 +35,27 @@ export function BundleManageDialog({
   const renameBundle = useNotes((state) => state.renameBundle);
   const deleteBundle = useNotes((state) => state.deleteBundle);
 
+  useEffect(() => {
+    if (open) {
+      setName(mode === "create" ? "" : bundleName);
+    }
+  }, [open, mode, bundleName]);
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = normalizeBundleName(name);
     if (!clean) {
       toast.error("Please enter a bundle name");
+      return;
+    }
+    const { bundles, activeWorkspaceId } = useNotes.getState();
+    const exists = Object.values(bundles).some(
+      (b) => b.workspaceId === activeWorkspaceId && b.name.toLowerCase() === clean.toLowerCase(),
+    );
+    if (exists) {
+      toast.info(`Bundle "${clean}" already exists`);
+      onSuccess?.(clean);
+      onOpenChange(false);
       return;
     }
     const created = createBundle(clean);
@@ -47,24 +64,39 @@ export function BundleManageDialog({
     onOpenChange(false);
   };
 
-  const handleRename = (e: React.FormEvent) => {
+  const handleRename = async (e: React.FormEvent) => {
     e.preventDefault();
     const clean = normalizeBundleName(name);
     if (!clean) {
       toast.error("Please enter a valid bundle name");
       return;
     }
-    if (clean.toLowerCase() === bundleName.toLowerCase()) {
+    if (clean === bundleName) {
       onOpenChange(false);
       return;
     }
+    const { bundles, activeWorkspaceId } = useNotes.getState();
+    const exists = Object.values(bundles).some(
+      (b) =>
+        b.workspaceId === activeWorkspaceId &&
+        b.name.toLowerCase() === clean.toLowerCase() &&
+        b.name.toLowerCase() !== bundleName.toLowerCase(),
+    );
+    if (exists) {
+      toast.error(`A bundle named "${clean}" already exists`);
+      return;
+    }
+    const ok = await requireVault("edit");
+    if (!ok) return;
     const count = renameBundle(bundleName, clean);
     toast.success(`Renamed bundle to "${clean}" (${count} notes updated)`);
     onSuccess?.(clean);
     onOpenChange(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    const ok = await requireVault("delete");
+    if (!ok) return;
     const count = deleteBundle(bundleName);
     toast.success(`Disbanded bundle "${bundleName}" (${count} notes kept in notes)`);
     onSuccess?.();

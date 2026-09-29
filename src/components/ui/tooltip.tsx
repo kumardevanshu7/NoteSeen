@@ -1,4 +1,4 @@
-import type * as React from "react";
+import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,33 @@ function TooltipProvider({
 }
 
 const Tooltip = TooltipPrimitive.Root;
-const TooltipTrigger = TooltipPrimitive.Trigger;
+
+function TooltipTrigger({
+  asChild,
+  children,
+  ...props
+}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+  // If child is a disabled element, wrap with an accessible span so hover/focus still triggers tooltip
+  if (
+    asChild &&
+    React.isValidElement(children) &&
+    Boolean((children.props as { disabled?: boolean })?.disabled)
+  ) {
+    return (
+      <TooltipPrimitive.Trigger asChild {...props}>
+        <span className="inline-flex cursor-not-allowed" tabIndex={0} aria-disabled="true">
+          {children}
+        </span>
+      </TooltipPrimitive.Trigger>
+    );
+  }
+
+  return (
+    <TooltipPrimitive.Trigger asChild={asChild} {...props}>
+      {children}
+    </TooltipPrimitive.Trigger>
+  );
+}
 
 function TooltipContent({
   className,
@@ -30,7 +56,7 @@ function TooltipContent({
       <TooltipPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "ns-fade z-50 max-w-64 rounded-xs bg-primary px-2.5 py-1.5 text-xs text-primary-ink",
+          "ns-fade z-[60] max-w-64 rounded-xs bg-primary px-2.5 py-1.5 text-xs text-primary-ink shadow-md",
           className,
         )}
         {...props}

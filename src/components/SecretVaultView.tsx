@@ -187,6 +187,22 @@ export function SecretVaultView() {
     };
   }, [unlocked, bumpIdle]);
 
+  // Auto-lock vault when navigating away from the view or backgrounding the tab
+  useEffect(() => {
+    const onHide = () => {
+      if (document.hidden) {
+        useSecrets.getState().lock();
+      }
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+      useSecrets.getState().lock();
+    };
+  }, []);
+
   const workspaceEntries = useMemo(
     () => entries.filter((entry) => entry.workspaceId === activeWorkspaceId),
     [entries, activeWorkspaceId],
@@ -636,7 +652,7 @@ function SecretCard({
       const pts = parsePatternPath(plain);
       const text = pts.map((n) => n + 1).join(" ➔ ");
       await navigator.clipboard.writeText(text);
-      toast.success("Pattern steps copied", { description: text });
+      toast.success("Pattern copied to clipboard");
       return;
     }
     const parsed = parseSecretValues(plain);
@@ -685,10 +701,17 @@ function SecretCard({
   if (variant === "list") {
     return (
       <li>
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={onOpen}
-          className="flex w-full items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-stone/50"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen();
+            }
+          }}
+          className="flex w-full cursor-pointer items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-stone/50"
         >
           {entry.category === "pattern" ? (
             <Grid3x3 className="size-3.5 shrink-0 text-slate" />
@@ -718,7 +741,7 @@ function SecretCard({
             {formatRelative(entry.updatedAt)}
           </span>
           <div onClick={stop}>{actions}</div>
-        </button>
+        </div>
       </li>
     );
   }
@@ -726,10 +749,17 @@ function SecretCard({
   if (variant === "grid") {
     return (
       <li>
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={onOpen}
-          className="flex h-44 w-full flex-col rounded-sm border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/20"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen();
+            }
+          }}
+          className="flex h-44 w-full cursor-pointer flex-col rounded-sm border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/20"
         >
           <div className="min-w-0">
             <p className="truncate text-[13.5px] font-medium text-ink">{entry.title}</p>
@@ -768,17 +798,24 @@ function SecretCard({
             <span className="ns-mono text-muted">{formatRelative(entry.updatedAt)}</span>
             <div onClick={stop}>{actions}</div>
           </div>
-        </button>
+        </div>
       </li>
     );
   }
 
   return (
     <li>
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
-        className="w-full rounded-sm border border-hairline bg-surface p-4 text-left transition-colors hover:border-ink/20"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
+        className="w-full cursor-pointer rounded-sm border border-hairline bg-surface p-4 text-left transition-colors hover:border-ink/20"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -834,7 +871,7 @@ function SecretCard({
           </div>
           <div onClick={stop}>{actions}</div>
         </div>
-      </button>
+      </div>
     </li>
   );
 }

@@ -1,19 +1,26 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Wordmark } from "@/components/Logo";
 import { navigate } from "@/lib/nav";
 
 export function BrandShell({ title, children }: { title: string; children: ReactNode }) {
+  useEffect(() => {
+    document.title = `${title} — NoteSeen`;
+    return () => {
+      document.title = "NoteSeen";
+    };
+  }, [title]);
+
   return (
     <div className="flex min-h-dvh flex-col bg-canvas text-ink">
       <header className="flex items-center justify-between border-b border-hairline px-5 py-5 sm:px-10">
         <Wordmark />
         <button
           type="button"
-          onClick={() => navigate("/")}
-          className="ns-caption text-muted transition-colors hover:text-ink"
+          onClick={() => navigate("/app")}
+          className="ns-caption font-medium text-ink transition-colors hover:text-primary"
         >
-          Home
+          Open App →
         </button>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-5 py-12 sm:px-10">

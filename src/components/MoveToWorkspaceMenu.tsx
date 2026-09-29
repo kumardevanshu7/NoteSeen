@@ -93,13 +93,15 @@ export function MoveToWorkspaceMenu({
   );
 }
 
+import type { WorkspaceColor } from "@/lib/types";
+
 export function WorkspaceColorPicker({
   value,
   onChange,
   className,
 }: {
-  value: string;
-  onChange: (color: string) => void;
+  value: WorkspaceColor;
+  onChange: (color: WorkspaceColor) => void;
   className?: string;
 }) {
   return (

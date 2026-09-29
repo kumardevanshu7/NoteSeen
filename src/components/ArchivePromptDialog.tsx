@@ -32,13 +32,13 @@ export function ArchivePromptDialog({
             <CheckCircle2 className="size-6" />
           </div>
           <DialogTitle className="text-center text-lg font-semibold text-ink">
-            100% Checked &amp; Covered!
+            100% Covered!
           </DialogTitle>
           <DialogDescription className="text-center text-body-muted text-[13.5px] leading-relaxed pt-1">
             <span className="font-medium text-ink">
               &quot;{noteTitle || "Untitled note"}&quot;
             </span>{" "}
-            is now marked as 100% finished. Would you like to put it in your{" "}
+            is now marked as 100% covered. Would you like to put it in your{" "}
             <span className="font-medium text-ink">Archive Space</span> to keep your workspace clean?
           </DialogDescription>
         </DialogHeader>
@@ -60,7 +60,7 @@ export function ArchivePromptDialog({
               onArchive();
               onOpenChange(false);
             }}
-            className="w-full gap-1.5 sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="w-full gap-1.5 sm:w-auto"
           >
             <Archive className="size-4" />
             <span>Put in Archive Space</span>

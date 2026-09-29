@@ -3,6 +3,7 @@ import type { Editor } from "@tiptap/react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -168,8 +169,12 @@ export function TableBadgeDialog({
 
   const handleApply = () => {
     if (choices.length === 0) return;
-    const first = choices[0];
-    const optionsJson = JSON.stringify(choices);
+    const sanitizedChoices = choices.map((c, i) => ({
+      ...c,
+      label: c.label.trim() || `Option ${i + 1}`,
+    }));
+    const first = sanitizedChoices[0];
+    const optionsJson = JSON.stringify(sanitizedChoices);
 
     if (applyToColumn) {
       fillColumnWithBadge(
@@ -212,9 +217,9 @@ export function TableBadgeDialog({
             <Sparkles className="size-4 text-emerald-500" />
             <span>{columnTitle ? `${columnTitle} — Options` : "Custom Table Options & Badges"}</span>
           </DialogTitle>
-          <p className="text-xs text-muted">
+          <DialogDescription className="text-xs text-muted">
             Configure 2 to 5 selectable options for this column. Each column remembers its own choices!
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">

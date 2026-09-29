@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Lock, Maximize2, Minimize2, Save } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, Lock, Maximize2, Minimize2, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -13,6 +13,8 @@ import { useFullscreen } from "@/store/fullscreen";
 import { useNotes } from "@/store/notes";
 import { requireVault, useVault } from "@/store/vault";
 
+const AUTOSAVE_DELAY_MS = 400;
+
 export function PromptEditor({ note }: { note: Note }) {
   const patchNote = useNotes((state) => state.patchNote);
   const isFullscreen = useFullscreen((state) => state.isFullscreen);
@@ -21,33 +23,86 @@ export function PromptEditor({ note }: { note: Note }) {
   const editUnlockExpiresAt = useVault((state) => state.editUnlockExpiresAt);
   const isTimerUnlocked = editUnlockExpiresAt !== null && Date.now() < editUnlockExpiresAt;
 
-  /** Empty at open means it is brand new, so the first write stays unlocked. */
-  const openedEmpty = useRef({
-    id: note.id,
-    empty: !note.title.trim() && !note.text.trim(),
-  });
-  if (openedEmpty.current.id !== note.id) {
-    openedEmpty.current = {
-      id: note.id,
-      empty: !note.title.trim() && !note.text.trim(),
-    };
-  }
-  const canEdit = openedEmpty.current.empty || sessionUnlocked || isTimerUnlocked;
+  const isInitialEmpty = useRef(!note.title.trim() && !note.text.trim());
+  const canEdit = isInitialEmpty.current || sessionUnlocked || isTimerUnlocked;
+  const canEditRef = useRef(canEdit);
+  canEditRef.current = canEdit;
 
   const [title, setTitle] = useState(note.title);
   const [tags, setTags] = useState(note.tags);
   const [body, setBody] = useState(note.text);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
 
+  const noteIdRef = useRef(note.id);
+  noteIdRef.current = note.id;
+
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const tagsRef = useRef(tags);
+  tagsRef.current = tags;
+  const bodyRef = useRef(body);
+  bodyRef.current = body;
+
+  const isDirtyRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Commit current in-memory edits to the store
+  const commit = useCallback(() => {
+    if (!isDirtyRef.current || !canEditRef.current) return;
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const currentText = bodyRef.current;
+    patchNote(noteIdRef.current, {
+      title: titleRef.current.trim(),
+      tags: tagsRef.current,
+      text: currentText,
+      html: plainTextToHtmlFriendly(currentText),
+    });
+    isDirtyRef.current = false;
+    setSaveStatus("saved");
+  }, [patchNote]);
+
+  const scheduleAutosave = useCallback(() => {
+    if (!canEditRef.current) return;
+    isDirtyRef.current = true;
+    setSaveStatus("saving");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(commit, AUTOSAVE_DELAY_MS);
+  }, [commit]);
+
+  // When active note changes, flush pending and reload state
   useEffect(() => {
     setSessionUnlocked(false);
-  }, [note.id]);
-
-  useEffect(() => {
+    isInitialEmpty.current = !note.title.trim() && !note.text.trim();
     setTitle(note.title);
     setTags(note.tags);
     setBody(note.text);
-  }, [note.id, note.title, note.tags, note.text]);
+    isDirtyRef.current = false;
+    setSaveStatus("saved");
+  }, [note.id]);
+
+  // If remote sync updates note and user has no unsaved local changes, sync safely
+  useEffect(() => {
+    if (!isDirtyRef.current) {
+      setTitle(note.title);
+      setTags(note.tags);
+      setBody(note.text);
+    }
+  }, [note.title, note.tags, note.text]);
+
+  // Save on blur, unmount or page hide
+  useEffect(() => {
+    const onFlush = () => commit();
+    window.addEventListener("beforeunload", onFlush);
+    window.addEventListener("pagehide", onFlush);
+    return () => {
+      commit();
+      window.removeEventListener("beforeunload", onFlush);
+      window.removeEventListener("pagehide", onFlush);
+    };
+  }, [commit]);
 
   const unlockForEdit = async () => {
     const ok = await requireVault("edit");
@@ -55,15 +110,12 @@ export function PromptEditor({ note }: { note: Note }) {
     return ok;
   };
 
-  const save = async () => {
+  const handleManualSave = async () => {
     if (!canEdit) {
       const ok = await unlockForEdit();
       if (!ok) return;
     }
-    setSaving(true);
-    const text = body;
-    patchNote(note.id, { title: title.trim(), tags, text, html: plainTextToHtmlFriendly(text) });
-    setSaving(false);
+    commit();
     toast.success("Prompt saved");
   };
 
@@ -71,7 +123,14 @@ export function PromptEditor({ note }: { note: Note }) {
     <div className="flex min-h-0 flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="ns-mono text-muted">Prompt</p>
+          <div className="flex items-center gap-2">
+            <p className="ns-mono text-muted">Prompt</p>
+            {canEdit && (
+              <span className="ns-micro text-muted">
+                {saveStatus === "saving" ? "Saving…" : "Auto-saved"}
+              </span>
+            )}
+          </div>
           <p className="ns-caption mt-1 text-muted">{formatClock(note.updatedAt)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -95,9 +154,13 @@ export function PromptEditor({ note }: { note: Note }) {
             </TooltipContent>
           </Tooltip>
           {canEdit ? (
-            <Button variant="primary" size="sm" onClick={() => void save()} disabled={saving}>
-              <Save className="size-3.5" />
-              Save
+            <Button variant="primary" size="sm" onClick={() => void handleManualSave()}>
+              {saveStatus === "saving" ? (
+                <Save className="size-3.5 animate-spin" />
+              ) : (
+                <Check className="size-3.5" />
+              )}
+              {saveStatus === "saving" ? "Saving" : "Saved"}
             </Button>
           ) : (
             <Button variant="outline" size="sm" onClick={() => void unlockForEdit()}>
@@ -112,16 +175,25 @@ export function PromptEditor({ note }: { note: Note }) {
         <span className="ns-caption text-ink">Title</span>
         <Input
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            scheduleAutosave();
+          }}
+          onBlur={commit}
           placeholder="Prompt title"
-          disabled={!canEdit}
+          readOnly={!canEdit}
+          maxLength={500}
         />
       </label>
 
       <NoteLabelsField
         tags={tags}
         disabled={!canEdit}
-        onChange={setTags}
+        onChange={(newTags) => {
+          setTags(newTags);
+          tagsRef.current = newTags;
+          scheduleAutosave();
+        }}
         placeholder="coding, rewrite, email"
       />
 
@@ -132,9 +204,13 @@ export function PromptEditor({ note }: { note: Note }) {
         </span>
         <textarea
           value={body}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={(event) => {
+            setBody(event.target.value);
+            scheduleAutosave();
+          }}
+          onBlur={commit}
           placeholder="Plain text prompt you can copy and reuse…"
-          disabled={!canEdit}
+          readOnly={!canEdit}
           className="ns-scroll min-h-[40vh] w-full flex-1 resize-y rounded-sm border border-hairline bg-surface px-3 py-3 font-mono text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/20 disabled:opacity-60"
         />
       </label>

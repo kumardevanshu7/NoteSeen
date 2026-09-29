@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Clock, Shield } from "lucide-react";
+import { Clock, Eye, EyeOff, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +30,8 @@ export function VaultGateDialog() {
 
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [confirmAnswer, setConfirmAnswer] = useState("");
+  const [showAnswer, setShowAnswer] = useState(false);
   const [selectedDuration, setSelectedDuration] = useState<number>(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,8 @@ export function VaultGateDialog() {
   const reset = () => {
     setQuestion("");
     setAnswer("");
+    setConfirmAnswer("");
+    setShowAnswer(false);
     setSelectedDuration(0);
     setError(null);
     setBusy(false);
@@ -59,6 +63,21 @@ export function VaultGateDialog() {
     setError(null);
     try {
       if (isSetup) {
+        if (!question.trim()) {
+          setError("Please enter a security question.");
+          setBusy(false);
+          return;
+        }
+        if (!answer.trim()) {
+          setError("Please enter a security answer.");
+          setBusy(false);
+          return;
+        }
+        if (answer.trim().toLowerCase() !== confirmAnswer.trim().toLowerCase()) {
+          setError("Answers do not match. Please verify your spelling.");
+          setBusy(false);
+          return;
+        }
         await setupVault(question, answer);
         toast.success("Vault set", {
           description: "Synced to your Google account — same question on every device.",
@@ -123,10 +142,21 @@ export function VaultGateDialog() {
             </p>
           )}
 
-          <label className="block space-y-1.5">
-            <span className="ns-caption text-ink">{isSetup ? "Answer" : "Your answer"}</span>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="ns-caption text-ink">{isSetup ? "Answer" : "Your answer"}</span>
+              <button
+                type="button"
+                onClick={() => setShowAnswer(!showAnswer)}
+                className="ns-micro flex items-center gap-1 text-muted hover:text-ink focus:outline-none"
+                tabIndex={-1}
+              >
+                {showAnswer ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                {showAnswer ? "Hide" : "Show"}
+              </button>
+            </div>
             <Input
-              type="password"
+              type={showAnswer ? "text" : "password"}
               value={answer}
               onChange={(event) => setAnswer(event.target.value)}
               placeholder={isSetup ? "Choose something only you know" : "Type the answer"}
@@ -134,7 +164,21 @@ export function VaultGateDialog() {
               required
               autoComplete="off"
             />
-          </label>
+          </div>
+
+          {isSetup ? (
+            <label className="block space-y-1.5">
+              <span className="ns-caption text-ink">Confirm answer</span>
+              <Input
+                type={showAnswer ? "text" : "password"}
+                value={confirmAnswer}
+                onChange={(event) => setConfirmAnswer(event.target.value)}
+                placeholder="Type the exact same answer again"
+                required
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
 
           {/* If unlocking for edit, give option to start a Long-time Unlock Timer */}
           {!isSetup && isEdit ? (

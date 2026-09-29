@@ -126,7 +126,7 @@ export function NoteTabs() {
                 title={noteLabel(note)}
                 draggable
                 onDragStart={(event) => {
-                  event.dataTransfer.setData("text/plain", note.id);
+                  event.dataTransfer.setData("application/x-noteseen-tab", note.id);
                   event.dataTransfer.effectAllowed = "move";
                   setDraggedTabId(note.id);
                 }}
@@ -134,7 +134,8 @@ export function NoteTabs() {
                   event.preventDefault();
                   event.stopPropagation();
                   event.dataTransfer.dropEffect = "move";
-                  if (!draggedTabId || draggedTabId === note.id) {
+                  const currentDragging = draggedTabId || (event.dataTransfer.types.includes("application/x-noteseen-tab") ? "active" : null);
+                  if (!currentDragging || draggedTabId === note.id) {
                     if (dropTarget) setDropTarget(null);
                     return;
                   }
@@ -155,11 +156,12 @@ export function NoteTabs() {
                 onDrop={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  if (draggedTabId && draggedTabId !== note.id) {
+                  const sourceId = draggedTabId || event.dataTransfer.getData("application/x-noteseen-tab");
+                  if (sourceId && sourceId !== note.id) {
                     const rect = event.currentTarget.getBoundingClientRect();
                     const midX = rect.left + rect.width / 2;
                     const edge = event.clientX < midX ? "left" : "right";
-                    reorderTab(draggedTabId, note.id, edge === "left" ? "before" : "after");
+                    reorderTab(sourceId, note.id, edge === "left" ? "before" : "after");
                   }
                   setDraggedTabId(null);
                   setDropTarget(null);

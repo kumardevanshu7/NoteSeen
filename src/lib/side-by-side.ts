@@ -28,6 +28,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
   content: "block+",
   defining: true,
   isolating: true,
+  priority: 1000,
 
   addOptions() {
     return {
@@ -59,10 +60,13 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
   },
 
   parseHTML() {
+    const getContentEl = (element: HTMLElement): HTMLElement =>
+      (element.querySelector(".ns-side-by-side-content") as HTMLElement) || element;
+
     return [
       {
         tag: 'div[data-side-by-side="true"]',
-        contentElement: ".ns-side-by-side-content",
+        contentElement: getContentEl,
         getAttrs: (element) => {
           const el = element as HTMLElement;
           return {
@@ -77,7 +81,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
       },
       {
         tag: "div.ns-side-by-side-card",
-        contentElement: ".ns-side-by-side-content",
+        contentElement: getContentEl,
         getAttrs: (element) => {
           const el = element as HTMLElement;
           return {
@@ -118,6 +122,7 @@ export const SideBySideCard = Node.create<SideBySideOptions>({
                 src: imageSrc,
                 alt: imageAlt || "Card picture",
                 class: "ns-side-by-side-img",
+                "data-side-by-side-img": "true",
               },
             ]
           : [

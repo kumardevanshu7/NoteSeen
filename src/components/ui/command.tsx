@@ -18,10 +18,14 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div className="flex items-center gap-3 border-b border-hairline px-4">
-      <Search className="size-4 shrink-0 text-muted" />
+      <Search className="size-4 shrink-0 text-muted" aria-hidden="true" />
       <CommandPrimitive.Input
+        aria-label={
+          props["aria-label"] ??
+          (typeof props.placeholder === "string" ? props.placeholder : "Search commands and notes")
+        }
         className={cn(
-          "h-14 w-full bg-transparent text-[15px] text-ink outline-none placeholder:text-muted",
+          "h-14 w-full bg-transparent text-base text-ink outline-none placeholder:text-muted focus-visible:outline-none md:text-[15px]",
           className,
         )}
         {...props}
@@ -52,7 +56,7 @@ function CommandGroup({ className, ...props }: React.ComponentProps<typeof Comma
   return (
     <CommandPrimitive.Group
       className={cn(
-        "overflow-hidden [&_[cmdk-group-heading]]:ns-mono [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-muted",
+        "overflow-hidden [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:tracking-[0.08em] [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:text-muted",
         className,
       )}
       {...props}
@@ -64,7 +68,8 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
   return (
     <CommandPrimitive.Item
       className={cn(
-        "flex cursor-pointer items-center gap-3 rounded-xs px-2.5 py-2.5 text-sm outline-none",
+        "flex cursor-pointer items-center gap-3 rounded-xs px-2.5 py-2.5 text-sm outline-none transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus",
         "data-[selected=true]:bg-stone data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-45",
         "[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-slate",
         className,

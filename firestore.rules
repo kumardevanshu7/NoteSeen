@@ -2,6 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------------
     function isSignedIn() {
       return request.auth != null;
     }
@@ -10,31 +13,211 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // User root profile & settings
+    function isValidTimestamp(val) {
+      return val is number && val > 0;
+    }
+
+    function createdAtImmutable() {
+      return resource == null || request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // -------------------------------------------------------------------------
+    // User Root Document & Settings (/users/{uid})
+    // -------------------------------------------------------------------------
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read: if isOwner(uid);
 
-      // Notes subcollection
+      allow create, update: if isOwner(uid)
+        && (!('username' in request.resource.data) || (
+          request.resource.data.username is string
+          && request.resource.data.username.size() >= 3
+          && request.resource.data.username.size() <= 24
+          && request.resource.data.username.matches('^[a-z0-9_]{3,24}$')
+        ))
+        && (!('fullName' in request.resource.data) || (
+          request.resource.data.fullName is string
+          && request.resource.data.fullName.size() >= 1
+          && request.resource.data.fullName.size() <= 100
+        ))
+        && (!('age' in request.resource.data) || (
+          request.resource.data.age is number
+          && request.resource.data.age >= 13
+          && request.resource.data.age <= 120
+        ))
+        && (!('gender' in request.resource.data) || (
+          request.resource.data.gender in ['male', 'female', 'other', 'prefer_not']
+        ))
+        && (!('profession' in request.resource.data) || (
+          request.resource.data.profession in ['job', 'student', 'freelancer', 'solo_entrepreneur']
+        ))
+        && (!('vaultQuestion' in request.resource.data) || (
+          request.resource.data.vaultQuestion is string
+          && request.resource.data.vaultQuestion.size() <= 200
+        ))
+        && (!('vaultAnswerHash' in request.resource.data) || (
+          request.resource.data.vaultAnswerHash is string
+          && request.resource.data.vaultAnswerHash.size() >= 32
+          && request.resource.data.vaultAnswerHash.size() <= 128
+        ))
+        && (!('secretPinHash' in request.resource.data) || (
+          request.resource.data.secretPinHash is string
+          && request.resource.data.secretPinHash.size() >= 32
+          && request.resource.data.secretPinHash.size() <= 128
+        ));
+
+      allow delete: if isOwner(uid);
+
+      // -----------------------------------------------------------------------
+      // Notes Subcollection (/users/{uid}/notes/{noteId})
+      // -----------------------------------------------------------------------
       match /notes/{noteId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          && (!('title' in request.resource.data) || (
+            request.resource.data.title is string
+            && request.resource.data.title.size() <= 500
+          ))
+          && (!('html' in request.resource.data) || (
+            request.resource.data.html is string
+            && request.resource.data.html.size() <= 500000
+          ))
+          && (!('text' in request.resource.data) || (
+            request.resource.data.text is string
+            && request.resource.data.text.size() <= 500000
+          ))
+          && (!('tags' in request.resource.data) || (
+            request.resource.data.tags is list
+            && request.resource.data.tags.size() <= 24
+          ))
+          && (!('createdAt' in request.resource.data) || isValidTimestamp(request.resource.data.createdAt));
+
+        allow update: if isOwner(uid)
+          && createdAtImmutable()
+          && (!('title' in request.resource.data) || (
+            request.resource.data.title is string
+            && request.resource.data.title.size() <= 500
+          ))
+          && (!('html' in request.resource.data) || (
+            request.resource.data.html is string
+            && request.resource.data.html.size() <= 500000
+          ))
+          && (!('text' in request.resource.data) || (
+            request.resource.data.text is string
+            && request.resource.data.text.size() <= 500000
+          ))
+          && (!('tags' in request.resource.data) || (
+            request.resource.data.tags is list
+            && request.resource.data.tags.size() <= 24
+          ));
+
+        allow delete: if isOwner(uid);
       }
 
-      // Subject / Category Bundles subcollection
-      match /bundles/{bundleId} {
-        allow read, write: if isOwner(uid);
-      }
-
-      // Secret Vault subcollection
+      // -----------------------------------------------------------------------
+      // Secret Vault Subcollection (/users/{uid}/secrets/{secretId})
+      // -----------------------------------------------------------------------
       match /secrets/{secretId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          // Plaintext password/secret must NEVER be stored in plaintext
+          && !('value' in request.resource.data)
+          && request.resource.data.valueCipher is string
+          && request.resource.data.valueCipher.size() > 0
+          && request.resource.data.valueCipher.size() <= 100000
+          && request.resource.data.valueIv is string
+          && request.resource.data.valueIv.size() >= 16
+          && (!('category' in request.resource.data) || (
+            request.resource.data.category in ['api', 'password', 'other']
+          ))
+          && (!('title' in request.resource.data) || (
+            request.resource.data.title is string
+            && request.resource.data.title.size() <= 200
+          ))
+          && (!('notes' in request.resource.data) || (
+            request.resource.data.notes is string
+            && request.resource.data.notes.size() <= 20000
+          ))
+          && (!('createdAt' in request.resource.data) || isValidTimestamp(request.resource.data.createdAt));
+
+        allow update: if isOwner(uid)
+          && createdAtImmutable()
+          && !('value' in request.resource.data)
+          && request.resource.data.valueCipher is string
+          && request.resource.data.valueCipher.size() > 0
+          && request.resource.data.valueCipher.size() <= 100000
+          && request.resource.data.valueIv is string
+          && request.resource.data.valueIv.size() >= 16
+          && (!('category' in request.resource.data) || (
+            request.resource.data.category in ['api', 'password', 'other']
+          ))
+          && (!('title' in request.resource.data) || (
+            request.resource.data.title is string
+            && request.resource.data.title.size() <= 200
+          ))
+          && (!('notes' in request.resource.data) || (
+            request.resource.data.notes is string
+            && request.resource.data.notes.size() <= 20000
+          ));
+
+        allow delete: if isOwner(uid);
       }
 
-      // Workspaces subcollection
+      // -----------------------------------------------------------------------
+      // Bundles Subcollection (/users/{uid}/bundles/{bundleId})
+      // -----------------------------------------------------------------------
+      match /bundles/{bundleId} {
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          && (!('name' in request.resource.data) || (
+            request.resource.data.name is string
+            && request.resource.data.name.size() <= 80
+          ))
+          && (!('createdAt' in request.resource.data) || isValidTimestamp(request.resource.data.createdAt));
+
+        allow update: if isOwner(uid)
+          && createdAtImmutable()
+          && (!('name' in request.resource.data) || (
+            request.resource.data.name is string
+            && request.resource.data.name.size() <= 80
+          ));
+
+        allow delete: if isOwner(uid);
+      }
+
+      // -----------------------------------------------------------------------
+      // Workspaces Subcollection (/users/{uid}/workspaces/{workspaceId})
+      // -----------------------------------------------------------------------
       match /workspaces/{workspaceId} {
-        allow read, write: if isOwner(uid);
+        allow read: if isOwner(uid);
+
+        allow create: if isOwner(uid)
+          && (!('name' in request.resource.data) || (
+            request.resource.data.name is string
+            && request.resource.data.name.size() <= 80
+          ))
+          && (!('color' in request.resource.data) || (
+            request.resource.data.color in ['azure', 'sage', 'sand', 'aurora', 'coral', 'violet']
+          ))
+          && (!('createdAt' in request.resource.data) || isValidTimestamp(request.resource.data.createdAt));
+
+        allow update: if isOwner(uid)
+          && createdAtImmutable()
+          && (!('name' in request.resource.data) || (
+            request.resource.data.name is string
+            && request.resource.data.name.size() <= 80
+          ))
+          && (!('color' in request.resource.data) || (
+            request.resource.data.color in ['azure', 'sage', 'sand', 'aurora', 'coral', 'violet']
+          ));
+
+        allow delete: if isOwner(uid);
       }
     }
 
+    // Default deny all other paths
     match /{document=**} {
       allow read, write: if false;
     }

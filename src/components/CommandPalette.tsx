@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  Archive,
   FileDown,
   FileText,
   FolderOpen,
@@ -13,11 +14,12 @@ import {
   Plus,
   Save,
   Sun,
+  Tag,
   Timer,
   Trash2,
   Users,
 } from "lucide-react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   Command,
   CommandEmpty,
@@ -59,10 +61,7 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOp
   const { toggle, isDark } = useAppearance();
 
   const list = useMemo(
-    () =>
-      liveNotes(notesForWorkspace(notes, activeWorkspaceId))
-        .filter((note) => note.kind !== "promptCard")
-        .slice(0, 60),
+    () => liveNotes(notesForWorkspace(notes, activeWorkspaceId)),
     [notes, activeWorkspaceId],
   );
   const activeNote = activeId ? notes[activeId] : null;
@@ -71,18 +70,22 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOp
   const run = (action: () => void) => {
     onOpenChange(false);
     setSearch("");
-    action();
+    // Give modal time to release focus lock
+    setTimeout(action, 50);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent showClose={false} className="max-w-xl p-0">
         <DialogTitle className="sr-only">Search notes and commands</DialogTitle>
+        <DialogDescription className="sr-only">
+          Search notes by title, tags, or content, or run actions and navigate views.
+        </DialogDescription>
         <Command loop shouldFilter>
           <CommandInput
             value={search}
             onValueChange={setSearch}
-            placeholder="Search notes or run a command…"
+            placeholder="Search notes, tags, or run a command…"
           />
           <CommandList>
             <CommandEmpty>Nothing found.</CommandEmpty>
@@ -91,8 +94,15 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOp
               {list.map((note) => (
                 <CommandItem
                   key={note.id}
-                  value={`${noteLabel(note)} ${note.text.slice(0, 400)}`}
-                  onSelect={() => run(() => setActive(note.id))}
+                  value={`${note.id} ${noteLabel(note)}`}
+                  keywords={[noteLabel(note), ...note.tags, note.text.slice(0, 1000)]}
+                  onSelect={() =>
+                    run(() => {
+                      setActive(note.id);
+                      if (note.kind === "promptCard") setView("cards");
+                      else setView("editor");
+                    })
+                  }
                 >
                   <FileText />
                   <span className="min-w-0 flex-1">
@@ -193,6 +203,14 @@ export function CommandPalette({ open, onOpenChange, onOpenFiles, onCreate, onOp
               <CommandItem value="prompt cards gallery pinterest" onSelect={() => run(() => setView("cards"))}>
                 <Images />
                 Prompt Cards
+              </CommandItem>
+              <CommandItem value="archive space completed covered" onSelect={() => run(() => setView("archive"))}>
+                <Archive />
+                Archive Space
+              </CommandItem>
+              <CommandItem value="labels tags categories" onSelect={() => run(() => setView("labels"))}>
+                <Tag />
+                Labels
               </CommandItem>
               <CommandItem
                 value="secret vault pin api password"

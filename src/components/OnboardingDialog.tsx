@@ -24,7 +24,8 @@ export function OnboardingDialog() {
   const profileReady = useAuth((state) => state.profileReady);
   const saveProfile = useAuth((state) => state.saveProfile);
 
-  const open = Boolean(user && profileReady && !profile);
+  const [dismissed, setDismissed] = useState(false);
+  const open = Boolean(user && profileReady && !profile && !dismissed);
 
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
@@ -62,8 +63,8 @@ export function OnboardingDialog() {
       setError("Pick a gender option.");
       return;
     }
-    if (!Number.isFinite(ageNum) || ageNum < 13 || ageNum > 120) {
-      setError("Enter a valid age (13–120).");
+    if (!Number.isInteger(ageNum) || ageNum < 13 || ageNum > 120) {
+      setError("Enter a valid whole age (13–120).");
       return;
     }
 
@@ -85,7 +86,7 @@ export function OnboardingDialog() {
         showClose={false}
         className="max-w-md"
         onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        onEscapeKeyDown={() => setDismissed(true)}
       >
         <DialogHeader>
           <DialogTitle>Set up your profile</DialogTitle>
@@ -100,7 +101,7 @@ export function OnboardingDialog() {
             <Input
               value={username}
               onChange={(e) => setUsername(normalizeUsername(e.target.value))}
-              placeholder="devanshu"
+              placeholder="e.g. alex24"
               autoComplete="username"
               maxLength={24}
             />
@@ -110,13 +111,14 @@ export function OnboardingDialog() {
             <Input
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Kumar Devanshu"
+              placeholder="e.g. Alex Morgan"
               autoComplete="name"
             />
           </Field>
 
-          <Field label="Profession">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="block space-y-1.5">
+            <span className="ns-caption text-ink">Profession</span>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Profession">
               {PROFESSIONS.map((option) => (
                 <Choice
                   key={option.id}
@@ -126,10 +128,11 @@ export function OnboardingDialog() {
                 />
               ))}
             </div>
-          </Field>
+          </div>
 
-          <Field label="Gender">
-            <div className="grid grid-cols-2 gap-2">
+          <div className="block space-y-1.5">
+            <span className="ns-caption text-ink">Gender</span>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Gender">
               {GENDERS.map((option) => (
                 <Choice
                   key={option.id}
@@ -139,7 +142,7 @@ export function OnboardingDialog() {
                 />
               ))}
             </div>
-          </Field>
+          </div>
 
           <Field label="Age">
             <Input
@@ -147,23 +150,33 @@ export function OnboardingDialog() {
               inputMode="numeric"
               min={13}
               max={120}
+              step={1}
               value={age}
               onChange={(e) => setAge(e.target.value)}
-              placeholder="21"
+              placeholder="e.g. 24"
             />
           </Field>
 
           {error ? <p className="text-[13px] text-error">{error}</p> : null}
 
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            disabled={saving}
-            onClick={() => void onSave()}
-          >
-            {saving ? "Saving…" : "Save"}
-          </Button>
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1 text-muted"
+              onClick={() => setDismissed(true)}
+            >
+              Skip for now
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              disabled={saving}
+              onClick={() => void onSave()}
+            >
+              {saving ? "Saving…" : "Save profile"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

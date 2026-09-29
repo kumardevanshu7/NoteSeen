@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 interface Props {
   children: ReactNode;
   fallbackTitle?: string;
+  resetKey?: string;
 }
 
 interface State {
@@ -27,6 +28,13 @@ export class EditorErrorBoundary extends Component<Props, State> {
     if (!this.retried) {
       this.retried = true;
       this.retryTimer = setTimeout(() => this.setState({ error: null }), 60);
+    }
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (this.props.resetKey !== prevProps.resetKey && this.state.error) {
+      this.retried = false;
+      this.setState({ error: null });
     }
   }
 

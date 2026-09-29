@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, KeyRound, Lock, Shield, Sparkles, Upload } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Logo";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -10,7 +11,7 @@ import { cn } from "@/lib/utils";
 const TYPE_LINES = [
   "Secret Vault encrypts on your device — not in the cloud.",
   "AES-GCM turns API keys into gibberish before Firestore sees them.",
-  "Your 4-digit PIN becomes an AES-256 key via PBKDF2.",
+  "Client-side AES-256 key derivation via PBKDF2.",
   "Even if someone opens the database, they only see ciphertext.",
   "Decrypt happens locally, only after you unlock.",
 ];
@@ -30,8 +31,8 @@ const FLOW = [
   },
   {
     step: "03",
-    title: "PBKDF2 stretches the PIN",
-    body: "120,000 rounds turn a tiny PIN into a strong key.",
+    title: "PBKDF2 key derivation",
+    body: "120,000 derivation rounds make brute-force computationally costly.",
     icon: Sparkles,
   },
   {
@@ -94,13 +95,14 @@ function TypingTechLine() {
   }, [shown, phase, lineIndex]);
 
   return (
-    <p className="ns-landing-type min-h-[4.5rem] font-mono text-[15px] leading-relaxed text-ink sm:min-h-[3.25rem] sm:text-[17px]">
-      <span className="text-muted">&gt; </span>
-      {shown}
-      <span className="ns-landing-caret" aria-hidden>
-        ▍
+    <div className="ns-landing-type min-h-[4.5rem] font-mono text-[15px] leading-relaxed text-ink sm:min-h-[3.25rem] sm:text-[17px]">
+      <span className="sr-only">{TYPE_LINES[lineIndex]}</span>
+      <span aria-hidden="true">
+        <span className="text-muted">&gt; </span>
+        {shown}
+        <span className="ns-landing-caret">▍</span>
       </span>
-    </p>
+    </div>
   );
 }
 
@@ -140,6 +142,9 @@ export function LandingPage() {
           prev?.();
           stop?.();
         };
+      })
+      .catch(() => {
+        /* offline or module load issue */
       });
 
     return () => {
@@ -155,6 +160,11 @@ export function LandingPage() {
       if (!useAuth.getState().ready) useAuth.getState().initAuth();
       await useAuth.getState().signInWithGoogle();
       if (useAuth.getState().user) navigate("/app");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Sign-in failed. Please check your connection.";
+      if (!message.includes("popup-closed-by-user") && !message.includes("cancelled-popup-request")) {
+        toast.error("Could not sign in", { description: message });
+      }
     } finally {
       setBusy(false);
     }

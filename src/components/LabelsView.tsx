@@ -38,7 +38,7 @@ export function LabelsView() {
       toast.error("Label cannot be empty");
       return;
     }
-    if (next.toLowerCase() === from.toLowerCase()) {
+    if (next === from) {
       cancelEdit();
       return;
     }
@@ -103,6 +103,7 @@ export function LabelsView() {
                         className="min-w-[12rem] flex-1"
                         autoFocus
                         onKeyDown={(e) => {
+                          if (e.nativeEvent.isComposing) return;
                           if (e.key === "Enter") {
                             e.preventDefault();
                             void saveEdit(label);

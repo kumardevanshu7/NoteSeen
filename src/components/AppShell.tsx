@@ -54,6 +54,15 @@ function isNoteFile(file: File): boolean {
   return isNoteFileName(file.name);
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function AppShell() {
   const ready = useNotes((state) => state.ready);
   const init = useNotes((state) => state.init);
@@ -75,6 +84,7 @@ export function AppShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
   const [unlockTimerOpen, setUnlockTimerOpen] = useState(false);
+  const [initFailed, setInitFailed] = useState(false);
 
   const note = activeId ? (notes[activeId] ?? null) : null;
 
@@ -87,6 +97,15 @@ export function AppShell() {
     void initVault();
     return registerLifecycleFlush();
   }, [init, initVault]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!useNotes.getState().ready) {
+        setInitFailed(true);
+      }
+    }, 8000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (ready) hideBootSplash();
@@ -110,7 +129,8 @@ export function AppShell() {
       if (navOpen) return;
       const touch = event.touches[0];
       if (!touch) return;
-      if (touch.clientX > 28) return;
+      // Stay clear of iOS Safari back-swipe zone (15px)
+      if (touch.clientX < 15 || touch.clientX > 32) return;
       startX = touch.clientX;
       startY = touch.clientY;
       tracking = true;
@@ -122,7 +142,7 @@ export function AppShell() {
       if (!touch) return;
       const dx = touch.clientX - startX;
       const dy = Math.abs(touch.clientY - startY);
-      if (dx > 56 && dy < 48) {
+      if (dx > 50 && dy < 40) {
         tracking = false;
         setNavOpen(true);
       }
@@ -148,7 +168,7 @@ export function AppShell() {
     if (!supportsFileSystemAccess()) {
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = ".noteseen,.md,.markdown,.txt";
+      input.accept = ".noteseen,.md,.markdown,.txt,.html,.htm";
       input.multiple = true;
       input.addEventListener("change", () => {
         void importFiles(Array.from(input.files ?? []));
@@ -176,25 +196,37 @@ export function AppShell() {
   }, [importHandles]);
 
   useEffect(() => {
+    if (!ready) return;
     if (!window.location.search) return;
     const params = new URLSearchParams(window.location.search);
 
     if (params.get("new") === "1") setChooserOpen(true);
     if (params.get("search") === "1") setPaletteOpen(true);
 
-    const shared = params.get("text") ?? params.get("url");
-    if (shared) {
+    const text = params.get("text") ?? "";
+    const url = params.get("url") ?? "";
+    const title = params.get("title") ?? "";
+    if (text || url) {
+      const parts = [text, url].filter(Boolean);
+      const combined = parts.join("\n\n");
+      const paragraphs = combined
+        .split(/\n\s*\n/)
+        .map((p) => `<p>${escapeHtml(p.trim()).replace(/\n/g, "<br>")}</p>`)
+        .join("");
       createNote({
-        title: params.get("title") ?? "",
-        html: `<p>${shared.replace(/[<>&]/g, "")}</p>`,
+        title: title || (text ? text.slice(0, 40) : "Shared Link"),
+        html: paragraphs || "<p></p>",
       });
+      toast.success("Created note from shared content");
     }
 
     window.history.replaceState({}, "", window.location.pathname);
-  }, [createNote]);
+  }, [ready, createNote]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // Ignore AltGr modifier combinations (which set both ctrlKey and altKey)
+      if (event.altKey) return;
       const mod = event.metaKey || event.ctrlKey;
 
       if (event.key === "F11" || (mod && event.shiftKey && event.key.toLowerCase() === "f")) {
@@ -203,10 +235,23 @@ export function AppShell() {
         return;
       }
 
-      if (event.key === "Escape" && isFullscreen) {
-        event.preventDefault();
-        useFullscreen.getState().setFullscreen(false);
-        return;
+      if (event.key === "Escape") {
+        if (navOpen) {
+          event.preventDefault();
+          setNavOpen(false);
+          return;
+        }
+        if (styleOpen && window.innerWidth < 1280) {
+          event.preventDefault();
+          setStyleOpen(false);
+          return;
+        }
+        if (isFullscreen) {
+          if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+          event.preventDefault();
+          useFullscreen.getState().setFullscreen(false);
+          return;
+        }
       }
 
       if (!mod) return;
@@ -240,7 +285,7 @@ export function AppShell() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeId, isFullscreen, openFromDisk, saveToFile, toggleFullscreen]);
+  }, [activeId, isFullscreen, navOpen, openFromDisk, saveToFile, styleOpen, toggleFullscreen]);
 
   useEffect(() => {
     const onDragOver = (event: DragEvent) => {
@@ -249,6 +294,7 @@ export function AppShell() {
     };
 
     const onDrop = async (event: DragEvent) => {
+      if (!event.dataTransfer?.types.includes("Files")) return;
       const items = Array.from(event.dataTransfer?.items ?? []);
       const files = Array.from(event.dataTransfer?.files ?? []);
       if (items.length === 0 && files.length === 0) return;
@@ -284,7 +330,7 @@ export function AppShell() {
         await importFiles(noteFiles);
       } else if (files.length > 0) {
         toast("That file type is not supported", {
-          description: "Drop a .noteseen, .md or .txt file, or an image to place it in the note.",
+          description: "Drop a .noteseen, .md, .txt, or .html file, or an image to place it in the note.",
         });
       }
     };
@@ -301,11 +347,38 @@ export function AppShell() {
 
   if (!ready) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <span className="ns-mono text-muted">Opening NoteSeen…</span>
+      <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+        <span className="ns-mono text-muted mb-2">Opening NoteSeen…</span>
+        {initFailed && (
+          <div className="mt-4 max-w-sm rounded-lg border border-hairline bg-surface p-4 text-xs text-body-muted">
+            <p className="font-semibold text-ink mb-1">Taking longer than usual?</p>
+            <p>Your browser storage may be blocked or restricted (e.g. strict private mode).</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => window.location.reload()}
+            >
+              Reload application
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
+
+  useEffect(() => {
+    const isMobileNav = navOpen && window.innerWidth < 1024;
+    const isMobileStyle = styleOpen && window.innerWidth < 1280;
+    if (isMobileNav || isMobileStyle) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [navOpen, styleOpen]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-canvas">
@@ -340,11 +413,16 @@ export function AppShell() {
         ) : null}
 
         {navOpen && !isFullscreen ? (
-          <div className="ns-no-print fixed inset-0 z-40 flex lg:hidden">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation drawer"
+            className="ns-no-print fixed inset-0 z-40 flex lg:hidden"
+          >
             <div
               className="ns-fade absolute inset-0 bg-black/25"
               onClick={() => setNavOpen(false)}
-              aria-hidden
+              aria-hidden="true"
             />
             <div className="relative z-10 h-full">
               <SideRail onClose={() => setNavOpen(false)} />
@@ -434,11 +512,16 @@ export function AppShell() {
             ) : null}
 
             {styleOpen ? (
-              <div className="ns-no-print fixed inset-0 z-40 flex justify-end xl:hidden">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Note style options"
+                className="ns-no-print fixed inset-0 z-40 flex justify-end xl:hidden"
+              >
                 <div
                   className="ns-fade absolute inset-0 bg-black/40"
                   onClick={() => setStyleOpen(false)}
-                  aria-hidden
+                  aria-hidden="true"
                 />
                 <div className="relative z-10 h-full max-w-[85vw]">
                   <ToolRail

@@ -66,34 +66,55 @@ export function BundlePicker({
     handleChoose(created.name);
   };
 
+  if (disabled) {
+    if (!currentBundle) return null;
+    return (
+      <div
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 font-medium text-primary/80 select-none",
+          size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs",
+          className,
+        )}
+      >
+        <Folder className={size === "sm" ? "size-3" : "size-3.5"} />
+        <span className="max-w-[140px] truncate">{currentBundle}</span>
+      </div>
+    );
+  }
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild disabled={disabled}>
-        {currentBundle ? (
-          <div
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 font-medium text-primary transition-colors hover:bg-primary/20 cursor-pointer shadow-2xs",
-              size === "sm" ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs",
-              className,
-            )}
+    <Popover open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
+      {currentBundle ? (
+        <div
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/10 font-medium text-primary shadow-2xs transition-colors hover:bg-primary/20",
+            size === "sm" ? "pl-2 pr-1 py-0.5 text-[11px]" : "pl-2.5 pr-1.5 py-1 text-xs",
+            className,
+          )}
+        >
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 truncate cursor-pointer outline-none focus-visible:underline"
+            >
+              <Folder className={size === "sm" ? "size-3" : "size-3.5"} />
+              <span className="max-w-[130px] truncate">{currentBundle}</span>
+            </button>
+          </PopoverTrigger>
+          <button
+            type="button"
+            aria-label="Remove from bundle"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleChoose(null);
+            }}
+            className="flex size-3.5 items-center justify-center rounded-full hover:bg-primary/30 text-primary/70 hover:text-primary transition-colors cursor-pointer"
           >
-            <Folder className={size === "sm" ? "size-3" : "size-3.5"} />
-            <span className="max-w-[140px] truncate">{currentBundle}</span>
-            {!disabled && (
-              <button
-                type="button"
-                aria-label="Remove from bundle"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleChoose(null);
-                }}
-                className="flex size-3.5 items-center justify-center rounded-full hover:bg-primary/20 text-primary/70 hover:text-primary transition-colors"
-              >
-                <X className="size-2.5" />
-              </button>
-            )}
-          </div>
-        ) : (
+            <X className="size-2.5" />
+          </button>
+        </div>
+      ) : (
+        <PopoverTrigger asChild>
           <button
             type="button"
             className={cn(
@@ -105,8 +126,8 @@ export function BundlePicker({
             <Folder className={size === "sm" ? "size-3 text-muted" : "size-3.5 text-muted"} />
             <span>+ Bundle</span>
           </button>
-        )}
-      </PopoverTrigger>
+        </PopoverTrigger>
+      )}
 
       <PopoverContent align="start" className="w-56 p-1.5 shadow-md">
         <div className="mb-1 px-1 pt-0.5">
@@ -116,9 +137,19 @@ export function BundlePicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && cleanQuery && !exactMatch) {
+              if (e.key === "Enter") {
+                if (e.nativeEvent.isComposing) return;
                 e.preventDefault();
-                handleCreateNew();
+                const matched = allBundles.find(
+                  (b) => b.name.toLowerCase() === cleanQuery.toLowerCase(),
+                );
+                if (matched) {
+                  handleChoose(matched.name);
+                } else if (filtered.length === 1) {
+                  handleChoose(filtered[0].name);
+                } else if (cleanQuery && !exactMatch) {
+                  handleCreateNew();
+                }
               }
             }}
             className="w-full rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs text-ink outline-none placeholder:text-muted focus:border-primary"

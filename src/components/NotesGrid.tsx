@@ -1042,9 +1042,16 @@ function NoteRow({
         <FileText className="size-3.5 shrink-0 text-slate" />
       )}
 
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen();
+          }
+        }}
         className="flex min-w-0 flex-1 flex-col text-left cursor-pointer"
       >
         <div className="flex items-center gap-2 truncate">
@@ -1067,7 +1074,7 @@ function NoteRow({
         <span className="ns-caption truncate text-body-muted">
           {excerpt(note.text, 160) || (note.kind === "prompt" ? "Empty prompt" : "Empty note")}
         </span>
-      </button>
+      </div>
 
       {note.tags.length > 0 ? (
         <div className="hidden shrink-0 items-center gap-1 lg:flex">
@@ -1087,6 +1094,7 @@ function NoteRow({
       </span>
 
       <div className="flex shrink-0 items-center gap-0.5">
+        <MoveToWorkspaceMenu noteId={note.id} currentWorkspaceId={note.workspaceId} />
         {onSetBundle && (
           <BundlePicker
             currentBundle={note.bundle}

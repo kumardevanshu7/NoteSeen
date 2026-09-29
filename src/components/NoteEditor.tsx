@@ -22,7 +22,14 @@ import { EditorErrorBoundary } from "@/components/EditorErrorBoundary";
 import { NoteLabelsField } from "@/components/NoteLabelsField";
 import { BundlePicker } from "@/components/BundlePicker";
 import { ArchivePromptDialog } from "@/components/ArchivePromptDialog";
-import { imageFilesFromData, insertPastedImages } from "@/lib/note-images";
+import {
+  imageFilesFromData,
+  insertPastedImages,
+  uploadPublicImage,
+  imageFileToOptimizedDataUrl,
+} from "@/lib/note-images";
+import { isImageStorageConfigured } from "@/lib/supabase";
+import { useAuth } from "@/store/auth";
 import {
   clipboardHasImageFile,
   hasMarkdownTable,
@@ -47,10 +54,14 @@ import { SlashCommandMenu } from "./SlashCommandMenu";
 import { TableControls } from "./TableControls";
 
 const CONTENT_DEBOUNCE_MS = 320;
-const MAX_NOTE_HTML = 15_000_000;
+const MAX_NOTE_HTML = 850_000;
 
 function isEmptyNote(note: Note): boolean {
-  return !note.title.trim() && !note.text.trim();
+  if (note.title.trim()) return false;
+  if (note.text.trim()) return false;
+  if (!note.html) return true;
+  const stripped = note.html.replace(/<p><\/p>|<p><br\s*\/?><\/p>/gi, "").trim();
+  return stripped === "";
 }
 
 export function NoteEditor({ note }: { note: Note }) {
@@ -107,6 +118,7 @@ export function NoteEditor({ note }: { note: Note }) {
   canEditRef.current = canEdit;
 
   const commit = useCallback(() => {
+    if (!canEditRef.current) return;
     if (flushTimer.current) {
       clearTimeout(flushTimer.current);
       flushTimer.current = null;
@@ -116,14 +128,14 @@ export function NoteEditor({ note }: { note: Note }) {
     if (edit) {
       lastHtmlRef.current = edit.html;
       patchNote(edit.id, { html: edit.html });
-    } else if (editorRef.current && noteIdRef.current) {
+    } else if (editorRef.current && loadedIdRef.current === noteIdRef.current) {
       const currentHtml = editorRef.current.getHTML();
-      if (currentHtml && currentHtml !== note.html) {
+      if (currentHtml && currentHtml !== lastHtmlRef.current) {
         lastHtmlRef.current = currentHtml;
-        patchNote(noteIdRef.current, { html: currentHtml });
+        patchNote(loadedIdRef.current, { html: currentHtml });
       }
     }
-  }, [patchNote, note.html]);
+  }, [patchNote]);
 
   const extensions = useMemo(
     () => [
@@ -197,6 +209,53 @@ export function NoteEditor({ note }: { note: Note }) {
             toast("Unlock the note to add images");
             return true;
           }
+
+          // If the selection is inside a sideBySideCard node and that card doesn't have an image yet,
+          // assign the picture directly to the card instead of splitting it into a standalone image!
+          const { state } = ed;
+          let sbsPos: number | null = null;
+          let sbsNode: any = null;
+          for (let d = state.selection.$from.depth; d > 0; d--) {
+            const n = state.selection.$from.node(d);
+            if (n.type.name === "sideBySideCard") {
+              sbsPos = state.selection.$from.before(d);
+              sbsNode = n;
+              break;
+            }
+          }
+
+          if (sbsNode && !sbsNode.attrs.imageSrc && images[0]) {
+            void (async () => {
+              try {
+                const file = images[0];
+                const noteId = noteIdRef.current;
+                const uid = useAuth.getState().user?.uid;
+                let url = "";
+                if (isImageStorageConfigured() && uid && noteId) {
+                  try {
+                    url = await uploadPublicImage(file, noteId, "note-assets");
+                  } catch {
+                    url = await imageFileToOptimizedDataUrl(file);
+                  }
+                } else {
+                  url = await imageFileToOptimizedDataUrl(file);
+                }
+                if (url && sbsPos !== null) {
+                  ed.view.dispatch(
+                    ed.view.state.tr.setNodeMarkup(sbsPos, undefined, {
+                      ...sbsNode.attrs,
+                      imageSrc: url,
+                    })
+                  );
+                  toast.success("Picture added to card!");
+                }
+              } catch (err) {
+                console.error("NoteSeen: could not paste picture into card", err);
+              }
+            })();
+            return true;
+          }
+
           void insertPastedImages(ed, images, noteIdRef.current);
           return true;
         }
@@ -247,6 +306,18 @@ export function NoteEditor({ note }: { note: Note }) {
         return true;
       },
       handleDrop(_view, event) {
+        // If dropping a tab, don't insert raw note id text
+        if (event.dataTransfer?.types.includes("application/x-noteseen-tab")) {
+          return false;
+        }
+
+        // If drop target is inside a side-by-side card's dropzone or media area,
+        // let the card's native drop listener handle it!
+        const target = event.target as HTMLElement | null;
+        if (target?.closest(".ns-side-by-side-card, .ns-side-by-side-media, .ns-side-by-side-dropzone")) {
+          return false;
+        }
+
         const images = imageFilesFromData(event.dataTransfer);
         if (images.length === 0) return false;
         event.preventDefault();
@@ -262,9 +333,9 @@ export function NoteEditor({ note }: { note: Note }) {
         const target = event.target as HTMLElement | null;
         if (!target) return false;
 
-        // 1. Handle clicking link or go-to link arrow
+        // 1. Handle clicking link (only follow link if Ctrl/Cmd is held or note is not editable)
         const anchor = target.closest("a");
-        if (anchor) {
+        if (anchor && (event.ctrlKey || event.metaKey || !canEditRef.current)) {
           const href = anchor.getAttribute("href");
           if (href) {
             event.preventDefault();
@@ -348,17 +419,6 @@ export function NoteEditor({ note }: { note: Note }) {
   }, [editor, canEdit]);
 
   useEffect(() => {
-    const handleFlush = () => commit();
-    window.addEventListener("beforeunload", handleFlush);
-    window.addEventListener("pagehide", handleFlush);
-    return () => {
-      commit();
-      window.removeEventListener("beforeunload", handleFlush);
-      window.removeEventListener("pagehide", handleFlush);
-    };
-  }, [commit]);
-
-  useEffect(() => {
     if (!editor) return;
 
     // Case 1: Switched to a different note tab
@@ -396,18 +456,21 @@ export function NoteEditor({ note }: { note: Note }) {
     }
   }, [editor, note.id, note.html, note.title, note.text, commit, canEdit]);
 
+  // Consolidated single lifecycle listener: flush on unmount, pagehide, visibility change, beforeunload
   useEffect(() => {
-    const onHide = () => {
+    const onFlush = () => {
       commit();
       void useNotes.getState().flush({ toDisk: true });
       void syncAdapter().flushCloud?.();
     };
-    document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", onHide);
+    window.addEventListener("beforeunload", onFlush);
+    window.addEventListener("pagehide", onFlush);
+    document.addEventListener("visibilitychange", onFlush);
     return () => {
-      document.removeEventListener("visibilitychange", onHide);
-      window.removeEventListener("pagehide", onHide);
-      onHide();
+      onFlush();
+      window.removeEventListener("beforeunload", onFlush);
+      window.removeEventListener("pagehide", onFlush);
+      document.removeEventListener("visibilitychange", onFlush);
     };
   }, [commit]);
 
@@ -433,7 +496,7 @@ export function NoteEditor({ note }: { note: Note }) {
   const words = countWords(note.text);
 
   return (
-    <EditorErrorBoundary>
+    <EditorErrorBoundary resetKey={note.id}>
       <div className="ns-editor">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -450,7 +513,7 @@ export function NoteEditor({ note }: { note: Note }) {
               )}
             >
               <CheckCircle2 className={cn("size-3.5", note.completed ? "text-emerald-500" : "text-muted")} />
-              <span>{note.completed ? "100% Covered" : "100% Check"}</span>
+              <span>{note.completed ? "100% Covered" : "Mark 100% Covered"}</span>
             </Button>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -511,8 +574,10 @@ export function NoteEditor({ note }: { note: Note }) {
           aria-label="Note title"
           spellCheck
           disabled={!canEdit}
+          maxLength={500}
           onChange={(event) => patchNote(note.id, { title: event.target.value })}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
             if (event.key === "Enter" || event.key === "ArrowDown") {
               event.preventDefault();
               editor?.commands.focus("start");
@@ -581,7 +646,7 @@ export function NoteEditor({ note }: { note: Note }) {
               setArchivePromptOpen(false);
             }}
             onKeep={() => {
-              toast.success("100% Checked", {
+              toast.success("Marked as 100% covered", {
                 description: `"${note.title || "Untitled note"}" kept in My Notes.`,
               });
               setArchivePromptOpen(false);

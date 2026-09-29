@@ -29,6 +29,41 @@ const DOT_COORDS = [
   { x: 250, y: 250, label: "Bottom-Right", num: 9 },
 ];
 
+/** Standard Android-style intermediate pass-through lookup for straight line jumps */
+const INTERMEDIATE_DOTS: Record<string, number> = {
+  "0-2": 1,
+  "2-0": 1,
+  "3-5": 4,
+  "5-3": 4,
+  "6-8": 7,
+  "8-6": 7,
+  "0-6": 3,
+  "6-0": 3,
+  "1-7": 4,
+  "7-1": 4,
+  "2-8": 5,
+  "8-2": 5,
+  "0-8": 4,
+  "8-0": 4,
+  "2-6": 4,
+  "6-2": 4,
+};
+
+function getIntermediateDot(from: number, to: number): number | null {
+  return INTERMEDIATE_DOTS[`${from}-${to}`] ?? null;
+}
+
+function appendDotWithPath(path: number[], nextDot: number): number[] {
+  if (path.includes(nextDot)) return path;
+  if (path.length === 0) return [nextDot];
+  const lastDot = path[path.length - 1];
+  const mid = getIntermediateDot(lastDot, nextDot);
+  if (mid !== null && !path.includes(mid)) {
+    return [...path, mid, nextDot];
+  }
+  return [...path, nextDot];
+}
+
 export function PatternLock({
   value,
   onChange,
@@ -45,8 +80,12 @@ export function PatternLock({
   const [animating, setAnimating] = useState(false);
   const [animProgress, setAnimProgress] = useState(0); // 0 to (path.length - 1)
   const animRef = useRef<number | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const pointerDownDotRef = useRef<number | null>(null);
+  const pointerDownStartPt = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef(false);
 
   // Sync external value
   useEffect(() => {
@@ -86,33 +125,68 @@ export function PatternLock({
     return null;
   }, []);
 
+  // Toggle dot on tap / keyboard
+  const handleDotToggle = useCallback(
+    (index: number) => {
+      if (!isRecord) return;
+      if (currentPath.includes(index)) {
+        // If clicking the last dot in sequence, remove it (undo)
+        if (currentPath[currentPath.length - 1] === index) {
+          updatePath(currentPath.slice(0, -1));
+        }
+      } else {
+        updatePath(appendDotWithPath(currentPath, index));
+      }
+    },
+    [currentPath, isRecord, updatePath],
+  );
+
   // Pointer event handlers for drawing pattern
   const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!isRecord) return;
     const pt = getSvgPoint(e);
     if (!pt) return;
 
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-
     const hit = findDotAt(pt.x, pt.y);
     if (hit !== null) {
-      setIsDragging(true);
-      setCursorPos(pt);
-      updatePath([hit]);
+      pointerDownDotRef.current = hit;
+      pointerDownStartPt.current = pt;
+      isDraggingRef.current = false;
+      try {
+        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+      } catch {
+        // ignore
+      }
     } else {
+      pointerDownDotRef.current = null;
+      pointerDownStartPt.current = null;
+      isDraggingRef.current = false;
       setCursorPos(null);
     }
   };
 
   const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!isRecord || !isDragging) return;
+    if (!isRecord || pointerDownDotRef.current === null) return;
     const pt = getSvgPoint(e);
     if (!pt) return;
 
-    setCursorPos(pt);
-    const hit = findDotAt(pt.x, pt.y);
-    if (hit !== null && !currentPath.includes(hit)) {
-      updatePath([...currentPath, hit]);
+    if (!isDraggingRef.current) {
+      const startPt = pointerDownStartPt.current ?? pt;
+      const dist = Math.hypot(pt.x - startPt.x, pt.y - startPt.y);
+      if (dist > 8) {
+        // Exceeded movement threshold: start dragging gesture
+        isDraggingRef.current = true;
+        setIsDragging(true);
+        updatePath([pointerDownDotRef.current]);
+      }
+    }
+
+    if (isDraggingRef.current) {
+      setCursorPos(pt);
+      const hit = findDotAt(pt.x, pt.y);
+      if (hit !== null && !currentPath.includes(hit)) {
+        updatePath(appendDotWithPath(currentPath, hit));
+      }
     }
   };
 
@@ -123,20 +197,19 @@ export function PatternLock({
     } catch {
       // ignore
     }
+
+    const wasDragging = isDraggingRef.current;
+    const tappedDot = pointerDownDotRef.current;
+
+    isDraggingRef.current = false;
     setIsDragging(false);
     setCursorPos(null);
-  };
+    pointerDownDotRef.current = null;
+    pointerDownStartPt.current = null;
 
-  // Alternative: click / tap individual dots to construct or toggle
-  const handleDotClick = (index: number) => {
-    if (!isRecord || isDragging) return;
-    if (currentPath.includes(index)) {
-      // If clicking the last dot in sequence, remove it (undo)
-      if (currentPath[currentPath.length - 1] === index) {
-        updatePath(currentPath.slice(0, -1));
-      }
-    } else {
-      updatePath([...currentPath, index]);
+    if (!wasDragging && tappedDot !== null) {
+      // It was a tap / click on the dot
+      handleDotToggle(tappedDot);
     }
   };
 
@@ -154,6 +227,7 @@ export function PatternLock({
   const replayAnimation = useCallback(() => {
     if (currentPath.length < 2) return;
     if (animRef.current) cancelAnimationFrame(animRef.current);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
     setAnimating(true);
     setAnimProgress(0);
@@ -172,7 +246,7 @@ export function PatternLock({
         animRef.current = requestAnimationFrame(tick);
       } else {
         // Hold briefly at end, then finish
-        setTimeout(() => {
+        timeoutRef.current = setTimeout(() => {
           setAnimating(false);
           setAnimProgress(0);
         }, 500);
@@ -186,6 +260,7 @@ export function PatternLock({
   useEffect(() => {
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
@@ -288,8 +363,16 @@ export function PatternLock({
             return (
               <g
                 key={idx}
-                className="cursor-pointer transition-transform"
-                onClick={() => handleDotClick(idx)}
+                className="cursor-pointer transition-transform outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                role={isRecord ? "button" : undefined}
+                tabIndex={isRecord ? 0 : -1}
+                aria-label={`Dot ${dot.num} (${dot.label})`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleDotToggle(idx);
+                  }
+                }}
               >
                 {/* Generous invisible hit zone */}
                 <circle cx={dot.x} cy={dot.y} r="34" fill="transparent" />
@@ -423,7 +506,8 @@ export function PatternLock({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                className="stroke-primary/30 stroke-[6] stroke-linecap-round"
+                strokeLinecap="round"
+                className="stroke-primary/30 stroke-[6]"
               />
               {/* Main vibrant path line */}
               <line
@@ -431,7 +515,8 @@ export function PatternLock({
                 y1={seg.y1}
                 x2={seg.x2}
                 y2={seg.y2}
-                className="stroke-primary stroke-[3.5] stroke-linecap-round"
+                strokeLinecap="round"
+                className="stroke-primary stroke-[3.5]"
                 filter="url(#pattern-glow)"
               />
 
@@ -455,7 +540,9 @@ export function PatternLock({
               y1={DOT_COORDS[currentPath[currentPath.length - 1]].y}
               x2={cursorPos.x}
               y2={cursorPos.y}
-              className="stroke-primary/60 stroke-[3] stroke-dashed stroke-dasharray-[5_5] stroke-linecap-round pointer-events-none"
+              strokeLinecap="round"
+              strokeDasharray="6 6"
+              className="stroke-primary/60 stroke-[3] pointer-events-none"
             />
           )}
 

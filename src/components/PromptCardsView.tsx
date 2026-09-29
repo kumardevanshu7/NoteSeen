@@ -27,6 +27,7 @@ export function PromptCardsView() {
   const trashNote = useNotes((state) => state.trashNote);
   const convertPromptCardToNote = useNotes((state) => state.convertPromptCardToNote);
   const recoverOrphanedPromptCards = useNotes((state) => state.recoverOrphanedPromptCards);
+  const ready = useNotes((state) => state.ready);
   const cloudUserId = useNotes((state) => state.cloudUserId);
   const user = useAuth((state) => state.user);
 
@@ -73,11 +74,11 @@ export function PromptCardsView() {
   };
 
   useEffect(() => {
-    if (autoRecoverDone.current || allCards.length > 0) return;
+    if (!ready || autoRecoverDone.current || allCards.length > 0) return;
     if (!user?.uid && !cloudUserId) return;
     autoRecoverDone.current = true;
     void runRecover(false);
-  }, [allCards.length, user?.uid, cloudUserId]);
+  }, [ready, allCards.length, user?.uid, cloudUserId]);
 
   const viewingLive = viewing ? (notes[viewing.id] ?? null) : null;
 
@@ -164,7 +165,7 @@ export function PromptCardsView() {
             ) : null}
             {!user?.uid && !cloudUserId ? (
               <p className="ns-caption mt-3 max-w-sm text-body-muted">
-                Sign in with Google — your cards are tied to your account and image library on Supabase.
+                Sign in with Google — your cards are tied to your account and image library.
               </p>
             ) : null}
             {!query && !labelFilter ? (
@@ -181,7 +182,7 @@ export function PromptCardsView() {
                     onClick={() => void runRecover(true)}
                   >
                     <RefreshCw className={cn("size-3.5", recovering && "animate-spin")} />
-                    {recovering ? "Checking Supabase…" : "Restore from image library"}
+                    {recovering ? "Checking image library…" : "Restore from image library"}
                   </Button>
                 ) : null}
               </div>
@@ -200,6 +201,8 @@ export function PromptCardsView() {
                     <img
                       src={card.coverUrl}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="block w-full"
                     />
                   ) : (

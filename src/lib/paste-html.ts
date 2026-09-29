@@ -99,6 +99,13 @@ function unwrapElement(el: Element) {
 
 function cleanAttributes(el: Element) {
   const tag = el.tagName;
+  const isSideBySide =
+    el.hasAttribute("data-side-by-side") ||
+    el.classList.contains("ns-side-by-side-card") ||
+    el.classList.contains("ns-side-by-side-media") ||
+    el.classList.contains("ns-side-by-side-content") ||
+    el.classList.contains("ns-side-by-side-img");
+
   const allowed = new Set<string>();
   if (tag === "A") allowed.add("href");
   if (tag === "SPAN") {
@@ -119,6 +126,20 @@ function cleanAttributes(el: Element) {
   if (tag === "TABLE") {
     allowed.add("border");
   }
+  if (isSideBySide) {
+    allowed.add("class");
+    allowed.add("style");
+    allowed.add("data-side-by-side");
+    allowed.add("data-image-src");
+    allowed.add("data-image-alt");
+    allowed.add("data-image-width");
+    allowed.add("data-side-by-side-img");
+    if (tag === "IMG") {
+      allowed.add("src");
+      allowed.add("alt");
+      allowed.add("loading");
+    }
+  }
 
   for (const attr of [...el.attributes]) {
     if (!allowed.has(attr.name.toLowerCase())) el.removeAttribute(attr.name);
@@ -130,6 +151,17 @@ function cleanAttributes(el: Element) {
   }
 }
 
+function isSideBySideElement(el: HTMLElement): boolean {
+  return (
+    el.hasAttribute("data-side-by-side") ||
+    el.classList.contains("ns-side-by-side-card") ||
+    el.classList.contains("ns-side-by-side-media") ||
+    el.classList.contains("ns-side-by-side-content") ||
+    el.classList.contains("ns-side-by-side-img") ||
+    el.hasAttribute("data-side-by-side-img")
+  );
+}
+
 function walk(node: Node) {
   if (node.nodeType === Node.COMMENT_NODE) {
     node.parentNode?.removeChild(node);
@@ -139,15 +171,21 @@ function walk(node: Node) {
 
   const el = node as HTMLElement;
   const tag = el.tagName;
+  const isSideBySide = isSideBySideElement(el);
 
   if (DROP_TAGS.has(tag)) {
-    el.remove();
-    return;
+    // Preserve side-by-side images
+    if (tag === "IMG" && (isSideBySide || el.closest?.(".ns-side-by-side-card"))) {
+      // Keep it
+    } else {
+      el.remove();
+      return;
+    }
   }
 
   for (const child of [...el.childNodes]) walk(child);
 
-  if (UNWRAP_TAGS.has(tag) || !KEEP_TAGS.has(tag)) {
+  if (!isSideBySide && (UNWRAP_TAGS.has(tag) || !KEEP_TAGS.has(tag))) {
     unwrapElement(el);
     return;
   }
@@ -183,9 +221,14 @@ export function sanitizePastedHtml(rawHtml: string, plainFallback = ""): string 
     return plainFallback ? plainTextToHtml(plainFallback.slice(0, MAX_PASTE_CHARS)) : "";
   }
 
-  // Strip data-URLs early — usual crash source from ChatGPT / web clipboards.
-  let html = rawHtml.replace(/src\s*=\s*["']data:[^"']*["']/gi, 'src=""');
-  html = html.replace(/url\(\s*['"]?data:[^)]+\)/gi, "none");
+  // Strip data-URLs early for generic pastes (usual crash source from ChatGPT / web clipboards).
+  // But preserve data URLs if the pasted content is our own side-by-side card.
+  const hasSideBySide = /data-side-by-side|ns-side-by-side/i.test(rawHtml);
+  let html = rawHtml;
+  if (!hasSideBySide) {
+    html = html.replace(/src\s*=\s*["']data:[^"']*["']/gi, 'src=""');
+    html = html.replace(/url\(\s*['"]?data:[^)]+\)/gi, "none");
+  }
 
   let doc: Document;
   try {
