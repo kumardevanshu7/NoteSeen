@@ -920,9 +920,11 @@ body.ns-is-resizing * {
   display: none;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  width: fit-content;
+  max-width: 100%;
+  gap: 0.45rem;
   margin-top: 0.65rem;
-  padding: 0.35rem 0.65rem;
+  padding: 0.35rem 0.55rem;
   border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--hairline);
@@ -948,6 +950,7 @@ body.ns-is-resizing * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.3rem;
   font-size: 11px;
   font-weight: 500;
   padding: 0.2rem 0.45rem;
@@ -957,11 +960,11 @@ body.ns-is-resizing * {
   color: var(--ink);
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .ns-editor .ns-img-align-btn:hover,
-.ns-editor .ns-img-preset-btn:hover,
-.ns-editor .ns-img-download-btn:hover {
+.ns-editor .ns-img-preset-btn:hover {
   background: var(--stone);
   border-color: #3b82f6;
   color: #3b82f6;
@@ -990,12 +993,17 @@ body.ns-is-resizing * {
 }
 
 .ns-editor .ns-img-download-btn {
-  margin-left: auto;
+  color: var(--ink);
+}
+
+.ns-editor .ns-img-download-btn:hover {
+  background: color-mix(in oklab, #3b82f6 15%, transparent);
+  border-color: #3b82f6;
+  color: #3b82f6;
 }
 
 .ns-editor .ns-img-del-btn {
   color: var(--error);
-  margin-left: 2px;
 }
 
 .ns-editor .ns-img-del-btn:hover {

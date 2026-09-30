@@ -215,7 +215,14 @@ export const ResizableImage = Node.create({
       downloadBtn.className = "ns-img-download-btn";
       downloadBtn.setAttribute("title", "Download image");
       downloadBtn.setAttribute("aria-label", "Download image");
-      downloadBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+      downloadBtn.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Download</span>
+      `;
       downloadBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -351,7 +358,11 @@ export const ResizableImage = Node.create({
 
       const onBoxDown = (event: MouseEvent) => {
         const target = event.target as HTMLElement;
-        if (target.closest(".ns-img-edge-handle, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-del-btn")) {
+        if (
+          target.closest(
+            ".ns-img-edge-handle, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-download-btn, .ns-img-del-btn",
+          )
+        ) {
           return;
         }
         selectSelf();
@@ -366,7 +377,9 @@ export const ResizableImage = Node.create({
         stopEvent(event) {
           const target = event.target as HTMLElement;
           return Boolean(
-            target.closest(".ns-img-edge-handle, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-del-btn"),
+            target.closest(
+              ".ns-img-edge-handle, .ns-img-preset-btn, .ns-img-align-btn, .ns-img-download-btn, .ns-img-del-btn",
+            ),
           );
         },
         update(updated) {
